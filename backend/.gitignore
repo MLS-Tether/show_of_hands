@@ -1,8 +1,10 @@
 .env
 __pycache__/
 *.pyc
-venv/
 .venv/
-dist/
-build/
-*.egg-info/
+venv/
+.pytest_cache/
+.DS_Store
+
+# Alembic auto-generated migration files (keep versions/ tracked if desired)
+# alembic/versions/
