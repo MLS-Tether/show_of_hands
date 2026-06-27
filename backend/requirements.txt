@@ -8,6 +8,7 @@ pydantic-settings
 python-jose[cryptography]
 passlib[bcrypt]
 python-dotenv
+python-multipart
 apscheduler
 httpx
 pytest
