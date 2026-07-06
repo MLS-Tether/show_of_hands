@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from db.pool import get_db
 from dependencies import get_current_user, require_role
-from models.enrollment_model import Enrollment, EnrollmentStatusEnum
+from models.enrollment_model import Enrollment
 from models.help_request_model import HelpRequest, HelpRequestAcceptance, HelpRequestStatusEnum
 from models.notification_model import Notification, NotificationTypeEnum
 from models.point_transaction_model import PointTransaction, TransactionSourceEnum
@@ -41,7 +41,6 @@ def _check_section_access(section_id: int, current_user: User, db: Session) -> S
         enrolled = db.query(Enrollment).filter(
             Enrollment.section_id == section_id,
             Enrollment.student_id == current_user.user_id,
-            Enrollment.status == EnrollmentStatusEnum.approved,
             Enrollment.is_archived == False,
         ).first()
         if not enrolled:
@@ -117,7 +116,6 @@ def create_help_request(
     enrolled = db.query(Enrollment).filter(
         Enrollment.section_id == section_id,
         Enrollment.student_id == current_user.user_id,
-        Enrollment.status == EnrollmentStatusEnum.approved,
         Enrollment.is_archived == False,
     ).first()
     if not enrolled:
@@ -167,7 +165,6 @@ def accept_help_request(
     enrolled = db.query(Enrollment).filter(
         Enrollment.section_id == help_request.section_id,
         Enrollment.student_id == current_user.user_id,
-        Enrollment.status == EnrollmentStatusEnum.approved,
         Enrollment.is_archived == False,
     ).first()
     if not enrolled:

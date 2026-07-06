@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.assignment_model import Assignment
-from models.enrollment_model import Enrollment, EnrollmentStatusEnum
+from models.enrollment_model import Enrollment
 from models.notification_model import Notification, NotificationTypeEnum
 from models.section_model import Section
 from models.user_model import User, RoleEnum
@@ -55,7 +55,6 @@ def list_assignments(
         enrolled = db.query(Enrollment).filter(
             Enrollment.section_id == section_id,
             Enrollment.student_id == current_user.user_id,
-            Enrollment.status == EnrollmentStatusEnum.approved,
             Enrollment.is_archived == False,
         ).first()
         if not enrolled:
@@ -93,7 +92,6 @@ def create_assignment(
 
     enrolled_students = db.query(Enrollment).filter(
         Enrollment.section_id == section_id,
-        Enrollment.status == EnrollmentStatusEnum.approved,
         Enrollment.is_archived == False,
     ).all()
 
@@ -122,7 +120,6 @@ def get_assignment(
         enrolled = db.query(Enrollment).filter(
             Enrollment.section_id == assignment.section_id,
             Enrollment.student_id == current_user.user_id,
-            Enrollment.status == EnrollmentStatusEnum.approved,
             Enrollment.is_archived == False,
         ).first()
         if not enrolled:

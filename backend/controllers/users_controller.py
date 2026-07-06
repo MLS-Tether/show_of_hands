@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from db.pool import get_db
 from dependencies import get_current_user, require_role
-from models.enrollment_model import Enrollment, EnrollmentStatusEnum
+from models.enrollment_model import Enrollment
 from models.notification_model import Notification, NotificationTypeEnum
 from models.section_model import Section, SectionStatusEnum
 from models.user_model import User, RoleEnum
@@ -101,7 +101,6 @@ def delete_user(
             section.status = SectionStatusEnum.pending_reassignment
             enrollments = db.query(Enrollment).filter(
                 Enrollment.section_id == section.section_id,
-                Enrollment.status == EnrollmentStatusEnum.approved,
                 Enrollment.is_archived == False,
             ).all()
             for enrollment in enrollments:

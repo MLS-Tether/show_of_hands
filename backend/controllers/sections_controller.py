@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from db.pool import get_db
 from dependencies import get_current_user, require_role
-from models.enrollment_model import Enrollment, EnrollmentStatusEnum
+from models.enrollment_model import Enrollment
 from models.section_model import Section, SectionStatusEnum
 from models.user_model import User, RoleEnum
 from schemas.section import (
@@ -24,7 +24,6 @@ router = APIRouter(prefix="/sections", tags=["sections"])
 def _approved_enrollments(section_id: int, db: Session):
     return db.query(Enrollment).filter(
         Enrollment.section_id == section_id,
-        Enrollment.status == EnrollmentStatusEnum.approved,
         Enrollment.is_archived == False,
     ).all()
 
@@ -128,7 +127,6 @@ def get_section(
         enrolled = db.query(Enrollment).filter(
             Enrollment.section_id == section_id,
             Enrollment.student_id == current_user.user_id,
-            Enrollment.status == EnrollmentStatusEnum.approved,
             Enrollment.is_archived == False,
         ).first()
         if not enrolled:

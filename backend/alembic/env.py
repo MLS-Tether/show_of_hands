@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from db.pool import Base
 
+from auth_utils import RefreshToken
 from models.user_model import User
 from models.school_model import School
 from models.class__model import Class_

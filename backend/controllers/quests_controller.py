@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from db.pool import get_db
 from dependencies import get_current_user, require_role
-from models.enrollment_model import Enrollment, EnrollmentStatusEnum
+from models.enrollment_model import Enrollment
 from models.notification_model import Notification, NotificationTypeEnum
 from models.quest_model import Quest, QuestCategoryEnum, QuestSourceEnum
 from models.section_model import Section
@@ -29,7 +29,6 @@ def _check_section_access(section_id: int, current_user: User, db: Session) -> S
         enrolled = db.query(Enrollment).filter(
             Enrollment.section_id == section_id,
             Enrollment.student_id == current_user.user_id,
-            Enrollment.status == EnrollmentStatusEnum.approved,
             Enrollment.is_archived == False,
         ).first()
         if not enrolled:
@@ -112,7 +111,6 @@ def create_quest(
     else:
         enrolled = db.query(Enrollment).filter(
             Enrollment.section_id == section_id,
-            Enrollment.status == EnrollmentStatusEnum.approved,
             Enrollment.is_archived == False,
         ).all()
         notify_user_ids = [e.student_id for e in enrolled]

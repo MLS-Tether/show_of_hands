@@ -17,7 +17,7 @@ from schemas.enrollment import (
     MessageResponse,
 )
 
-router = APIRouter(prefix="/api", tags=["enrollment-requests"])
+router = APIRouter(tags=["enrollment-requests"])
 
 @router.post(
     "/sections/{section_id}/enrollment-requests",

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.assignment_model import Assignment
-from models.enrollment_model import Enrollment, EnrollmentStatusEnum
+from models.enrollment_model import Enrollment
 from models.point_transaction_model import PointTransaction, TransactionSourceEnum
 from models.section_model import Section
 from models.submission_model import Submission, SubmissionStatusEnum
@@ -72,7 +72,6 @@ def create_submission(
     enrolled = db.query(Enrollment).filter(
         Enrollment.section_id == assignment.section_id,
         Enrollment.student_id == current_user.user_id,
-        Enrollment.status == EnrollmentStatusEnum.approved,
         Enrollment.is_archived == False,
     ).first()
     if not enrolled:

@@ -8,7 +8,7 @@ class School(Base):
     __tablename__ = "schools"
 
     school_id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
+    name = Column(String, nullable=False, unique=True)
     school_code = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
