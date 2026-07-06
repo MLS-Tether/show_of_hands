@@ -1,9 +1,14 @@
+import enum
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-EnrollmentRequestStatus = Literal["pending", "approved", "rejected"]
+
+class EnrollmentStatusEnum(str, enum.Enum):
+    pending = "pending"
+    accepted = "accepted"
+    rejected = "rejected"
+    archived = "archived"
 
 
 class EnrollmentRequestCreateResponse(BaseModel):
@@ -13,7 +18,7 @@ class EnrollmentRequestCreateResponse(BaseModel):
     enrollment_request_id: int
     section_id: int
     student_id: int
-    status: EnrollmentRequestStatus
+    status: EnrollmentStatusEnum
     created_at: datetime
 
 
@@ -24,19 +29,19 @@ class EnrollmentRequestListItem(BaseModel):
     enrollment_request_id: int
     student_id: int
     username: str
-    status: EnrollmentRequestStatus
+    status: EnrollmentStatusEnum
     created_at: datetime
 
 
 class EnrollmentRequestUpdate(BaseModel):
 
-    status: Literal["approved", "rejected"]
+    status: EnrollmentStatusEnum
 
 
 class EnrollmentRequestUpdateResponse(BaseModel):
 
     enrollment_request_id: int
-    status: Literal["approved", "rejected"]
+    status: EnrollmentStatusEnum
 
 
 class MessageResponse(BaseModel):
