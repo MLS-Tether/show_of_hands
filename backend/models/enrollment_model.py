@@ -1,8 +1,17 @@
-from sqlalchemy import Column, Integer, Boolean, TIMESTAMP, ForeignKey, Text, UniqueConstraint
+import enum
+
+from sqlalchemy import Column, Integer, Boolean, TIMESTAMP, ForeignKey, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from db.pool import Base
+
+
+class EnrollmentStatusEnum(str, enum.Enum):
+    pending = "pending"
+    accepted = "accepted"
+    rejected = "rejected"
+    archived = "archived"
 
 
 class Enrollment(Base):
@@ -33,7 +42,7 @@ class EnrollmentRequest(Base):
     section_id = Column(Integer, ForeignKey("sections.section_id", ondelete="CASCADE"), nullable=False)
     student_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
 
-    status = Column(Text, nullable=False, default="pending")  
+    status = Column(Enum(EnrollmentStatusEnum), nullable=False, default=EnrollmentStatusEnum.pending)
 
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

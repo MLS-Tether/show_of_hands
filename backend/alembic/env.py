@@ -13,7 +13,7 @@ from db.pool import Base
 
 from models.user_model import User
 from models.school_model import School
-from models.class__model import Class
+from models.class__model import Class_
 from models.class_request_model import ClassRequest
 from models.section_model import Section
 from models.enrollment_model import Enrollment

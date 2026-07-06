@@ -7,7 +7,7 @@ from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.user_model import User
 from models.section_model import Section
-from models.enrollment_model import Enrollment, EnrollmentRequest
+from models.enrollment_model import Enrollment, EnrollmentRequest, EnrollmentStatusEnum
 from models.notification_model import Notification
 from schemas.enrollment import (
     EnrollmentRequestCreateResponse,
@@ -54,7 +54,7 @@ def create_enrollment_request(
         .filter(
             EnrollmentRequest.section_id == section_id,
             EnrollmentRequest.student_id == current_user.user_id,
-            EnrollmentRequest.status == "pending",
+            EnrollmentRequest.status == EnrollmentStatusEnum.pending,
         )
         .first()
     )
@@ -64,7 +64,7 @@ def create_enrollment_request(
     new_request = EnrollmentRequest(
         section_id=section_id,
         student_id=current_user.user_id,
-        status="pending",
+        status=EnrollmentStatusEnum.pending,
     )
     db.add(new_request)
     db.commit()
@@ -79,7 +79,7 @@ def create_enrollment_request(
 def get_enrollment_requests(
     section_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("teacher", "admin")),
+    current_user: User = Depends(require_role(["teacher", "admin"])),
 ):
     section = db.query(Section).filter(Section.section_id == section_id).first()
     if not section:
@@ -92,7 +92,7 @@ def get_enrollment_requests(
         db.query(EnrollmentRequest)
         .filter(
             EnrollmentRequest.section_id == section_id,
-            EnrollmentRequest.status == "pending",
+            EnrollmentRequest.status == EnrollmentStatusEnum.pending,
         )
         .all()
     )
@@ -133,7 +133,7 @@ def update_enrollment_request(
     request.status = body.status
     request.updated_at = datetime.now(timezone.utc)
 
-    if body.status == "approved":
+    if body.status == EnrollmentStatusEnum.accepted:
         db.add(Enrollment(section_id=request.section_id, student_id=request.student_id))
         db.add(
             Notification(
@@ -142,7 +142,7 @@ def update_enrollment_request(
                 message=f"Your request to join {section.period} was approved.",
             )
         )
-    else:
+    elif body.status == EnrollmentStatusEnum.rejected:
         db.add(
             Notification(
                 user_id=request.student_id,
