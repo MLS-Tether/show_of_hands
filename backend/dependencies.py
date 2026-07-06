@@ -27,3 +27,4 @@ def require_role(allowed_roles: list):
             raise HTTPException(status_code=403, detail="Unauthorized")
         return current_user
     return dependency
+
