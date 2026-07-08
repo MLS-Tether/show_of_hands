@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from db.pool import SessionLocal
-from db.seed import seed_classes
+from db.seed import seed_classes, seed_dev_data
 from models.submission_model import Submission, SubmissionStatusEnum
 from models.notification_model import Notification, NotificationTypeEnum
 
@@ -64,6 +64,7 @@ def check_pending_grades():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     seed_classes()
+    seed_dev_data()
     scheduler.add_job(check_pending_grades, "interval", days=1)
     scheduler.start()
     yield
