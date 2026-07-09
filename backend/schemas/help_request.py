@@ -40,6 +40,7 @@ class HelpRequestStudentResponse(BaseModel):
     current_size: int
     duration_minutes: int
     status: HelpRequestStatusEnum
+    room_id: Optional[int] = None
     created_at: datetime
 
 
@@ -56,6 +57,7 @@ class HelpRequestTeacherResponse(BaseModel):
     duration_minutes: int
     status: HelpRequestStatusEnum
     accepted_by: List[AcceptedByEntry]
+    room_id: Optional[int] = None
     created_at: datetime
 
 

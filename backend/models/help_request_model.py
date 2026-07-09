@@ -34,6 +34,10 @@ class HelpRequest(Base):
     acceptances = relationship("HelpRequestAcceptance", back_populates="help_request")
     study_room = relationship("StudyRoom", back_populates="help_request", uselist=False)
 
+    @property
+    def room_id(self):
+        return self.study_room.room_id if self.study_room else None
+
 
 class HelpRequestAcceptance(Base):
     __tablename__ = "help_request_acceptances"
