@@ -52,6 +52,7 @@ def _build_detail(section: Section, db: Session) -> dict:
         "capacity": section.capacity,
         "enrolled_count": len(approved),
         "status": section.status,
+        "created_at": section.created_at,
         "students": [
             {"user_id": e.student_id, "username": e.student.username}
             for e in approved
@@ -70,15 +71,30 @@ def _build_detail(section: Section, db: Session) -> dict:
 @router.get("", response_model=List[SectionListResponse])
 def list_sections(
     class_id: Optional[int] = None,
+    scope: str = "mine",
     current_user: User = Depends(require_role(["student", "teacher", "admin"])),
     db: Session = Depends(get_db),
 ):
+    if scope not in ("mine", "all"):
+        raise HTTPException(status_code=400, detail="Invalid scope. Must be 'mine' or 'all'.")
+
     query = db.query(Section).filter(
         Section.school_id == current_user.school_id,
         Section.is_archived == False,
     )
     if class_id is not None:
         query = query.filter(Section.class_id == class_id)
+
+    if current_user.role == RoleEnum.student and scope == "mine":
+        enrolled_section_ids = {
+            e.section_id
+            for e in db.query(Enrollment).filter(
+                Enrollment.student_id == current_user.user_id,
+                Enrollment.is_archived == False,
+            ).all()
+        }
+        query = query.filter(Section.section_id.in_(enrolled_section_ids))
+
     return [_build_list_item(s, db) for s in query.all()]
 
 

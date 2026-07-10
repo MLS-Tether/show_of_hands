@@ -8,6 +8,7 @@ from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.enrollment_model import Enrollment
 from models.notification_model import Notification, NotificationTypeEnum
+from models.quest_completion_model import QuestCompletion
 from models.quest_model import Quest, QuestCategoryEnum, QuestSourceEnum
 from models.section_model import Section
 from models.user_model import User, RoleEnum
@@ -60,7 +61,20 @@ def list_quests(
             raise HTTPException(status_code=400, detail=f"Invalid category: {category}")
         query = query.filter(Quest.category == category_enum)
 
-    return query.order_by(Quest.created_at.desc()).all()
+    quests = query.order_by(Quest.created_at.desc()).all()
+
+    if current_user.role == RoleEnum.student:
+        completed_quest_ids = {
+            c.quest_id
+            for c in db.query(QuestCompletion).filter(
+                QuestCompletion.student_id == current_user.user_id,
+                QuestCompletion.quest_id.in_([q.quest_id for q in quests]),
+            ).all()
+        }
+        for quest in quests:
+            quest.completed = quest.quest_id in completed_quest_ids
+
+    return quests
 
 
 @router.post("/sections/{section_id}/quests", response_model=QuestCreateResponse, status_code=201)

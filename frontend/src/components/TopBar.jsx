@@ -1,0 +1,84 @@
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import api from '../api'
+import NotificationBell from './NotificationBell'
+import './TopBar.css'
+
+function TopBar() {
+  const navigate = useNavigate()
+  const [points, setPoints] = useState(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    const userId = localStorage.getItem('user_id')
+    if (!userId) return
+    let cancelled = false
+
+    api
+      .get(`/users/${userId}/points`)
+      .then(({ data }) => {
+        if (!cancelled) setPoints(data.total_points)
+      })
+      .catch(() => {
+        if (!cancelled) setPoints(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function handleClickOutside(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [menuOpen])
+
+  async function handleLogout() {
+    const refreshToken = localStorage.getItem('refresh_token')
+    try {
+      await api.post('/auth/logout', { refresh_token: refreshToken })
+    } catch {
+      // best-effort: still clear local session and redirect below
+    }
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user_id')
+    localStorage.removeItem('role')
+    navigate('/auth')
+  }
+
+  return (
+    <header className="topbar">
+      <div className="topbar-logo">Show of Hands</div>
+      <div className="topbar-actions">
+        <NotificationBell />
+        <span className="topbar-points">{points === null ? '—' : points} pts</span>
+        <div className="topbar-account" ref={menuRef}>
+          <button
+            type="button"
+            className="topbar-avatar"
+            aria-label="Account menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          />
+          {menuOpen && (
+            <div className="topbar-menu" role="menu">
+              <button type="button" role="menuitem" onClick={handleLogout}>
+                Log out
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  )
+}
+
+export default TopBar

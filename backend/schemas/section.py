@@ -80,6 +80,7 @@ class SectionDetailResponse(BaseModel):
     capacity: int
     enrolled_count: int
     status: SectionStatusEnum
+    created_at: datetime
     students: List[UserBrief]
     assignments: List[AssignmentBrief]
     quests: List[QuestBrief]

@@ -1,0 +1,27 @@
+.sidebar {
+  width: 170px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-strong);
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-link {
+  font-size: 14px;
+  color: var(--text);
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+.sidebar-link:hover {
+  background: var(--surface-1);
+}
+
+.sidebar-link.active {
+  background: var(--text-h);
+  color: var(--bg);
+  font-weight: 500;
+}
