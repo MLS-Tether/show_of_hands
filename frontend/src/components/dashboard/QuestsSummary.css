@@ -1,0 +1,31 @@
+.quests-list {
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+}
+
+.quest-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.quest-row:last-child {
+  border-bottom: none;
+}
+
+.quest-title {
+  font-size: 13px;
+  color: var(--text-h);
+}
+
+.quest-category {
+  font-size: 11px;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}

@@ -1,0 +1,27 @@
+.assignments-list {
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+}
+
+.assignment-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.assignment-row:last-child {
+  border-bottom: none;
+}
+
+.assignment-title {
+  font-size: 13px;
+  color: var(--text-h);
+}
+
+.assignment-due {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

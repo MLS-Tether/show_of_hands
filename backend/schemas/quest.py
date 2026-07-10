@@ -49,6 +49,7 @@ class QuestResponse(BaseModel):
     source: QuestSourceEnum
     assigned_to: Union[Literal["all"], int]
     created_at: datetime
+    completed: Optional[bool] = None
 
     @field_validator("assigned_to", mode="before")
     @classmethod
