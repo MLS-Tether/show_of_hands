@@ -1,0 +1,78 @@
+.assignments-page {
+  text-align: left;
+}
+
+.assignments-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: -16px 0 16px;
+}
+
+.assignments-tab {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.assignments-tab:hover {
+  color: var(--text-h);
+}
+
+.assignments-tab.active {
+  color: var(--text-h);
+  border-bottom-color: var(--text-h);
+  font-weight: 500;
+}
+
+.assignments-placeholder {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.assignments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.assignments-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 12px 14px;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.assignments-row:hover {
+  background: var(--surface-1);
+}
+
+.assignments-row-title {
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.assignments-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.assignments-row-points {
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 1px 8px;
+}

@@ -1,22 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../../api'
+import { formatDueDate } from '../../utils/formatDueDate'
 import './AssignmentsSummary.css'
 
-function formatDueDate(dueDateStr) {
-  const due = new Date(dueDateStr)
-  const now = new Date()
-  const dueDay = Date.UTC(due.getFullYear(), due.getMonth(), due.getDate())
-  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
-  const diffDays = Math.round((dueDay - today) / 86400000)
-
-  if (diffDays >= 0 && diffDays < 7) {
-    const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(due)
-    return `due ${weekday.toLowerCase()}`
-  }
-  return `due ${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(due)}`
-}
-
 function AssignmentsSummary({ sections }) {
+  const navigate = useNavigate()
   const [assignments, setAssignments] = useState(null)
 
   useEffect(() => {
@@ -51,10 +40,15 @@ function AssignmentsSummary({ sections }) {
         )}
         {!loading &&
           assignments.map((a) => (
-            <div className="assignment-row" key={a.assignment_id}>
+            <button
+              type="button"
+              className="assignment-row"
+              key={a.assignment_id}
+              onClick={() => navigate(`/assignments/${a.assignment_id}`)}
+            >
               <span className="assignment-title">{a.title}</span>
               <span className="assignment-due">{formatDueDate(a.due_date)}</span>
-            </div>
+            </button>
           ))}
       </div>
     </section>

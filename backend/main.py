@@ -9,6 +9,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from db.pool import SessionLocal
 from db.seed import seed_classes, seed_dev_data
+from models.assignment_model import Assignment
+from models.enrollment_model import Enrollment
 from models.submission_model import Submission, SubmissionStatusEnum
 from models.notification_model import Notification, NotificationTypeEnum
 
@@ -61,11 +63,55 @@ def check_pending_grades():
         db.close()
 
 
+def check_overdue_assignments():
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        overdue_assignments = (
+            db.query(Assignment)
+            .filter(Assignment.due_date < now)
+            .filter(Assignment.is_archived == False)
+            .all()
+        )
+        for assignment in overdue_assignments:
+            enrolled = db.query(Enrollment).filter(
+                Enrollment.section_id == assignment.section_id,
+                Enrollment.is_archived == False,
+            ).all()
+            for enrollment in enrolled:
+                submitted = db.query(Submission).filter(
+                    Submission.assignment_id == assignment.assignment_id,
+                    Submission.student_id == enrollment.student_id,
+                    Submission.is_archived == False,
+                ).first()
+                if submitted:
+                    continue
+
+                already_notified = db.query(Notification).filter(
+                    Notification.user_id == enrollment.student_id,
+                    Notification.assignment_id == assignment.assignment_id,
+                    Notification.type == NotificationTypeEnum.assignment_overdue,
+                ).first()
+                if already_notified:
+                    continue
+
+                db.add(Notification(
+                    user_id=enrollment.student_id,
+                    type=NotificationTypeEnum.assignment_overdue,
+                    assignment_id=assignment.assignment_id,
+                    message=f"Assignment '{assignment.title}' is overdue.",
+                ))
+        db.commit()
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     seed_classes()
     seed_dev_data()
     scheduler.add_job(check_pending_grades, "interval", days=1)
+    scheduler.add_job(check_overdue_assignments, "interval", days=1)
     scheduler.start()
     yield
     scheduler.shutdown()

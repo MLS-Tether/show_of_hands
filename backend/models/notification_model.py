@@ -15,6 +15,7 @@ class NotificationTypeEnum(str, enum.Enum):
     class_request_approved = "class_request_approved"
     class_request_rejected = "class_request_rejected"
     grade_finalization_reminder = "grade_finalization_reminder"
+    assignment_overdue = "assignment_overdue"
 
 
 class Notification(Base):
@@ -25,6 +26,7 @@ class Notification(Base):
     type = Column(Enum(NotificationTypeEnum), nullable=False)
     message = Column(Text, nullable=False)
     is_read = Column(Boolean, nullable=False, default=False)
+    assignment_id = Column(Integer, ForeignKey("assignments.assignment_id"), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="notifications")

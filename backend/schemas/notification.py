@@ -1,5 +1,6 @@
 import enum
 from datetime import datetime
+from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 
@@ -13,6 +14,7 @@ class NotificationTypeEnum(str, enum.Enum):
     class_request_approved = "class_request_approved"
     class_request_rejected = "class_request_rejected"
     grade_finalization_reminder = "grade_finalization_reminder"
+    assignment_overdue = "assignment_overdue"
 
 
 class NotificationResponse(BaseModel):
@@ -22,6 +24,7 @@ class NotificationResponse(BaseModel):
     type: NotificationTypeEnum
     message: str
     is_read: bool
+    assignment_id: Optional[int] = None
     created_at: datetime
 
 
