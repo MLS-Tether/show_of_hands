@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Modal from './Modal'
 import api from '../api'
 import './NotificationBell.css'
 
@@ -11,9 +12,15 @@ function formatTimestamp(dateStr) {
   }).format(new Date(dateStr))
 }
 
+function typeLabel(type) {
+  const words = type.split('_')
+  return words[0][0].toUpperCase() + words[0].slice(1) + ' ' + words.slice(1).join(' ')
+}
+
 function NotificationBell() {
   const [notifications, setNotifications] = useState(null)
   const [open, setOpen] = useState(false)
+  const [selectedNotification, setSelectedNotification] = useState(null)
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -65,6 +72,12 @@ function NotificationBell() {
     }
   }
 
+  function handleRowClick(notification) {
+    if (!notification.is_read) markRead(notification.notification_id)
+    setOpen(false)
+    setSelectedNotification(notification)
+  }
+
   return (
     <div className="notification-bell" ref={menuRef}>
       <button
@@ -99,7 +112,7 @@ function NotificationBell() {
                   type="button"
                   key={n.notification_id}
                   className={`notification-row${n.is_read ? '' : ' unread'}`}
-                  onClick={() => markRead(n.notification_id)}
+                  onClick={() => handleRowClick(n)}
                 >
                   <span className="notification-message">{n.message}</span>
                   <span className="notification-time">{formatTimestamp(n.created_at)}</span>
@@ -107,6 +120,16 @@ function NotificationBell() {
               ))}
           </div>
         </div>
+      )}
+
+      {selectedNotification && (
+        <Modal onClose={() => setSelectedNotification(null)}>
+          <div className="notification-modal-type">{typeLabel(selectedNotification.type)}</div>
+          <p className="notification-modal-message">{selectedNotification.message}</p>
+          <div className="notification-modal-time">
+            {formatTimestamp(selectedNotification.created_at)}
+          </div>
+        </Modal>
       )}
     </div>
   )

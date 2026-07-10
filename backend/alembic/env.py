@@ -36,6 +36,14 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# Always target the same database the running app uses (db/pool.py reads
+# DATABASE_URL the same way) instead of the static url in alembic.ini.
+from dotenv import load_dotenv
+load_dotenv()
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
+
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

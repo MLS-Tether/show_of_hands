@@ -114,3 +114,20 @@
   font-size: 11px;
   color: var(--text-muted);
 }
+
+.notification-modal-type {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.notification-modal-message {
+  font-size: 16px;
+  color: var(--text-h);
+  margin-bottom: 14px;
+}
+
+.notification-modal-time {
+  font-size: 12px;
+  color: var(--text-muted);
+}
