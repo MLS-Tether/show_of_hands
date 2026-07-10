@@ -240,3 +240,30 @@ def finalize_submission(
     db.commit()
     db.refresh(submission)
     return submission
+
+@router.get("/assignments/{assignment_id}/my-submission", response_model=SubmissionResponse)
+def get_my_submission(
+    assignment_id: int,
+    current_user: User = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    assignment = _get_assignment_or_404(assignment_id, db)
+
+    enrolled = db.query(Enrollment).filter(
+        Enrollment.section_id == assignment.section_id,
+        Enrollment.student_id == current_user.user_id,
+        Enrollment.status == EnrollmentStatusEnum.approved,
+        Enrollment.is_archived == False,
+    ).first()
+    if not enrolled:
+        raise HTTPException(status_code=403, detail="Not enrolled in this section.")
+
+    submission = db.query(Submission).filter(
+        Submission.assignment_id == assignment_id,
+        Submission.student_id == current_user.user_id,
+        Submission.is_archived == False,
+    ).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="No submission found.")
+
+    return submission
