@@ -8,6 +8,7 @@ import AssignmentDetail from './pages/AssignmentDetail'
 import Quests from './pages/Quests'
 import BulletinBoard from './pages/BulletinBoard'
 import StudyRooms from './pages/StudyRooms'
+import RoomDetail from './pages/RoomDetail'
 import Points from './pages/Points'
 import Auth from './pages/Auth'
 import './App.css'
@@ -31,6 +32,7 @@ function App() {
         <Route path="/quests" element={<Quests />} />
         <Route path="/bulletin-board" element={<BulletinBoard />} />
         <Route path="/study-rooms" element={<StudyRooms />} />
+        <Route path="/rooms/:roomId" element={<RoomDetail />} />
         <Route path="/points" element={<Points />} />
       </Route>
     </Routes>
