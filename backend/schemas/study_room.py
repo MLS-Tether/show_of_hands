@@ -21,6 +21,7 @@ class StudyRoomResponse(BaseModel):
 
     room_id: int
     help_request_id: int
+    requester_id: int
     members: List[RoomMemberBrief]
     timer_ends_at: datetime
     status: StudyRoomStatusEnum

@@ -39,6 +39,7 @@ def _build_room_response(room: StudyRoom) -> dict:
     return {
         "room_id": room.room_id,
         "help_request_id": room.help_request_id,
+        "requester_id": room.help_request.requester_id,
         "members": [
             {"user_id": m.user_id, "username": m.user.username}
             for m in room.members

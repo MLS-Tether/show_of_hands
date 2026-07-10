@@ -71,6 +71,7 @@ def _build_teacher_response(hr: HelpRequest) -> HelpRequestTeacherResponse:
             )
             for a in hr.acceptances
         ],
+        room_id=hr.room_id,
         created_at=hr.created_at,
     )
 
