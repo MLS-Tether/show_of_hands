@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from auth_utils import decode_token
 from db.pool import get_db, SessionLocal
 from dependencies import get_current_user
+from models.help_request_model import HelpRequestStatusEnum
 from models.study_room_model import StudyRoom, RoomMember, StudyRoomStatusEnum
 from models.user_model import User, RoleEnum
 from schemas.study_room import StudyRoomResponse, StudyRoomExtendResponse
@@ -166,6 +167,16 @@ async def leave_room(
         room.status = StudyRoomStatusEnum.closed
         db.commit()
         await _close_room_connections(room_id, requester_id=room.help_request.requester_id)
+
+    # Keep the help request's participant count in sync with who's actually left in the room,
+    # reopen it if it's no longer full, and close it out once nobody remains.
+    help_request = room.help_request
+    help_request.current_size = remaining
+    if remaining == 0:
+        help_request.status = HelpRequestStatusEnum.closed
+    elif remaining < help_request.group_size and help_request.status == HelpRequestStatusEnum.active:
+        help_request.status = HelpRequestStatusEnum.open
+    db.commit()
 
     return {"message": "Left the room."}
 

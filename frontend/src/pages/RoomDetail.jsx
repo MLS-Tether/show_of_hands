@@ -182,23 +182,21 @@ function RoomDetail() {
 
       {actionError && <p className="room-detail-error">{actionError}</p>}
 
-      {room.status === 'active' && (
-        <div className="room-detail-controls">
-          {isRequester && (
-            <>
-              <button type="button" onClick={handleExtend}>
-                +10 min
-              </button>
-              <button type="button" onClick={handleClose}>
-                Close room
-              </button>
-            </>
-          )}
-          <button type="button" onClick={handleLeave}>
-            Leave room
-          </button>
-        </div>
-      )}
+      <div className="room-detail-controls">
+        {isRequester && room.status === 'active' && (
+          <>
+            <button type="button" onClick={handleExtend}>
+              +10 min
+            </button>
+            <button type="button" onClick={handleClose}>
+              Close room
+            </button>
+          </>
+        )}
+        <button type="button" onClick={handleLeave}>
+          Leave room
+        </button>
+      </div>
 
       {confirmPending && (
         <div className="room-detail-confirm">
