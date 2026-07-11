@@ -150,6 +150,55 @@ def test_accept_help_request_already_full(client, world, cleanup):
     assert resp.status_code == 409
 
 
+def test_leave_then_rejoin_help_request(client, world, cleanup):
+    classmate_id, classmate_token = _enroll_new_student(client, world, cleanup)
+    second_id, second_token = _enroll_new_student(client, world, cleanup)
+
+    resp = client.post(
+        f"/api/sections/{world.section_id}/help-requests",
+        json={"topic": "Need help", "group_size": 3, "duration_minutes": 30},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 201, resp.text
+    hr_id = resp.json()["help_request_id"]
+    cleanup(HelpRequest, hr_id)
+
+    resp = client.post(f"/api/help-requests/{hr_id}/accept", headers=auth_header(classmate_token))
+    assert resp.status_code == 200, resp.text
+    room_id = resp.json()["room_id"]
+    cleanup(StudyRoom, room_id)
+    cleanup(RoomMember, room_id=room_id, user_id=world.student_id)
+    cleanup(RoomMember, room_id=room_id, user_id=classmate_id)
+    cleanup(RoomMember, room_id=room_id, user_id=second_id)
+    cleanup(HelpRequestAcceptance, help_request_id=hr_id, user_id=classmate_id)
+    cleanup(HelpRequestAcceptance, help_request_id=hr_id, user_id=second_id)
+
+    resp = client.post(f"/api/help-requests/{hr_id}/accept", headers=auth_header(second_token))
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "active"
+
+    # Classmate leaves — group drops below capacity, request reopens, room stays active.
+    resp = client.post(f"/api/rooms/{room_id}/leave", headers=auth_header(classmate_token))
+    assert resp.status_code == 200, resp.text
+
+    resp = client.get(f"/api/rooms/{room_id}", headers=auth_header(second_token))
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "active"
+    member_ids = {m["user_id"] for m in resp.json()["members"]}
+    assert classmate_id not in member_ids
+
+    # Rejoin: previously-accepted-but-departed member can come back without
+    # a duplicate acceptance record or a 409 "already accepted" error.
+    resp = client.post(f"/api/help-requests/{hr_id}/accept", headers=auth_header(classmate_token))
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "active"
+
+    resp = client.get(f"/api/rooms/{room_id}", headers=auth_header(second_token))
+    assert resp.status_code == 200, resp.text
+    member_ids = {m["user_id"] for m in resp.json()["members"]}
+    assert member_ids == {world.student_id, classmate_id, second_id}
+
+
 def test_drop_help_request_requester_only(client, world, cleanup):
     resp = client.post(
         f"/api/sections/{world.section_id}/help-requests",

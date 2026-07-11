@@ -175,14 +175,6 @@ def accept_help_request(
         HelpRequestAcceptance.help_request_id == help_request_id,
         HelpRequestAcceptance.user_id == current_user.user_id,
     ).first()
-    if already_accepted:
-        raise HTTPException(status_code=409, detail="Already accepted this help request.")
-
-    db.add(HelpRequestAcceptance(
-        help_request_id=help_request_id,
-        user_id=current_user.user_id,
-    ))
-    help_request.current_size += 1
 
     # Create study room on first acceptance; add members on subsequent accepts
     if help_request.study_room is None:
@@ -196,8 +188,26 @@ def accept_help_request(
     else:
         room = help_request.study_room
 
-    db.add(RoomMember(room_id=room.room_id, user_id=current_user.user_id))
+    existing_member = db.query(RoomMember).filter(
+        RoomMember.room_id == room.room_id,
+        RoomMember.user_id == current_user.user_id,
+    ).first()
+    if existing_member:
+        raise HTTPException(status_code=409, detail="Already a member of this room.")
 
+    # A student who accepted before and later left has an existing acceptance
+    # record but no room membership — let them rejoin without recording a
+    # second acceptance (points/history already reflect their original accept).
+    if not already_accepted:
+        db.add(HelpRequestAcceptance(
+            help_request_id=help_request_id,
+            user_id=current_user.user_id,
+        ))
+
+    db.add(RoomMember(room_id=room.room_id, user_id=current_user.user_id))
+    db.flush()
+
+    help_request.current_size = db.query(RoomMember).filter(RoomMember.room_id == room.room_id).count()
     if help_request.current_size >= help_request.group_size:
         help_request.status = HelpRequestStatusEnum.active
 

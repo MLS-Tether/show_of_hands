@@ -73,6 +73,12 @@ function RoomDetail() {
         setConfirmPending(true)
         return
       }
+      if (data.type === 'room_deleted') {
+        forgetRoom(Number(roomId))
+        window.alert('This room was deleted by its creator.')
+        navigate('/study-rooms')
+        return
+      }
       setMessages((prev) => [...prev, data])
     }
 
@@ -127,7 +133,11 @@ function RoomDetail() {
   }
 
   async function handleDelete() {
-    if (!window.confirm('Delete this room? This cannot be undone.')) return
+    const warning =
+      room.status === 'active'
+        ? 'Delete this room? Everyone still connected will be disconnected immediately. This cannot be undone.'
+        : 'Delete this room? This cannot be undone.'
+    if (!window.confirm(warning)) return
     setActionError('')
     try {
       await api.delete(`/rooms/${roomId}`)
@@ -205,7 +215,7 @@ function RoomDetail() {
             </button>
           </>
         )}
-        {isRequester && room.status === 'closed' && (
+        {isRequester && (
           <button type="button" onClick={handleDelete}>
             Delete room
           </button>

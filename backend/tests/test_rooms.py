@@ -106,3 +106,34 @@ def test_close_room(client, world, cleanup):
 
     resp = client.post(f"/api/rooms/{room_id}/close", headers=auth_header(world.student_token))
     assert resp.status_code == 409
+
+
+def test_delete_room_requester_only(client, world, cleanup):
+    hr_id, room_id, classmate_id, classmate_token = _new_room(client, world, cleanup)
+
+    resp = client.delete(f"/api/rooms/{room_id}", headers=auth_header(classmate_token))
+    assert resp.status_code == 403
+
+    resp = client.delete(f"/api/rooms/{room_id}", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+
+    # Room is gone entirely, not just closed.
+    resp = client.get(f"/api/rooms/{room_id}", headers=auth_header(world.student_token))
+    assert resp.status_code == 404
+
+    resp = client.get(
+        f"/api/sections/{world.section_id}/help-requests",
+        headers=auth_header(world.teacher_token),
+    )
+    hr = [r for r in resp.json() if r["help_request_id"] == hr_id][0]
+    assert hr["status"] == "closed"
+
+
+def test_delete_room_allowed_while_active(client, world, cleanup):
+    hr_id, room_id, classmate_id, classmate_token = _new_room(client, world, cleanup)
+
+    resp = client.get(f"/api/rooms/{room_id}", headers=auth_header(world.student_token))
+    assert resp.json()["status"] == "active"
+
+    resp = client.delete(f"/api/rooms/{room_id}", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text

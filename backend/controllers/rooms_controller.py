@@ -55,14 +55,26 @@ def _build_room_response(room: StudyRoom) -> dict:
     }
 
 
-async def _close_room_connections(room_id: int, requester_id: Optional[int] = None):
-    """Send session confirmation prompt to requester, then disconnect all WS connections."""
+async def _close_room_connections(
+    room_id: int,
+    requester_id: Optional[int] = None,
+    notify_type: Optional[str] = None,
+):
+    """Disconnect all WS connections for a room. If requester_id is given, that
+    connection first gets a session-confirmation prompt. If notify_type is given,
+    every connection first gets a {"type": notify_type} message (e.g. room deletion)."""
     room_messages.pop(room_id, None)
 
     if room_id not in room_registry:
         return
 
-    if requester_id and requester_id in room_registry[room_id]:
+    if notify_type:
+        for ws in list(room_registry[room_id].values()):
+            try:
+                await ws.send_json({"type": notify_type})
+            except Exception:
+                pass
+    elif requester_id and requester_id in room_registry[room_id]:
         try:
             await room_registry[room_id][requester_id].send_json({
                 "type": "session_confirmation_required",
@@ -226,7 +238,7 @@ async def close_room(
 
 
 @router.delete("/{room_id}")
-def delete_room(
+async def delete_room(
     room_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -234,8 +246,14 @@ def delete_room(
     room = _get_room_or_404(room_id, db)
     _require_requester(room, current_user.user_id)
 
-    if room.status != StudyRoomStatusEnum.closed:
-        raise HTTPException(status_code=409, detail="Only a closed room can be deleted.")
+    # The requester has full autonomy to delete the room at any time, active or
+    # closed — this is a hard teardown, not the graceful /close flow, so there's
+    # no session-confirmation prompt: just notify everyone and disconnect them.
+    await _close_room_connections(room_id, notify_type="room_deleted")
+
+    help_request = room.help_request
+    if help_request.status != HelpRequestStatusEnum.closed:
+        help_request.status = HelpRequestStatusEnum.closed
 
     db.query(RoomMember).filter(RoomMember.room_id == room_id).delete()
     db.delete(room)
