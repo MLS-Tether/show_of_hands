@@ -10,8 +10,15 @@ from sqlalchemy import text
 from db.pool import DATABASE_URL
 
 CHANNEL_NAME = "room_chat_channel"
+NOTIFICATION_CHANNEL_NAME = "user_notifications_channel"
 
 broadcast_queue: asyncio.Queue = asyncio.Queue()
+notification_queue: asyncio.Queue = asyncio.Queue()
+
+_QUEUE_BY_CHANNEL = {
+    CHANNEL_NAME: broadcast_queue,
+    NOTIFICATION_CHANNEL_NAME: notification_queue,
+}
 
 _stop_event = threading.Event()
 _listener_thread: Optional[threading.Thread] = None
@@ -19,14 +26,16 @@ _listener_thread: Optional[threading.Thread] = None
 
 def _listen_loop(loop: asyncio.AbstractEventLoop):
     """Runs in a background thread. Blocks waiting for Postgres NOTIFY events
-    and hands each payload off to the asyncio event loop via a thread-safe call."""
+    on any registered channel and hands each payload off to that channel's
+    asyncio queue via a thread-safe call."""
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL is not set")
 
     conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = True
     cur = conn.cursor()
-    cur.execute(f"LISTEN {CHANNEL_NAME};")
+    for channel in _QUEUE_BY_CHANNEL:
+        cur.execute(f"LISTEN {channel};")
 
     try:
         while not _stop_event.is_set():
@@ -35,7 +44,9 @@ def _listen_loop(loop: asyncio.AbstractEventLoop):
             conn.poll()
             while conn.notifies:
                 notify = conn.notifies.pop(0)
-                loop.call_soon_threadsafe(broadcast_queue.put_nowait, notify.payload)
+                queue = _QUEUE_BY_CHANNEL.get(notify.channel)
+                if queue is not None:
+                    loop.call_soon_threadsafe(queue.put_nowait, notify.payload)
     finally:
         cur.close()
         conn.close()

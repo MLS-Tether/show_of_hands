@@ -4,6 +4,7 @@ import api from '../api'
 import { useDialog } from '../components/DialogProvider'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
+import { authToken, wsBaseUrl } from '../utils/ws'
 import './RoomDetail.css'
 
 function formatCountdown(ms) {
@@ -15,9 +16,7 @@ function formatCountdown(ms) {
 }
 
 function wsUrlFor(roomId) {
-  const wsBase = api.defaults.baseURL.replace(/^http/, 'ws')
-  const token = localStorage.getItem('access_token')
-  return `${wsBase}/rooms/${roomId}/chat?token=${encodeURIComponent(token)}`
+  return `${wsBaseUrl()}/rooms/${roomId}/chat?token=${encodeURIComponent(authToken())}`
 }
 
 function RoomDetail() {
@@ -59,7 +58,10 @@ function RoomDetail() {
   }, [roomId])
 
   useEffect(() => loadRoom(), [loadRoom])
-  useAutoRefresh(loadRoom)
+  // Kicks/leaves/status changes from other members aren't pushed in real
+  // time (only chat is) — keep this one on a shorter interval than the app
+  // default so room state doesn't feel stale for minutes at a time.
+  useAutoRefresh(loadRoom, 20000)
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)

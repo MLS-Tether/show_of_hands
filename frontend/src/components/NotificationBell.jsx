@@ -4,10 +4,19 @@ import ToastStack from './ToastStack'
 import api from '../api'
 import { broadcastRefresh, useAutoRefresh } from '../utils/autoRefresh'
 import { playNotificationChime } from '../utils/notificationSound'
+import { authToken, wsBaseUrl } from '../utils/ws'
 import './NotificationBell.css'
 
-const POLL_INTERVAL_MS = 8000
+// Real-time push does the heavy lifting now (a Postgres trigger fires on
+// every notification insert, relayed over this WebSocket) — this is just a
+// rare safety net in case the socket was disconnected and missed something.
+const FALLBACK_POLL_INTERVAL_MS = 180000
 const TOAST_DURATION_MS = 6000
+const RECONNECT_DELAY_MS = 3000
+
+function wsUrl() {
+  return `${wsBaseUrl()}/notifications/stream?token=${encodeURIComponent(authToken())}`
+}
 
 function formatTimestamp(dateStr) {
   return new Intl.DateTimeFormat('en-US', {
@@ -29,11 +38,32 @@ function NotificationBell() {
   const [selectedNotification, setSelectedNotification] = useState(null)
   const [toasts, setToasts] = useState([])
   const menuRef = useRef(null)
-  const seenIdsRef = useRef(null)
+  const seenIdsRef = useRef(new Set())
+  const wsRef = useRef(null)
+  const reconnectTimerRef = useRef(null)
 
   const dismissToast = useCallback((toastId) => {
     setToasts((prev) => prev.filter((t) => t.id !== toastId))
   }, [])
+
+  // Handles a notification arriving from either the live WebSocket push or
+  // the fallback poll catching something the socket missed — same treatment
+  // either way: surface a toast + chime and tell every open page to refresh.
+  const showIncoming = useCallback(
+    (notification) => {
+      if (seenIdsRef.current.has(notification.notification_id)) return
+      seenIdsRef.current.add(notification.notification_id)
+
+      setNotifications((prev) => [notification, ...(prev || [])])
+      broadcastRefresh()
+      playNotificationChime()
+      setToasts((prev) => [...prev, { id: notification.notification_id, message: notification.message }])
+      setTimeout(() => dismissToast(notification.notification_id), TOAST_DURATION_MS)
+    },
+    [dismissToast]
+  )
+
+  const hasLoadedRef = useRef(false)
 
   const load = useCallback(() => {
     let cancelled = false
@@ -41,25 +71,23 @@ function NotificationBell() {
       .get('/notifications')
       .then(({ data }) => {
         if (cancelled) return
-        const isFirstLoad = seenIdsRef.current === null
-        const newOnes = isFirstLoad ? [] : data.filter((n) => !seenIdsRef.current.has(n.notification_id))
-        seenIdsRef.current = new Set(data.map((n) => n.notification_id))
-        setNotifications(data)
+        const isFirstLoad = !hasLoadedRef.current
+        hasLoadedRef.current = true
+        data.forEach((n) => seenIdsRef.current.add(n.notification_id))
 
-        if (newOnes.length > 0) {
-          // A new notification means something changed elsewhere (a request
-          // accepted, an assignment graded, etc.) — reload every open page's
-          // data instead of leaving the user to notice the badge and refresh,
-          // and surface it immediately as a toast + chime rather than making
-          // the student notice the badge on their own.
-          broadcastRefresh()
-          playNotificationChime()
-          const newToasts = newOnes.map((n) => ({ id: n.notification_id, message: n.message }))
-          setToasts((prev) => [...prev, ...newToasts])
-          newToasts.forEach((t) => {
-            setTimeout(() => dismissToast(t.id), TOAST_DURATION_MS)
-          })
+        if (isFirstLoad) {
+          setNotifications(data)
+          return
         }
+
+        // Merge rather than replace: a WS push may have already added a
+        // notification locally that this fallback fetch also just returned.
+        setNotifications((prev) => {
+          const existingIds = new Set((prev || []).map((n) => n.notification_id))
+          const missed = data.filter((n) => !existingIds.has(n.notification_id))
+          if (missed.length === 0) return prev
+          return [...missed, ...(prev || [])]
+        })
       })
       .catch(() => {
         if (!cancelled) setNotifications((prev) => prev ?? [])
@@ -67,10 +95,40 @@ function NotificationBell() {
     return () => {
       cancelled = true
     }
-  }, [dismissToast])
+  }, [])
 
   useEffect(() => load(), [load])
-  useAutoRefresh(load, POLL_INTERVAL_MS)
+  useAutoRefresh(load, FALLBACK_POLL_INTERVAL_MS)
+
+  useEffect(() => {
+    let unmounted = false
+
+    function connect() {
+      const ws = new WebSocket(wsUrl())
+      wsRef.current = ws
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+        if (data.type === 'new_notification') {
+          showIncoming(data.notification)
+        }
+      }
+
+      ws.onclose = () => {
+        if (unmounted) return
+        reconnectTimerRef.current = setTimeout(connect, RECONNECT_DELAY_MS)
+      }
+    }
+
+    connect()
+
+    return () => {
+      unmounted = true
+      clearTimeout(reconnectTimerRef.current)
+      wsRef.current?.close()
+      wsRef.current = null
+    }
+  }, [showIncoming])
 
   useEffect(() => {
     if (!open) return

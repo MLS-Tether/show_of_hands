@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react'
 
 const REFRESH_EVENT = 'sh:refresh'
-const DEFAULT_INTERVAL_MS = 15000
+// Real-time push (notifications WebSocket -> broadcastRefresh) handles the
+// instant updates now, so this interval is just a rare safety net for missed
+// pushes — not the primary way pages stay fresh. Keep it long.
+const DEFAULT_INTERVAL_MS = 180000
 
 // Fired whenever new content is known to exist (e.g. a new notification
 // arrived) so every mounted page can refetch immediately instead of waiting

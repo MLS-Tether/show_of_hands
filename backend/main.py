@@ -29,7 +29,10 @@ from controllers.quest_completions_controller import router as quest_completions
 from controllers.points_controller import router as points_router
 from controllers.help_requests_controller import router as help_requests_router
 from controllers.rooms_controller import router as rooms_router, room_registry
-from controllers.notifications_controller import router as notifications_router
+from controllers.notifications_controller import (
+    router as notifications_router,
+    deliver_notifications,
+)
 from controllers.users_controller import router as users_router
 
 scheduler = BackgroundScheduler()
@@ -119,10 +122,12 @@ async def lifespan(app: FastAPI):
     loop = asyncio.get_event_loop()
     start_listener(loop)
     delivery_task = asyncio.create_task(deliver_loop(room_registry))
+    notifications_task = asyncio.create_task(deliver_notifications())
 
     yield
 
     delivery_task.cancel()
+    notifications_task.cancel()
     stop_listener()
     scheduler.shutdown()
 
