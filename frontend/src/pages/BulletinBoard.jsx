@@ -100,6 +100,20 @@ function BulletinBoard() {
   const [sections, setSections] = useState(null)
   const [requests, setRequests] = useState(null)
   const [joiningId, setJoiningId] = useState(null)
+  const [refreshTick, setRefreshTick] = useState(0)
+
+  useEffect(() => {
+    function handleRefresh() {
+      if (document.visibilityState !== 'visible') return
+      setRefreshTick((t) => t + 1)
+    }
+    window.addEventListener('focus', handleRefresh)
+    document.addEventListener('visibilitychange', handleRefresh)
+    return () => {
+      window.removeEventListener('focus', handleRefresh)
+      document.removeEventListener('visibilitychange', handleRefresh)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -114,7 +128,7 @@ function BulletinBoard() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [refreshTick])
 
   useEffect(() => {
     if (!sections) return
