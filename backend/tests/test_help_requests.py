@@ -3,6 +3,7 @@ from db.pool import SessionLocal
 from models.user_model import User
 from models.enrollment_model import Enrollment, EnrollmentRequest
 from models.help_request_model import HelpRequest, HelpRequestAcceptance
+from models.notification_model import Notification, NotificationTypeEnum
 from models.study_room_model import StudyRoom, RoomMember
 from tests.conftest import unique, auth_header
 
@@ -60,6 +61,61 @@ def test_create_help_request(client, world, cleanup):
     assert body["status"] == "open"
     assert body["current_size"] == 1
     cleanup(HelpRequest, body["help_request_id"])
+
+
+def test_list_my_help_requests_across_sections(client, world, cleanup):
+    resp = client.post(
+        f"/api/sections/{world.section_id}/help-requests",
+        json={"topic": "Aggregate endpoint test", "group_size": 2, "duration_minutes": 30},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 201, resp.text
+    hr_id = resp.json()["help_request_id"]
+    cleanup(HelpRequest, hr_id)
+
+    resp = client.get("/api/help-requests", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+    mine = [r for r in resp.json() if r["help_request_id"] == hr_id][0]
+    assert mine["section_id"] == world.section_id
+    assert mine["section_name"]
+    assert mine["topic"] == "Aggregate endpoint test"
+    assert "requester_id" not in mine
+
+    resp = client.get("/api/help-requests", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 403
+
+
+def test_create_help_request_notifies_classmates_not_requester(client, world, cleanup):
+    classmate_id, classmate_token = _enroll_new_student(client, world, cleanup)
+
+    resp = client.post(
+        f"/api/sections/{world.section_id}/help-requests",
+        json={"topic": "Need help with recursion", "group_size": 2, "duration_minutes": 30},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 201, resp.text
+    hr_id = resp.json()["help_request_id"]
+    cleanup(HelpRequest, hr_id)
+
+    db = SessionLocal()
+    classmate_notifications = db.query(Notification).filter(
+        Notification.user_id == classmate_id,
+        Notification.type == NotificationTypeEnum.new_help_request,
+    ).all()
+    assert len(classmate_notifications) == 1
+    assert "Need help with recursion" in classmate_notifications[0].message
+    cleanup(Notification, classmate_notifications[0].notification_id)
+
+    requester_notifications = db.query(Notification).filter(
+        Notification.user_id == world.student_id,
+        Notification.type == NotificationTypeEnum.new_help_request,
+    ).all()
+    assert requester_notifications == []
+    db.close()
+
+    resp = client.get("/api/notifications", headers=auth_header(classmate_token))
+    assert resp.status_code == 200, resp.text
+    assert any(n["message"] == "New help request posted: Need help with recursion" for n in resp.json())
 
 
 def test_list_help_requests_student_vs_teacher_shape(client, world, cleanup):

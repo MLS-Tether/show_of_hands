@@ -68,6 +68,20 @@ class HelpRequestTeacherResponse(BaseModel):
     created_at: datetime
 
 
+class HelpRequestBoardResponse(BaseModel):
+    help_request_id: int
+    section_id: int
+    section_name: str
+    topic: str
+    description: Optional[str]
+    group_size: int
+    current_size: int
+    duration_minutes: int
+    status: HelpRequestStatusEnum
+    room_id: Optional[int] = None
+    created_at: datetime
+
+
 class HelpRequestAcceptResponse(BaseModel):
     help_request_id: int
     status: HelpRequestStatusEnum

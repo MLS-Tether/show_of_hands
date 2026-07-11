@@ -6,31 +6,27 @@ import { useAutoRefresh } from '../../utils/autoRefresh'
 import { getMyHelpRequestIds, rememberRoom } from '../../utils/roomTracking'
 import './HelpRequestsSummary.css'
 
-function HelpRequestsSummary({ sections }) {
+function HelpRequestsSummary() {
   const navigate = useNavigate()
   const { alert } = useDialog()
   const [requests, setRequests] = useState(null)
   const [joiningId, setJoiningId] = useState(null)
 
   const load = useCallback(() => {
-    if (!sections) return undefined
     let cancelled = false
-    Promise.allSettled(
-      sections.map((s) => api.get(`/sections/${s.section_id}/help-requests`))
-    ).then((results) => {
-      if (cancelled) return
-      const merged = results
-        .flatMap((r, i) => {
-          if (r.status !== 'fulfilled') return []
-          return r.value.data.map((hr) => ({ ...hr, section_id: sections[i].section_id }))
-        })
-        .filter((h) => h.status === 'open')
-      setRequests(merged)
-    })
+    api
+      .get('/help-requests')
+      .then(({ data }) => {
+        if (cancelled) return
+        setRequests(data.filter((h) => h.status === 'open'))
+      })
+      .catch(() => {
+        if (!cancelled) setRequests((prev) => prev ?? [])
+      })
     return () => {
       cancelled = true
     }
-  }, [sections])
+  }, [])
 
   useEffect(() => load(), [load])
   useAutoRefresh(load)

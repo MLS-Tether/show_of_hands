@@ -32,10 +32,10 @@ function Dashboard() {
     <div className="dashboard">
       <SectionsSummary sections={sections} />
       <div className="dashboard-columns">
-        <AssignmentsSummary sections={sections} />
+        <AssignmentsSummary />
         <QuestsSummary sections={sections} />
       </div>
-      <HelpRequestsSummary sections={sections} />
+      <HelpRequestsSummary />
     </div>
   )
 }

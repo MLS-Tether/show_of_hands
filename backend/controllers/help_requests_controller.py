@@ -2,7 +2,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Union
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from db.pool import get_db
 from dependencies import get_current_user, require_role
@@ -15,6 +15,7 @@ from models.study_room_model import StudyRoom, RoomMember
 from models.user_model import User, RoleEnum
 from schemas.help_request import (
     AcceptedByEntry,
+    HelpRequestBoardResponse,
     HelpRequestConfirmCreate,
     HelpRequestCreate,
     HelpRequestStudentResponse,
@@ -77,6 +78,56 @@ def _build_teacher_response(hr: HelpRequest) -> HelpRequestTeacherResponse:
     )
 
 
+@router.get("/help-requests", response_model=List[HelpRequestBoardResponse])
+def list_my_help_requests(
+    current_user: User = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    """Help requests across every section the student is enrolled in, in one
+    query — avoids the frontend having to fetch /sections then fan out one
+    request per section just to build a bulletin board/dashboard view."""
+    section_ids = [
+        e.section_id
+        for e in db.query(Enrollment).filter(
+            Enrollment.student_id == current_user.user_id,
+            Enrollment.is_archived == False,
+        ).all()
+    ]
+    if not section_ids:
+        return []
+
+    help_requests = (
+        db.query(HelpRequest)
+        .options(
+            joinedload(HelpRequest.section).joinedload(Section.class_),
+            joinedload(HelpRequest.study_room),
+        )
+        .filter(
+            HelpRequest.section_id.in_(section_ids),
+            HelpRequest.is_archived == False,
+        )
+        .order_by(HelpRequest.created_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "help_request_id": hr.help_request_id,
+            "section_id": hr.section_id,
+            "section_name": hr.section.class_.name,
+            "topic": hr.topic,
+            "description": hr.description,
+            "group_size": hr.group_size,
+            "current_size": hr.current_size,
+            "duration_minutes": hr.duration_minutes,
+            "status": hr.status,
+            "room_id": hr.room_id,
+            "created_at": hr.created_at,
+        }
+        for hr in help_requests
+    ]
+
+
 @router.get("/sections/{section_id}/help-requests")
 def list_help_requests(
     section_id: int,
@@ -132,6 +183,21 @@ def create_help_request(
         duration_minutes=body.duration_minutes,
     )
     db.add(help_request)
+    db.flush()
+
+    classmates = db.query(Enrollment).filter(
+        Enrollment.section_id == section_id,
+        Enrollment.student_id != current_user.user_id,
+        Enrollment.is_archived == False,
+    ).all()
+
+    for enrollment in classmates:
+        db.add(Notification(
+            user_id=enrollment.student_id,
+            type=NotificationTypeEnum.new_help_request,
+            message=f"New help request posted: {body.topic}",
+        ))
+
     db.commit()
     db.refresh(help_request)
     return help_request

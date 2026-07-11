@@ -13,15 +13,9 @@ function Assignments() {
   const load = useCallback(() => {
     let cancelled = false
     api
-      .get('/sections')
-      .then(({ data: sections }) =>
-        Promise.allSettled(sections.map((s) => api.get(`/sections/${s.section_id}/assignments`)))
-      )
-      .then((results) => {
+      .get('/assignments')
+      .then(({ data: merged }) => {
         if (cancelled) return
-        const merged = results
-          .filter((r) => r.status === 'fulfilled')
-          .flatMap((r) => r.value.data)
         const now = Date.now()
         setAssignments({
           upcoming: merged

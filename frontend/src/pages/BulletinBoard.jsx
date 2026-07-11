@@ -198,33 +198,28 @@ function BulletinBoard() {
   useEffect(() => loadSections(), [loadSections])
   useAutoRefresh(loadSections)
 
-  useEffect(() => {
-    if (!sections) return
+  const loadRequests = useCallback(() => {
     let cancelled = false
-    Promise.allSettled(
-      sections.map((s) => api.get(`/sections/${s.section_id}/help-requests`))
-    ).then((results) => {
-      if (cancelled) return
-      const myHelpRequestIds = getMyHelpRequestIds()
-      const merged = results.flatMap((r, i) => {
-        if (r.status !== 'fulfilled') return []
-        const section = sections[i]
-        return r.value.data.map((hr) => ({
-          ...hr,
-          section_id: section.section_id,
-          section_name: section.class_name,
-        }))
+    api
+      .get('/help-requests')
+      .then(({ data }) => {
+        if (cancelled) return
+        const myHelpRequestIds = getMyHelpRequestIds()
+        data
+          .filter((hr) => myHelpRequestIds.includes(hr.help_request_id) && hr.room_id)
+          .forEach((hr) => rememberRoom({ room_id: hr.room_id, topic: hr.topic }))
+        setRequests(data)
       })
-      merged
-        .filter((hr) => myHelpRequestIds.includes(hr.help_request_id) && hr.room_id)
-        .forEach((hr) => rememberRoom({ room_id: hr.room_id, topic: hr.topic }))
-      merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      setRequests(merged)
-    })
+      .catch(() => {
+        if (!cancelled) setRequests((prev) => prev ?? [])
+      })
     return () => {
       cancelled = true
     }
-  }, [sections])
+  }, [])
+
+  useEffect(() => loadRequests(), [loadRequests])
+  useAutoRefresh(loadRequests)
 
   async function handleJoin(hr) {
     setJoiningId(hr.help_request_id)
