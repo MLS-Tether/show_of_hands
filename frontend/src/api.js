@@ -6,14 +6,6 @@ const api = axios.create({
   baseURL: BASE_URL,
 })
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
-
 function logout() {
   localStorage.removeItem('access_token')
   localStorage.removeItem('refresh_token')
@@ -22,8 +14,8 @@ function logout() {
   window.location.assign('/auth')
 }
 
-// Dedupes concurrent 401s into a single refresh call instead of firing one
-// per failed request.
+// Dedupes concurrent refreshes into a single call instead of firing one per
+// caller that notices the token is stale.
 let refreshPromise = null
 
 function refreshAccessToken() {
@@ -45,6 +37,47 @@ function refreshAccessToken() {
   }
   return refreshPromise
 }
+
+function decodeJwtExpiryMs(token) {
+  try {
+    const payloadB64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = payloadB64 + '='.repeat((4 - (payloadB64.length % 4)) % 4)
+    const { exp } = JSON.parse(atob(padded))
+    return exp ? exp * 1000 : null
+  } catch {
+    return null
+  }
+}
+
+const EXPIRY_SKEW_MS = 10000
+
+// Returns a token that's valid for at least a few more seconds, refreshing
+// first if the stored one is expired or about to be — used both by the
+// request interceptor below and by anything opening a WebSocket, since a
+// long-idle tab's access token can go stale with no HTTP request around to
+// reactively trigger a refresh (a WS just fails outright, with no retry).
+export async function getValidAccessToken() {
+  const token = localStorage.getItem('access_token')
+  if (!token) return null
+
+  const expiryMs = decodeJwtExpiryMs(token)
+  const isExpiringSoon = expiryMs === null || expiryMs - EXPIRY_SKEW_MS <= Date.now()
+  if (!isExpiringSoon) return token
+
+  try {
+    return await refreshAccessToken()
+  } catch {
+    return token
+  }
+}
+
+api.interceptors.request.use(async (config) => {
+  const token = await getValidAccessToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
 
 api.interceptors.response.use(
   (response) => response,

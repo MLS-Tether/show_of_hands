@@ -4,7 +4,7 @@ import api from '../api'
 import { useDialog } from '../components/DialogProvider'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
-import { authToken, wsBaseUrl } from '../utils/ws'
+import { wsUrlWithFreshToken } from '../utils/ws'
 import './RoomDetail.css'
 
 function formatCountdown(ms) {
@@ -13,10 +13,6 @@ function formatCountdown(ms) {
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
   return `${minutes}:${String(seconds).padStart(2, '0')}`
-}
-
-function wsUrlFor(roomId) {
-  return `${wsBaseUrl()}/rooms/${roomId}/chat?token=${encodeURIComponent(authToken())}`
 }
 
 function RoomDetail() {
@@ -72,25 +68,31 @@ function RoomDetail() {
 
   useEffect(() => {
     if (!activeRoomId) return
-    const ws = new WebSocket(wsUrlFor(activeRoomId))
-    wsRef.current = ws
+    let cancelled = false
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      if (data.type === 'session_confirmation_required') {
-        setConfirmPending(true)
-        return
+    wsUrlWithFreshToken(`/rooms/${activeRoomId}/chat`).then((url) => {
+      if (cancelled) return
+      const ws = new WebSocket(url)
+      wsRef.current = ws
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+        if (data.type === 'session_confirmation_required') {
+          setConfirmPending(true)
+          return
+        }
+        if (data.type === 'room_deleted') {
+          forgetRoom(Number(roomId))
+          alert('This room was deleted by its creator.').then(() => navigate('/study-rooms'))
+          return
+        }
+        setMessages((prev) => [...prev, data])
       }
-      if (data.type === 'room_deleted') {
-        forgetRoom(Number(roomId))
-        alert('This room was deleted by its creator.').then(() => navigate('/study-rooms'))
-        return
-      }
-      setMessages((prev) => [...prev, data])
-    }
+    })
 
     return () => {
-      ws.close()
+      cancelled = true
+      wsRef.current?.close()
       wsRef.current = null
     }
   }, [activeRoomId])

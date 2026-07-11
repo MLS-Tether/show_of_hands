@@ -4,7 +4,7 @@ import ToastStack from './ToastStack'
 import api from '../api'
 import { broadcastRefresh, useAutoRefresh } from '../utils/autoRefresh'
 import { playNotificationChime } from '../utils/notificationSound'
-import { authToken, wsBaseUrl } from '../utils/ws'
+import { wsUrlWithFreshToken } from '../utils/ws'
 import './NotificationBell.css'
 
 // Real-time push does the heavy lifting now (a Postgres trigger fires on
@@ -13,10 +13,6 @@ import './NotificationBell.css'
 const FALLBACK_POLL_INTERVAL_MS = 180000
 const TOAST_DURATION_MS = 6000
 const RECONNECT_DELAY_MS = 3000
-
-function wsUrl() {
-  return `${wsBaseUrl()}/notifications/stream?token=${encodeURIComponent(authToken())}`
-}
 
 function formatTimestamp(dateStr) {
   return new Intl.DateTimeFormat('en-US', {
@@ -103,8 +99,10 @@ function NotificationBell() {
   useEffect(() => {
     let unmounted = false
 
-    function connect() {
-      const ws = new WebSocket(wsUrl())
+    async function connect() {
+      const url = await wsUrlWithFreshToken('/notifications/stream')
+      if (unmounted) return
+      const ws = new WebSocket(url)
       wsRef.current = ws
 
       ws.onmessage = (event) => {
