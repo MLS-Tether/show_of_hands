@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../api'
+import { useDialog } from '../components/DialogProvider'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
 import './RoomDetail.css'
 
@@ -21,6 +22,7 @@ function wsUrlFor(roomId) {
 function RoomDetail() {
   const { roomId } = useParams()
   const navigate = useNavigate()
+  const { confirm, alert } = useDialog()
   const currentUserId = Number(localStorage.getItem('user_id'))
 
   const [room, setRoom] = useState(null)
@@ -75,8 +77,7 @@ function RoomDetail() {
       }
       if (data.type === 'room_deleted') {
         forgetRoom(Number(roomId))
-        window.alert('This room was deleted by its creator.')
-        navigate('/study-rooms')
+        alert('This room was deleted by its creator.').then(() => navigate('/study-rooms'))
         return
       }
       setMessages((prev) => [...prev, data])
@@ -110,7 +111,7 @@ function RoomDetail() {
   }
 
   async function handleClose() {
-    if (!window.confirm('Close this study room for everyone?')) return
+    if (!(await confirm('Close this study room for everyone?'))) return
     setActionError('')
     try {
       await api.post(`/rooms/${roomId}/close`)
@@ -122,7 +123,7 @@ function RoomDetail() {
   }
 
   async function handleKick(userId) {
-    if (!window.confirm('Remove this member from the room?')) return
+    if (!(await confirm('Remove this member from the room?'))) return
     setActionError('')
     try {
       await api.post(`/rooms/${roomId}/kick`, { user_id: userId })
@@ -137,7 +138,7 @@ function RoomDetail() {
       room.status === 'active'
         ? 'Delete this room? Everyone still connected will be disconnected immediately. This cannot be undone.'
         : 'Delete this room? This cannot be undone.'
-    if (!window.confirm(warning)) return
+    if (!(await confirm(warning))) return
     setActionError('')
     try {
       await api.delete(`/rooms/${roomId}`)
@@ -149,7 +150,7 @@ function RoomDetail() {
   }
 
   async function handleLeave() {
-    if (!window.confirm('Leave this study room?')) return
+    if (!(await confirm('Leave this study room?'))) return
     setActionError('')
     try {
       await api.post(`/rooms/${roomId}/leave`)
@@ -169,7 +170,7 @@ function RoomDetail() {
       setConfirmPending(false)
       setConfirmResult(data.points_awarded)
     } catch (err) {
-      window.alert(err.response?.data?.message || 'Could not confirm the session.')
+      await alert(err.response?.data?.message || 'Could not confirm the session.')
     }
   }
 

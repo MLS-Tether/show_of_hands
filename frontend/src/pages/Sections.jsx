@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
+import { useDialog } from '../components/DialogProvider'
 import './Sections.css'
 
 function Sections() {
   const navigate = useNavigate()
+  const { confirm, alert } = useDialog()
   const [sections, setSections] = useState(null)
   const [allSections, setAllSections] = useState(null)
   const [requestedIds, setRequestedIds] = useState(() => new Set())
@@ -40,15 +42,15 @@ function Sections() {
   }, [])
 
   async function handleEnroll(s) {
-    const confirmed = window.confirm(`Request to join ${s.class_name} (${s.period})?`)
+    const confirmed = await confirm(`Request to join ${s.class_name} (${s.period})?`)
     if (!confirmed) return
 
     try {
       await api.post(`/sections/${s.section_id}/enrollment-requests`)
       setRequestedIds((prev) => new Set(prev).add(s.section_id))
-      window.alert('Request sent. A teacher or admin needs to approve it.')
+      await alert('Request sent. A teacher or admin needs to approve it.')
     } catch (err) {
-      window.alert(err.response?.data?.message || 'Could not send the request.')
+      await alert(err.response?.data?.message || 'Could not send the request.')
     }
   }
 

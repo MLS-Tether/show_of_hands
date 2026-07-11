@@ -199,6 +199,47 @@ def test_leave_then_rejoin_help_request(client, world, cleanup):
     assert member_ids == {world.student_id, classmate_id, second_id}
 
 
+def test_leave_and_rejoin_two_person_room_stays_active(client, world, cleanup):
+    """Regression test: in a 2-person group, one member leaving used to drop
+    the room straight to 'closed' (remaining <= 1) in the same instant the
+    help request reopened for a rejoin, permanently bricking the room's chat
+    even after the departed member rejoined. The room must stay active."""
+    classmate_id, classmate_token = _enroll_new_student(client, world, cleanup)
+
+    resp = client.post(
+        f"/api/sections/{world.section_id}/help-requests",
+        json={"topic": "Need help", "group_size": 2, "duration_minutes": 30},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 201, resp.text
+    hr_id = resp.json()["help_request_id"]
+    cleanup(HelpRequest, hr_id)
+
+    resp = client.post(f"/api/help-requests/{hr_id}/accept", headers=auth_header(classmate_token))
+    assert resp.status_code == 200, resp.text
+    room_id = resp.json()["room_id"]
+    cleanup(StudyRoom, room_id)
+    cleanup(RoomMember, room_id=room_id, user_id=world.student_id)
+    cleanup(RoomMember, room_id=room_id, user_id=classmate_id)
+    cleanup(HelpRequestAcceptance, help_request_id=hr_id, user_id=classmate_id)
+
+    resp = client.post(f"/api/rooms/{room_id}/leave", headers=auth_header(classmate_token))
+    assert resp.status_code == 200, resp.text
+
+    resp = client.get(f"/api/rooms/{room_id}", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "active"
+
+    resp = client.post(f"/api/help-requests/{hr_id}/accept", headers=auth_header(classmate_token))
+    assert resp.status_code == 200, resp.text
+
+    resp = client.get(f"/api/rooms/{room_id}", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "active"
+    member_ids = {m["user_id"] for m in resp.json()["members"]}
+    assert member_ids == {world.student_id, classmate_id}
+
+
 def test_drop_help_request_requester_only(client, world, cleanup):
     resp = client.post(
         f"/api/sections/{world.section_id}/help-requests",

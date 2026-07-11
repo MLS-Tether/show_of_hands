@@ -180,9 +180,11 @@ async def leave_room(
             pass
         del room_registry[room_id][current_user.user_id]
 
-    # If only one member (or none) remains, close the room like a kick would
+    # Only tear the room down once it's truly empty — a solo requester's room
+    # stays active so a departed/kicked member (or a new student) can still
+    # join back in, per the help-request reopen logic just below.
     remaining = db.query(RoomMember).filter(RoomMember.room_id == room_id).count()
-    if remaining <= 1 and room.status == StudyRoomStatusEnum.active:
+    if remaining == 0 and room.status == StudyRoomStatusEnum.active:
         room.status = StudyRoomStatusEnum.closed
         db.commit()
         await _close_room_connections(room_id, requester_id=room.help_request.requester_id)

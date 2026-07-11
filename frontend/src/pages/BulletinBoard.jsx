@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
-import { getMyHelpRequestIds, getMyRooms, rememberHelpRequestId, rememberRoom } from '../utils/roomTracking'
+import { useDialog } from '../components/DialogProvider'
+import { forgetRoom, getMyHelpRequestIds, getMyRooms, rememberHelpRequestId, rememberRoom } from '../utils/roomTracking'
 import './BulletinBoard.css'
 
 const STATUS_LABELS = {
@@ -97,9 +98,11 @@ function NewRequestForm({ sections, onCreated }) {
 
 function BulletinBoard() {
   const navigate = useNavigate()
+  const { confirm, alert } = useDialog()
   const [sections, setSections] = useState(null)
   const [requests, setRequests] = useState(null)
   const [joiningId, setJoiningId] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
@@ -165,9 +168,30 @@ function BulletinBoard() {
       rememberRoom({ room_id: data.room_id, topic: hr.topic })
       navigate(`/rooms/${data.room_id}`)
     } catch (err) {
-      window.alert(err.response?.data?.message || 'Could not join this request.')
+      await alert(err.response?.data?.message || 'Could not join this request.')
     } finally {
       setJoiningId(null)
+    }
+  }
+
+  async function handleDelete(hr) {
+    const warning =
+      hr.status === 'active'
+        ? 'Delete this room? Everyone still connected will be disconnected immediately. This cannot be undone.'
+        : 'Delete this room? This cannot be undone.'
+    if (!(await confirm(warning))) return
+
+    setDeletingId(hr.help_request_id)
+    try {
+      await api.delete(`/rooms/${hr.room_id}`)
+      forgetRoom(hr.room_id)
+      setRequests((prev) =>
+        prev.map((r) => (r.help_request_id === hr.help_request_id ? { ...r, room_id: null, status: 'closed' } : r))
+      )
+    } catch (err) {
+      await alert(err.response?.data?.message || 'Could not delete the room.')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -234,6 +258,15 @@ function BulletinBoard() {
                           onClick={() => handleJoin(hr)}
                         >
                           {joiningId === hr.help_request_id ? 'Joining…' : 'Join'}
+                        </button>
+                      )}
+                      {isMine && hr.room_id && (
+                        <button
+                          type="button"
+                          disabled={deletingId === hr.help_request_id}
+                          onClick={() => handleDelete(hr)}
+                        >
+                          {deletingId === hr.help_request_id ? 'Deleting…' : 'Delete room'}
                         </button>
                       )}
                     </div>
