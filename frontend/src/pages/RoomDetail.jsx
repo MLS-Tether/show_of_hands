@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import api from '../api'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
 import './RoomDetail.css'
@@ -20,6 +20,7 @@ function wsUrlFor(roomId) {
 
 function RoomDetail() {
   const { roomId } = useParams()
+  const navigate = useNavigate()
   const currentUserId = Number(localStorage.getItem('user_id'))
 
   const [room, setRoom] = useState(null)
@@ -125,6 +126,19 @@ function RoomDetail() {
     }
   }
 
+  async function handleLeave() {
+    if (!window.confirm('Leave this study room?')) return
+    setActionError('')
+    try {
+      await api.post(`/rooms/${roomId}/leave`)
+      wsRef.current?.close()
+      forgetRoom(Number(roomId))
+      navigate('/study-rooms')
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not leave the room.')
+    }
+  }
+
   async function handleConfirm(sessionOccurred) {
     try {
       const { data } = await api.post(`/help-requests/${room.help_request_id}/confirm`, {
@@ -168,13 +182,20 @@ function RoomDetail() {
 
       {actionError && <p className="room-detail-error">{actionError}</p>}
 
-      {isRequester && room.status === 'active' && (
+      {room.status === 'active' && (
         <div className="room-detail-controls">
-          <button type="button" onClick={handleExtend}>
-            +10 min
-          </button>
-          <button type="button" onClick={handleClose}>
-            Close room
+          {isRequester && (
+            <>
+              <button type="button" onClick={handleExtend}>
+                +10 min
+              </button>
+              <button type="button" onClick={handleClose}>
+                Close room
+              </button>
+            </>
+          )}
+          <button type="button" onClick={handleLeave}>
+            Leave room
           </button>
         </div>
       )}

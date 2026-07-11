@@ -134,6 +134,42 @@ async def kick_member(
     return {"message": "Member removed from room."}
 
 
+@router.post("/{room_id}/leave")
+async def leave_room(
+    room_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    room = _get_room_or_404(room_id, db)
+
+    member = db.query(RoomMember).filter(
+        RoomMember.room_id == room_id,
+        RoomMember.user_id == current_user.user_id,
+    ).first()
+    if not member:
+        raise HTTPException(status_code=403, detail="Not a room member.")
+
+    db.delete(member)
+    db.commit()
+
+    # Disconnect the leaving user's own WS if connected
+    if room_id in room_registry and current_user.user_id in room_registry[room_id]:
+        try:
+            await room_registry[room_id][current_user.user_id].close(code=1000)
+        except Exception:
+            pass
+        del room_registry[room_id][current_user.user_id]
+
+    # If only one member (or none) remains, close the room like a kick would
+    remaining = db.query(RoomMember).filter(RoomMember.room_id == room_id).count()
+    if remaining <= 1 and room.status == StudyRoomStatusEnum.active:
+        room.status = StudyRoomStatusEnum.closed
+        db.commit()
+        await _close_room_connections(room_id, requester_id=room.help_request.requester_id)
+
+    return {"message": "Left the room."}
+
+
 @router.post("/{room_id}/extend", response_model=StudyRoomExtendResponse)
 def extend_room(
     room_id: int,
