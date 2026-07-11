@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Modal from './Modal'
+import ToastStack from './ToastStack'
 import api from '../api'
 import { broadcastRefresh, useAutoRefresh } from '../utils/autoRefresh'
+import { playNotificationChime } from '../utils/notificationSound'
 import './NotificationBell.css'
 
 const POLL_INTERVAL_MS = 8000
+const TOAST_DURATION_MS = 6000
 
 function formatTimestamp(dateStr) {
   return new Intl.DateTimeFormat('en-US', {
@@ -24,8 +27,13 @@ function NotificationBell() {
   const [notifications, setNotifications] = useState(null)
   const [open, setOpen] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState(null)
+  const [toasts, setToasts] = useState([])
   const menuRef = useRef(null)
   const seenIdsRef = useRef(null)
+
+  const dismissToast = useCallback((toastId) => {
+    setToasts((prev) => prev.filter((t) => t.id !== toastId))
+  }, [])
 
   const load = useCallback(() => {
     let cancelled = false
@@ -33,15 +41,25 @@ function NotificationBell() {
       .get('/notifications')
       .then(({ data }) => {
         if (cancelled) return
-        const ids = new Set(data.map((n) => n.notification_id))
         const isFirstLoad = seenIdsRef.current === null
-        const hasNew = !isFirstLoad && data.some((n) => !seenIdsRef.current.has(n.notification_id))
-        seenIdsRef.current = ids
+        const newOnes = isFirstLoad ? [] : data.filter((n) => !seenIdsRef.current.has(n.notification_id))
+        seenIdsRef.current = new Set(data.map((n) => n.notification_id))
         setNotifications(data)
-        // A new notification means something changed elsewhere (a request
-        // accepted, an assignment graded, etc.) — reload every open page's
-        // data instead of leaving the user to notice the badge and refresh.
-        if (hasNew) broadcastRefresh()
+
+        if (newOnes.length > 0) {
+          // A new notification means something changed elsewhere (a request
+          // accepted, an assignment graded, etc.) — reload every open page's
+          // data instead of leaving the user to notice the badge and refresh,
+          // and surface it immediately as a toast + chime rather than making
+          // the student notice the badge on their own.
+          broadcastRefresh()
+          playNotificationChime()
+          const newToasts = newOnes.map((n) => ({ id: n.notification_id, message: n.message }))
+          setToasts((prev) => [...prev, ...newToasts])
+          newToasts.forEach((t) => {
+            setTimeout(() => dismissToast(t.id), TOAST_DURATION_MS)
+          })
+        }
       })
       .catch(() => {
         if (!cancelled) setNotifications((prev) => prev ?? [])
@@ -49,7 +67,7 @@ function NotificationBell() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [dismissToast])
 
   useEffect(() => load(), [load])
   useAutoRefresh(load, POLL_INTERVAL_MS)
@@ -147,6 +165,8 @@ function NotificationBell() {
           </div>
         </Modal>
       )}
+
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }

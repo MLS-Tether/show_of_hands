@@ -257,6 +257,64 @@ def test_drop_help_request_requester_only(client, world, cleanup):
     resp = client.post(f"/api/help-requests/{hr_id}/drop", headers=auth_header(world.student_token))
     assert resp.status_code == 200, resp.text
 
+    # Dropping archives it too, so it disappears from the bulletin board
+    # instead of lingering there forever as "closed".
+    resp = client.get(
+        f"/api/sections/{world.section_id}/help-requests",
+        headers=auth_header(world.teacher_token),
+    )
+    assert not any(r["help_request_id"] == hr_id for r in resp.json())
+
+
+def test_update_help_request_before_and_after_join(client, world, cleanup):
+    resp = client.post(
+        f"/api/sections/{world.section_id}/help-requests",
+        json={"topic": "Need help", "description": "original", "group_size": 2, "duration_minutes": 30},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 201, resp.text
+    hr_id = resp.json()["help_request_id"]
+    cleanup(HelpRequest, hr_id)
+
+    classmate_id, classmate_token = _enroll_new_student(client, world, cleanup)
+
+    # Non-requester can't edit.
+    resp = client.patch(
+        f"/api/help-requests/{hr_id}",
+        json={"topic": "Hijacked"},
+        headers=auth_header(classmate_token),
+    )
+    assert resp.status_code == 403
+
+    # Requester can edit freely before anyone else has joined.
+    resp = client.patch(
+        f"/api/help-requests/{hr_id}",
+        json={"topic": "Updated topic", "group_size": 3, "duration_minutes": 45},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["topic"] == "Updated topic"
+    assert body["group_size"] == 3
+    assert body["duration_minutes"] == 45
+    assert body["description"] == "original"
+
+    resp = client.post(f"/api/help-requests/{hr_id}/accept", headers=auth_header(classmate_token))
+    assert resp.status_code == 200, resp.text
+    room_id = resp.json()["room_id"]
+    cleanup(StudyRoom, room_id)
+    cleanup(RoomMember, room_id=room_id, user_id=world.student_id)
+    cleanup(RoomMember, room_id=room_id, user_id=classmate_id)
+    cleanup(HelpRequestAcceptance, help_request_id=hr_id, user_id=classmate_id)
+
+    # Once someone else has joined, editing is blocked.
+    resp = client.patch(
+        f"/api/help-requests/{hr_id}",
+        json={"topic": "Too late"},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 409
+
 
 def test_confirm_session_awards_points_and_blocks_double_confirm(client, world, cleanup):
     classmate_id, classmate_token = _enroll_new_student(client, world, cleanup)

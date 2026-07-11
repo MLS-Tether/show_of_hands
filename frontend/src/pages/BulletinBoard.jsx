@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
+import Modal from '../components/Modal'
 import { useDialog } from '../components/DialogProvider'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { forgetRoom, getMyHelpRequestIds, getMyRooms, rememberHelpRequestId, rememberRoom } from '../utils/roomTracking'
@@ -97,6 +98,78 @@ function NewRequestForm({ sections, onCreated }) {
   )
 }
 
+function EditRequestForm({ hr, onSaved, onCancel }) {
+  const [topic, setTopic] = useState(hr.topic)
+  const [description, setDescription] = useState(hr.description || '')
+  const [groupSize, setGroupSize] = useState(hr.group_size)
+  const [durationMinutes, setDurationMinutes] = useState(hr.duration_minutes)
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    setSubmitting(true)
+    try {
+      const { data } = await api.patch(`/help-requests/${hr.help_request_id}`, {
+        topic,
+        description: description || null,
+        group_size: Number(groupSize),
+        duration_minutes: Number(durationMinutes),
+      })
+      onSaved(data)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not save changes.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="bulletin-request-form" onSubmit={handleSubmit}>
+      <label className="bulletin-request-form-field">
+        Topic
+        <input value={topic} onChange={(e) => setTopic(e.target.value)} required />
+      </label>
+      <label className="bulletin-request-form-field">
+        Description (optional)
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+      </label>
+      <div className="bulletin-request-form-row">
+        <label className="bulletin-request-form-field">
+          Group size
+          <input
+            type="number"
+            min={2}
+            value={groupSize}
+            onChange={(e) => setGroupSize(e.target.value)}
+            required
+          />
+        </label>
+        <label className="bulletin-request-form-field">
+          Duration (minutes)
+          <input
+            type="number"
+            min={5}
+            value={durationMinutes}
+            onChange={(e) => setDurationMinutes(e.target.value)}
+            required
+          />
+        </label>
+      </div>
+      {error && <p className="bulletin-request-form-error">{error}</p>}
+      <div className="bulletin-request-form-row">
+        <button type="submit" disabled={submitting}>
+          {submitting ? 'Saving…' : 'Save changes'}
+        </button>
+        <button type="button" onClick={onCancel} disabled={submitting}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
 function BulletinBoard() {
   const navigate = useNavigate()
   const { confirm, alert } = useDialog()
@@ -104,6 +177,8 @@ function BulletinBoard() {
   const [requests, setRequests] = useState(null)
   const [joiningId, setJoiningId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
+  const [droppingId, setDroppingId] = useState(null)
+  const [editingRequest, setEditingRequest] = useState(null)
 
   const loadSections = useCallback(() => {
     let cancelled = false
@@ -185,6 +260,20 @@ function BulletinBoard() {
     }
   }
 
+  async function handleDrop(hr) {
+    if (!(await confirm('Delete this help request? This cannot be undone.'))) return
+
+    setDroppingId(hr.help_request_id)
+    try {
+      await api.post(`/help-requests/${hr.help_request_id}/drop`)
+      setRequests((prev) => prev.filter((r) => r.help_request_id !== hr.help_request_id))
+    } catch (err) {
+      await alert(err.response?.data?.message || 'Could not delete this help request.')
+    } finally {
+      setDroppingId(null)
+    }
+  }
+
   const loading = sections === null || requests === null
   const myHelpRequestIds = getMyHelpRequestIds()
   const myRoomIds = getMyRooms().map((r) => r.room_id)
@@ -217,6 +306,7 @@ function BulletinBoard() {
                 const isMine = myHelpRequestIds.includes(hr.help_request_id)
                 const canJoin = hr.status === 'open' && hr.current_size < hr.group_size && !isMine
                 const canOpen = hr.room_id && (isMine || myRoomIds.includes(hr.room_id))
+                const canManageUnclaimed = isMine && !hr.room_id && hr.status === 'open' && hr.current_size <= 1
                 return (
                   <div className="bulletin-request-card" key={hr.help_request_id}>
                     <div className="bulletin-request-card-main">
@@ -259,6 +349,20 @@ function BulletinBoard() {
                           {deletingId === hr.help_request_id ? 'Deleting…' : 'Delete room'}
                         </button>
                       )}
+                      {canManageUnclaimed && (
+                        <>
+                          <button type="button" onClick={() => setEditingRequest(hr)}>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            disabled={droppingId === hr.help_request_id}
+                            onClick={() => handleDrop(hr)}
+                          >
+                            {droppingId === hr.help_request_id ? 'Deleting…' : 'Delete request'}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )
@@ -266,6 +370,24 @@ function BulletinBoard() {
             </div>
           )}
         </>
+      )}
+
+      {editingRequest && (
+        <Modal onClose={() => setEditingRequest(null)}>
+          <h2 className="bulletin-board-subheading">Edit help request</h2>
+          <EditRequestForm
+            hr={editingRequest}
+            onCancel={() => setEditingRequest(null)}
+            onSaved={(updated) => {
+              setRequests((prev) =>
+                prev.map((r) =>
+                  r.help_request_id === updated.help_request_id ? { ...r, ...updated } : r
+                )
+              )
+              setEditingRequest(null)
+            }}
+          />
+        </Modal>
       )}
     </section>
   )

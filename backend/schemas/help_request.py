@@ -18,6 +18,13 @@ class HelpRequestCreate(BaseModel):
     duration_minutes: int
 
 
+class HelpRequestUpdate(BaseModel):
+    topic: Optional[str] = None
+    description: Optional[str] = None
+    group_size: Optional[int] = None
+    duration_minutes: Optional[int] = None
+
+
 class HelpRequestConfirmCreate(BaseModel):
     session_occurred: bool
 

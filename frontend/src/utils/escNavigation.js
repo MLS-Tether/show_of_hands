@@ -11,6 +11,7 @@ const ROUTE_PARENTS = [
   { pattern: /^\/bulletin-board$/, parent: '/dashboard' },
   { pattern: /^\/quests$/, parent: '/dashboard' },
   { pattern: /^\/points$/, parent: '/dashboard' },
+  { pattern: /^\/profile$/, parent: '/dashboard' },
 ]
 
 export function getParentPath(pathname) {

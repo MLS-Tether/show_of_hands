@@ -21,6 +21,7 @@ from schemas.help_request import (
     HelpRequestTeacherResponse,
     HelpRequestAcceptResponse,
     HelpRequestConfirmResponse,
+    HelpRequestUpdate,
 )
 
 router = APIRouter(tags=["help-requests"])
@@ -131,6 +132,38 @@ def create_help_request(
         duration_minutes=body.duration_minutes,
     )
     db.add(help_request)
+    db.commit()
+    db.refresh(help_request)
+    return help_request
+
+
+@router.patch("/help-requests/{help_request_id}", response_model=HelpRequestStudentResponse)
+def update_help_request(
+    help_request_id: int,
+    body: HelpRequestUpdate,
+    current_user: User = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    help_request = db.query(HelpRequest).filter(
+        HelpRequest.help_request_id == help_request_id,
+        HelpRequest.is_archived == False,
+    ).first()
+    if not help_request:
+        raise HTTPException(status_code=404, detail="Help request not found.")
+    if help_request.requester_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Only the requester can edit this help request.")
+    if help_request.status != HelpRequestStatusEnum.open or help_request.current_size > 1:
+        raise HTTPException(status_code=409, detail="Can only edit before anyone else has joined.")
+
+    if body.topic is not None:
+        help_request.topic = body.topic
+    if body.description is not None:
+        help_request.description = body.description
+    if body.group_size is not None:
+        help_request.group_size = body.group_size
+    if body.duration_minutes is not None:
+        help_request.duration_minutes = body.duration_minutes
+
     db.commit()
     db.refresh(help_request)
     return help_request
