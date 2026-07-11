@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Modal from './Modal'
 import api from '../api'
+import { broadcastRefresh, useAutoRefresh } from '../utils/autoRefresh'
 import './NotificationBell.css'
+
+const POLL_INTERVAL_MS = 8000
 
 function formatTimestamp(dateStr) {
   return new Intl.DateTimeFormat('en-US', {
@@ -22,21 +25,34 @@ function NotificationBell() {
   const [open, setOpen] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState(null)
   const menuRef = useRef(null)
+  const seenIdsRef = useRef(null)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false
     api
       .get('/notifications')
       .then(({ data }) => {
-        if (!cancelled) setNotifications(data)
+        if (cancelled) return
+        const ids = new Set(data.map((n) => n.notification_id))
+        const isFirstLoad = seenIdsRef.current === null
+        const hasNew = !isFirstLoad && data.some((n) => !seenIdsRef.current.has(n.notification_id))
+        seenIdsRef.current = ids
+        setNotifications(data)
+        // A new notification means something changed elsewhere (a request
+        // accepted, an assignment graded, etc.) — reload every open page's
+        // data instead of leaving the user to notice the badge and refresh.
+        if (hasNew) broadcastRefresh()
       })
       .catch(() => {
-        if (!cancelled) setNotifications([])
+        if (!cancelled) setNotifications((prev) => prev ?? [])
       })
     return () => {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => load(), [load])
+  useAutoRefresh(load, POLL_INTERVAL_MS)
 
   useEffect(() => {
     if (!open) return

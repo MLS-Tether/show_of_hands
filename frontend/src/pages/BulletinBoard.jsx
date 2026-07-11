@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import { useDialog } from '../components/DialogProvider'
+import { useAutoRefresh } from '../utils/autoRefresh'
 import { forgetRoom, getMyHelpRequestIds, getMyRooms, rememberHelpRequestId, rememberRoom } from '../utils/roomTracking'
 import './BulletinBoard.css'
 
@@ -103,22 +104,8 @@ function BulletinBoard() {
   const [requests, setRequests] = useState(null)
   const [joiningId, setJoiningId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
-  const [refreshTick, setRefreshTick] = useState(0)
 
-  useEffect(() => {
-    function handleRefresh() {
-      if (document.visibilityState !== 'visible') return
-      setRefreshTick((t) => t + 1)
-    }
-    window.addEventListener('focus', handleRefresh)
-    document.addEventListener('visibilitychange', handleRefresh)
-    return () => {
-      window.removeEventListener('focus', handleRefresh)
-      document.removeEventListener('visibilitychange', handleRefresh)
-    }
-  }, [])
-
-  useEffect(() => {
+  const loadSections = useCallback(() => {
     let cancelled = false
     api
       .get('/sections')
@@ -126,12 +113,15 @@ function BulletinBoard() {
         if (!cancelled) setSections(data)
       })
       .catch(() => {
-        if (!cancelled) setSections([])
+        if (!cancelled) setSections((prev) => prev ?? [])
       })
     return () => {
       cancelled = true
     }
-  }, [refreshTick])
+  }, [])
+
+  useEffect(() => loadSections(), [loadSections])
+  useAutoRefresh(loadSections)
 
   useEffect(() => {
     if (!sections) return

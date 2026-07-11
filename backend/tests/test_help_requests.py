@@ -292,3 +292,39 @@ def test_confirm_session_awards_points_and_blocks_double_confirm(client, world, 
         headers=auth_header(world.student_token),
     )
     assert resp.status_code == 409
+
+
+def test_confirm_session_still_works_after_room_closed(client, world, cleanup):
+    """Regression test: closing (or deleting) the room archives the help
+    request immediately so it drops off the bulletin board, but the requester
+    still needs to answer the "did this happen?" prompt afterward. Archiving
+    must not 404 that confirm call, or points never get awarded."""
+    classmate_id, classmate_token = _enroll_new_student(client, world, cleanup)
+
+    resp = client.post(
+        f"/api/sections/{world.section_id}/help-requests",
+        json={"topic": "Need help", "group_size": 2, "duration_minutes": 30},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 201, resp.text
+    hr_id = resp.json()["help_request_id"]
+    cleanup(HelpRequest, hr_id)
+
+    resp = client.post(f"/api/help-requests/{hr_id}/accept", headers=auth_header(classmate_token))
+    assert resp.status_code == 200, resp.text
+    room_id = resp.json()["room_id"]
+    cleanup(StudyRoom, room_id)
+    cleanup(RoomMember, room_id=room_id, user_id=world.student_id)
+    cleanup(RoomMember, room_id=room_id, user_id=classmate_id)
+    cleanup(HelpRequestAcceptance, help_request_id=hr_id, user_id=classmate_id)
+
+    resp = client.post(f"/api/rooms/{room_id}/close", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+
+    resp = client.post(
+        f"/api/help-requests/{hr_id}/confirm",
+        json={"session_occurred": True},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["points_awarded"] == 25

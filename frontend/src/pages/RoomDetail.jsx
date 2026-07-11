@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../api'
 import { useDialog } from '../components/DialogProvider'
+import { useAutoRefresh } from '../utils/autoRefresh'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
 import './RoomDetail.css'
 
@@ -36,7 +37,7 @@ function RoomDetail() {
   const [actionError, setActionError] = useState('')
   const wsRef = useRef(null)
 
-  useEffect(() => {
+  const loadRoom = useCallback(() => {
     let cancelled = false
     api
       .get(`/rooms/${roomId}`)
@@ -56,6 +57,9 @@ function RoomDetail() {
       cancelled = true
     }
   }, [roomId])
+
+  useEffect(() => loadRoom(), [loadRoom])
+  useAutoRefresh(loadRoom)
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)

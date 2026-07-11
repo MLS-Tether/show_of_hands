@@ -254,9 +254,12 @@ def confirm_session(
     current_user: User = Depends(require_role(["student"])),
     db: Session = Depends(get_db),
 ):
+    # Not filtered by is_archived: closing/deleting the room archives the help
+    # request immediately (to drop it off the bulletin board), but the
+    # requester still needs to answer the "did this happen?" prompt afterward
+    # to actually get points awarded.
     help_request = db.query(HelpRequest).filter(
         HelpRequest.help_request_id == help_request_id,
-        HelpRequest.is_archived == False,
     ).first()
     if not help_request:
         raise HTTPException(status_code=404, detail="Help request not found.")

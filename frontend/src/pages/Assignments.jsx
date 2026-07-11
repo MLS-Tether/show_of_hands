@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import { formatDueDate } from '../utils/formatDueDate'
+import { useAutoRefresh } from '../utils/autoRefresh'
 import './Assignments.css'
 
 function Assignments() {
@@ -9,7 +10,7 @@ function Assignments() {
   const [assignments, setAssignments] = useState(null)
   const [tab, setTab] = useState('upcoming')
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false
     api
       .get('/sections')
@@ -32,12 +33,15 @@ function Assignments() {
         })
       })
       .catch(() => {
-        if (!cancelled) setAssignments({ upcoming: [], past: [] })
+        if (!cancelled) setAssignments((prev) => prev ?? { upcoming: [], past: [] })
       })
     return () => {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => load(), [load])
+  useAutoRefresh(load)
 
   const loading = assignments === null
   const rows = loading ? [] : assignments[tab]

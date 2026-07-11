@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import { useDialog } from '../components/DialogProvider'
+import { useAutoRefresh } from '../utils/autoRefresh'
 import './Sections.css'
 
 function Sections() {
@@ -11,7 +12,7 @@ function Sections() {
   const [allSections, setAllSections] = useState(null)
   const [requestedIds, setRequestedIds] = useState(() => new Set())
 
-  useEffect(() => {
+  const loadSections = useCallback(() => {
     let cancelled = false
     api
       .get('/sections')
@@ -19,14 +20,14 @@ function Sections() {
         if (!cancelled) setSections(data)
       })
       .catch(() => {
-        if (!cancelled) setSections([])
+        if (!cancelled) setSections((prev) => prev ?? [])
       })
     return () => {
       cancelled = true
     }
   }, [])
 
-  useEffect(() => {
+  const loadAllSections = useCallback(() => {
     let cancelled = false
     api
       .get('/sections', { params: { scope: 'all' } })
@@ -34,12 +35,17 @@ function Sections() {
         if (!cancelled) setAllSections(data)
       })
       .catch(() => {
-        if (!cancelled) setAllSections([])
+        if (!cancelled) setAllSections((prev) => prev ?? [])
       })
     return () => {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => loadSections(), [loadSections])
+  useEffect(() => loadAllSections(), [loadAllSections])
+  useAutoRefresh(loadSections)
+  useAutoRefresh(loadAllSections)
 
   async function handleEnroll(s) {
     const confirmed = await confirm(`Request to join ${s.class_name} (${s.period})?`)
