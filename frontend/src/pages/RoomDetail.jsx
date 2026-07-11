@@ -126,6 +126,18 @@ function RoomDetail() {
     }
   }
 
+  async function handleDelete() {
+    if (!window.confirm('Delete this room? This cannot be undone.')) return
+    setActionError('')
+    try {
+      await api.delete(`/rooms/${roomId}`)
+      forgetRoom(Number(roomId))
+      navigate('/study-rooms')
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not delete the room.')
+    }
+  }
+
   async function handleLeave() {
     if (!window.confirm('Leave this study room?')) return
     setActionError('')
@@ -193,6 +205,11 @@ function RoomDetail() {
             </button>
           </>
         )}
+        {isRequester && room.status === 'closed' && (
+          <button type="button" onClick={handleDelete}>
+            Delete room
+          </button>
+        )}
         <button type="button" onClick={handleLeave}>
           Leave room
         </button>
@@ -243,12 +260,7 @@ function RoomDetail() {
       {room.status === 'active' && (
         <>
           <div className="room-detail-chat">
-            {messages.length === 0 && (
-              <p className="room-detail-placeholder">
-                No messages yet. Chat history isn't saved — messages sent before you joined won't
-                appear.
-              </p>
-            )}
+            {messages.length === 0 && <p className="room-detail-placeholder">No messages yet.</p>}
             {messages.map((m, i) => (
               <div className="room-detail-message" key={i}>
                 <span className="room-detail-message-author">{m.username}</span>

@@ -224,6 +224,25 @@ async def close_room(
     return {"message": "Room closed."}
 
 
+@router.delete("/{room_id}")
+def delete_room(
+    room_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    room = _get_room_or_404(room_id, db)
+    _require_requester(room, current_user.user_id)
+
+    if room.status != StudyRoomStatusEnum.closed:
+        raise HTTPException(status_code=409, detail="Only a closed room can be deleted.")
+
+    db.query(RoomMember).filter(RoomMember.room_id == room_id).delete()
+    db.delete(room)
+    db.commit()
+
+    return {"message": "Room deleted."}
+
+
 @router.websocket("/{room_id}/chat")
 async def chat(websocket: WebSocket, room_id: int, token: str, db: Session = Depends(get_db)):
     # Validate JWT
