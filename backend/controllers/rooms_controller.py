@@ -195,6 +195,7 @@ async def leave_room(
     help_request.current_size = remaining
     if remaining == 0:
         help_request.status = HelpRequestStatusEnum.closed
+        help_request.is_archived = True
     elif remaining < help_request.group_size and help_request.status == HelpRequestStatusEnum.active:
         help_request.status = HelpRequestStatusEnum.open
     db.commit()
@@ -233,6 +234,14 @@ async def close_room(
         raise HTTPException(status_code=409, detail="Room is already closed.")
 
     room.status = StudyRoomStatusEnum.closed
+
+    # Closing the room is terminal for its help request too — without this,
+    # the help request was left dangling at its prior status (active/open)
+    # forever, showing on the bulletin board with no room to back it.
+    help_request = room.help_request
+    help_request.status = HelpRequestStatusEnum.closed
+    help_request.is_archived = True
+
     db.commit()
 
     await _close_room_connections(room_id, requester_id=current_user.user_id)
@@ -253,9 +262,11 @@ async def delete_room(
     # no session-confirmation prompt: just notify everyone and disconnect them.
     await _close_room_connections(room_id, notify_type="room_deleted")
 
+    # Deletion is terminal — archive the help request too so it stops
+    # cluttering the bulletin board now that its room is gone for good.
     help_request = room.help_request
-    if help_request.status != HelpRequestStatusEnum.closed:
-        help_request.status = HelpRequestStatusEnum.closed
+    help_request.status = HelpRequestStatusEnum.closed
+    help_request.is_archived = True
 
     db.query(RoomMember).filter(RoomMember.room_id == room_id).delete()
     db.delete(room)

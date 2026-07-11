@@ -242,6 +242,7 @@ def drop_help_request(
         raise HTTPException(status_code=403, detail="Only the requester can drop this help request.")
 
     help_request.status = HelpRequestStatusEnum.closed
+    help_request.is_archived = True
     db.commit()
     return {"message": "Help request closed."}
 
