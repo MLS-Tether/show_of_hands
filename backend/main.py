@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 
@@ -9,6 +10,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from db.pool import SessionLocal
 from db.seed import seed_classes, seed_dev_data
+from db.ws_broadcast import start_listener, stop_listener, deliver_loop
 from models.assignment_model import Assignment
 from models.enrollment_model import Enrollment
 from models.submission_model import Submission, SubmissionStatusEnum
@@ -26,7 +28,7 @@ from controllers.quests_controller import router as quests_router
 from controllers.quest_completions_controller import router as quest_completions_router
 from controllers.points_controller import router as points_router
 from controllers.help_requests_controller import router as help_requests_router
-from controllers.rooms_controller import router as rooms_router
+from controllers.rooms_controller import router as rooms_router, room_registry
 from controllers.notifications_controller import router as notifications_router
 from controllers.users_controller import router as users_router
 
@@ -113,7 +115,15 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(check_pending_grades, "interval", days=1)
     scheduler.add_job(check_overdue_assignments, "interval", days=1)
     scheduler.start()
+
+    loop = asyncio.get_event_loop()
+    start_listener(loop)
+    delivery_task = asyncio.create_task(deliver_loop(room_registry))
+
     yield
+
+    delivery_task.cancel()
+    stop_listener()
     scheduler.shutdown()
 
 

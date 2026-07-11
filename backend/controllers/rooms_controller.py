@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from auth_utils import decode_token
 from db.pool import get_db, SessionLocal
+from db.ws_broadcast import notify_room_message
 from dependencies import get_current_user
 from models.help_request_model import HelpRequestStatusEnum
 from models.study_room_model import StudyRoom, RoomMember, StudyRoomStatusEnum
@@ -303,17 +304,7 @@ async def chat(websocket: WebSocket, room_id: int, token: str, db: Session = Dep
             }
             room_messages.setdefault(room_id, []).append(message_out)
 
-            # Broadcast to all other connections in this room
-            dead_connections = []
-            for other_user_id, other_ws in list(room_registry.get(room_id, {}).items()):
-                if other_user_id != user_id:
-                    try:
-                        await other_ws.send_json(message_out)
-                    except Exception:
-                        dead_connections.append(other_user_id)
-
-            for dead_id in dead_connections:
-                room_registry.get(room_id, {}).pop(dead_id, None)
+            notify_room_message(db, room_id, message_out, sender_id=user_id)
 
     except WebSocketDisconnect:
         pass
