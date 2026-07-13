@@ -18,6 +18,13 @@ class HelpRequestCreate(BaseModel):
     duration_minutes: int
 
 
+class HelpRequestUpdate(BaseModel):
+    topic: Optional[str] = None
+    description: Optional[str] = None
+    group_size: Optional[int] = None
+    duration_minutes: Optional[int] = None
+
+
 class HelpRequestConfirmCreate(BaseModel):
     session_occurred: bool
 
@@ -57,6 +64,20 @@ class HelpRequestTeacherResponse(BaseModel):
     duration_minutes: int
     status: HelpRequestStatusEnum
     accepted_by: List[AcceptedByEntry]
+    room_id: Optional[int] = None
+    created_at: datetime
+
+
+class HelpRequestBoardResponse(BaseModel):
+    help_request_id: int
+    section_id: int
+    section_name: str
+    topic: str
+    description: Optional[str]
+    group_size: int
+    current_size: int
+    duration_minutes: int
+    status: HelpRequestStatusEnum
     room_id: Optional[int] = None
     created_at: datetime
 

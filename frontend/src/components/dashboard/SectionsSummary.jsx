@@ -14,10 +14,10 @@ function SectionsSummary({ sections }) {
         )}
         {!loading &&
           sections.map((s) => (
-            <div className="section-card" key={s.section_id}>
+            <Link to={`/sections/${s.section_id}`} className="section-card" key={s.section_id}>
               <div className="section-card-title">{s.class_name}</div>
               <div className="section-card-sub">{s.period}</div>
-            </div>
+            </Link>
           ))}
         <Link to="/sections" className="join-section-card">
           + join section

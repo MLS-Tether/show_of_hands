@@ -16,6 +16,7 @@ class NotificationTypeEnum(str, enum.Enum):
     class_request_rejected = "class_request_rejected"
     grade_finalization_reminder = "grade_finalization_reminder"
     assignment_overdue = "assignment_overdue"
+    new_help_request = "new_help_request"
 
 
 class Notification(Base):

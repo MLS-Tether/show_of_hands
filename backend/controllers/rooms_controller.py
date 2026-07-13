@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from auth_utils import decode_token
 from db.pool import get_db, SessionLocal
+from db.ws_broadcast import notify_room_message
 from dependencies import get_current_user
 from models.help_request_model import HelpRequestStatusEnum
 from models.study_room_model import StudyRoom, RoomMember, StudyRoomStatusEnum
@@ -18,6 +19,10 @@ router = APIRouter(prefix="/rooms", tags=["rooms"])
 # In-memory registry — never persisted to DB
 # Structure: { room_id: { user_id: WebSocket } }
 room_registry: dict = {}
+
+# In-memory chat history for the room's lifetime — cleared as soon as the room closes.
+# Structure: { room_id: [ {user_id, username, content, sent_at}, ... ] }
+room_messages: dict = {}
 
 
 class KickRequest(BaseModel):
@@ -50,12 +55,26 @@ def _build_room_response(room: StudyRoom) -> dict:
     }
 
 
-async def _close_room_connections(room_id: int, requester_id: Optional[int] = None):
-    """Send session confirmation prompt to requester, then disconnect all WS connections."""
+async def _close_room_connections(
+    room_id: int,
+    requester_id: Optional[int] = None,
+    notify_type: Optional[str] = None,
+):
+    """Disconnect all WS connections for a room. If requester_id is given, that
+    connection first gets a session-confirmation prompt. If notify_type is given,
+    every connection first gets a {"type": notify_type} message (e.g. room deletion)."""
+    room_messages.pop(room_id, None)
+
     if room_id not in room_registry:
         return
 
-    if requester_id and requester_id in room_registry[room_id]:
+    if notify_type:
+        for ws in list(room_registry[room_id].values()):
+            try:
+                await ws.send_json({"type": notify_type})
+            except Exception:
+                pass
+    elif requester_id and requester_id in room_registry[room_id]:
         try:
             await room_registry[room_id][requester_id].send_json({
                 "type": "session_confirmation_required",
@@ -161,9 +180,11 @@ async def leave_room(
             pass
         del room_registry[room_id][current_user.user_id]
 
-    # If only one member (or none) remains, close the room like a kick would
+    # Only tear the room down once it's truly empty — a solo requester's room
+    # stays active so a departed/kicked member (or a new student) can still
+    # join back in, per the help-request reopen logic just below.
     remaining = db.query(RoomMember).filter(RoomMember.room_id == room_id).count()
-    if remaining <= 1 and room.status == StudyRoomStatusEnum.active:
+    if remaining == 0 and room.status == StudyRoomStatusEnum.active:
         room.status = StudyRoomStatusEnum.closed
         db.commit()
         await _close_room_connections(room_id, requester_id=room.help_request.requester_id)
@@ -174,6 +195,7 @@ async def leave_room(
     help_request.current_size = remaining
     if remaining == 0:
         help_request.status = HelpRequestStatusEnum.closed
+        help_request.is_archived = True
     elif remaining < help_request.group_size and help_request.status == HelpRequestStatusEnum.active:
         help_request.status = HelpRequestStatusEnum.open
     db.commit()
@@ -212,10 +234,45 @@ async def close_room(
         raise HTTPException(status_code=409, detail="Room is already closed.")
 
     room.status = StudyRoomStatusEnum.closed
+
+    # Closing the room is terminal for its help request too — without this,
+    # the help request was left dangling at its prior status (active/open)
+    # forever, showing on the bulletin board with no room to back it.
+    help_request = room.help_request
+    help_request.status = HelpRequestStatusEnum.closed
+    help_request.is_archived = True
+
     db.commit()
 
     await _close_room_connections(room_id, requester_id=current_user.user_id)
     return {"message": "Room closed."}
+
+
+@router.delete("/{room_id}")
+async def delete_room(
+    room_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    room = _get_room_or_404(room_id, db)
+    _require_requester(room, current_user.user_id)
+
+    # The requester has full autonomy to delete the room at any time, active or
+    # closed — this is a hard teardown, not the graceful /close flow, so there's
+    # no session-confirmation prompt: just notify everyone and disconnect them.
+    await _close_room_connections(room_id, notify_type="room_deleted")
+
+    # Deletion is terminal — archive the help request too so it stops
+    # cluttering the bulletin board now that its room is gone for good.
+    help_request = room.help_request
+    help_request.status = HelpRequestStatusEnum.closed
+    help_request.is_archived = True
+
+    db.query(RoomMember).filter(RoomMember.room_id == room_id).delete()
+    db.delete(room)
+    db.commit()
+
+    return {"message": "Room deleted."}
 
 
 @router.websocket("/{room_id}/chat")
@@ -255,6 +312,14 @@ async def chat(websocket: WebSocket, room_id: int, token: str, db: Session = Dep
         room_registry[room_id] = {}
     room_registry[room_id][user_id] = websocket
 
+    # Replay this room's history so far (cleared when the room closes) so a
+    # newly connected or reconnecting member sees the full conversation.
+    for past_message in room_messages.get(room_id, []):
+        try:
+            await websocket.send_json(past_message)
+        except Exception:
+            break
+
     try:
         while True:
             data = await websocket.receive_json()
@@ -268,34 +333,20 @@ async def chat(websocket: WebSocket, room_id: int, token: str, db: Session = Dep
                 "content": content,
                 "sent_at": datetime.now(timezone.utc).isoformat(),
             }
+            room_messages.setdefault(room_id, []).append(message_out)
 
-            # Broadcast to all other connections in this room
-            dead_connections = []
-            for other_user_id, other_ws in list(room_registry.get(room_id, {}).items()):
-                if other_user_id != user_id:
-                    try:
-                        await other_ws.send_json(message_out)
-                    except Exception:
-                        dead_connections.append(other_user_id)
-
-            for dead_id in dead_connections:
-                room_registry.get(room_id, {}).pop(dead_id, None)
+            notify_room_message(db, room_id, message_out, sender_id=user_id)
 
     except WebSocketDisconnect:
         pass
     finally:
-        # Remove connection from registry
+        # Remove this connection from the registry. A dropped websocket (page
+        # navigation, refresh, tab switch, brief network blip — there's no
+        # reconnect support) does NOT mean the member left the room; actual
+        # departures are tracked via /leave and /kick against real DB
+        # membership, not live socket presence. Auto-closing here would wipe
+        # out the room (and its chat history) on a transient disconnect.
         if room_id in room_registry:
             room_registry[room_id].pop(user_id, None)
-
-            # If only the requester remains in WS registry, auto-close the room
-            requester_id = room.help_request.requester_id
-            remaining_ids = set(room_registry.get(room_id, {}).keys())
-            if remaining_ids and remaining_ids == {requester_id}:
-                db_room = db.query(StudyRoom).filter(StudyRoom.room_id == room_id).first()
-                if db_room and db_room.status == StudyRoomStatusEnum.active:
-                    db_room.status = StudyRoomStatusEnum.closed
-                    db.commit()
-                await _close_room_connections(room_id, requester_id=requester_id)
-            elif not remaining_ids:
+            if not room_registry.get(room_id):
                 room_registry.pop(room_id, None)

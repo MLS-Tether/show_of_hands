@@ -43,6 +43,30 @@ def _get_assignment_or_404(assignment_id: int, db: Session) -> Assignment:
     return assignment
 
 
+@router.get("/assignments", response_model=List[AssignmentListResponse])
+def list_my_assignments(
+    current_user: User = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    """Assignments across every section the student is enrolled in, in one
+    query — avoids the frontend having to fetch /sections then fan out one
+    request per section just to build a dashboard/list view."""
+    section_ids = [
+        e.section_id
+        for e in db.query(Enrollment).filter(
+            Enrollment.student_id == current_user.user_id,
+            Enrollment.is_archived == False,
+        ).all()
+    ]
+    if not section_ids:
+        return []
+
+    return db.query(Assignment).filter(
+        Assignment.section_id.in_(section_ids),
+        Assignment.is_archived == False,
+    ).all()
+
+
 @router.get("/sections/{section_id}/assignments", response_model=List[AssignmentListResponse])
 def list_assignments(
     section_id: int,

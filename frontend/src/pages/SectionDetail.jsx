@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../api'
+import { useAutoRefresh } from '../utils/autoRefresh'
 import './SectionDetail.css'
 
 function SectionDetail() {
@@ -9,7 +10,7 @@ function SectionDetail() {
   const [notFound, setNotFound] = useState(false)
   const [loadedSectionId, setLoadedSectionId] = useState(null)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false
     api
       .get(`/sections/${sectionId}`)
@@ -28,6 +29,9 @@ function SectionDetail() {
       cancelled = true
     }
   }, [sectionId])
+
+  useEffect(() => load(), [load])
+  useAutoRefresh(load)
 
   const loading = loadedSectionId !== sectionId
 

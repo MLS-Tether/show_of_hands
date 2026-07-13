@@ -143,38 +143,6 @@ def list_submissions(
     ]
 
 
-@router.get("/submissions/{submission_id}", response_model=SubmissionResponse)
-def get_submission(
-    submission_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    submission = db.query(Submission).filter(
-        Submission.submission_id == submission_id,
-        Submission.is_archived == False,
-    ).first()
-    if not submission:
-        raise HTTPException(status_code=404, detail="Submission not found.")
-
-    assignment = submission.assignment
-    section = db.query(Section).filter(
-        Section.section_id == assignment.section_id,
-        Section.school_id == current_user.school_id,
-        Section.is_archived == False,
-    ).first()
-    if not section:
-        raise HTTPException(status_code=403, detail="Access denied.")
-
-    if current_user.role == RoleEnum.student:
-        if submission.student_id != current_user.user_id:
-            raise HTTPException(status_code=403, detail="Not your submission.")
-    elif current_user.role == RoleEnum.teacher:
-        if section.teacher_id != current_user.user_id:
-            raise HTTPException(status_code=403, detail="Not your section.")
-
-    return submission
-
-
 @router.patch("/submissions/{submission_id}/grade", response_model=SubmissionGradeResponse)
 def grade_submission(
     submission_id: int,
