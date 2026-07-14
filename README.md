@@ -924,18 +924,16 @@ Below is an example of a simple todo application's API contract with three endpo
 
 ## Wireframe 
 
-![][image1]
-
-![][image2]
-
-![][image3]
-
 ## Core Technologies, 3rd-Party APIs and New Libraries
 
 This project will make use of the following technologies, 3rd-Party APIs, and new libraries
 
-* React for the frontend user interface  
-* Python and FastAPI for the server  
-* Postgres for the database  
+* React 
+* Python  
+* FastAPI
+* Postgres
+* Pydantic
+* SQLAlchemy
+* Pytest
 
 
