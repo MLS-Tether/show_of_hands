@@ -1,0 +1,139 @@
+.quests-page {
+  text-align: left;
+}
+
+.quests-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: -16px 0 16px;
+}
+
+.quests-tab {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.quests-tab:hover {
+  color: var(--text-h);
+}
+
+.quests-tab.active {
+  color: var(--text-h);
+  border-bottom-color: var(--text-h);
+  font-weight: 500;
+}
+
+.quests-placeholder {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.quests-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.quest-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 14px;
+}
+
+.quest-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.quest-card-title {
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.quest-card-category {
+  font-size: 11px;
+  border-radius: 10px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.quest-card-category-academic {
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+}
+
+.quest-card-category-social {
+  color: var(--text-muted);
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+}
+
+.quest-card-description {
+  font-size: 13px;
+  color: var(--text);
+  margin: 8px 0 0;
+  flex-grow: 1;
+}
+
+.quest-card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+
+.quest-card-type,
+.quest-card-points {
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+.quest-card-status {
+  align-self: flex-start;
+  font-size: 11px;
+  border-radius: 10px;
+  padding: 2px 9px;
+  margin-top: 10px;
+}
+
+.quest-card-status-done {
+  color: #1f7a4d;
+  background: rgba(31, 122, 77, 0.12);
+  border: 1px solid rgba(31, 122, 77, 0.35);
+}
+
+.quest-card-complete {
+  align-self: flex-start;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: none;
+  color: var(--text-h);
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.quest-card-complete:hover {
+  background: var(--surface-1);
+}
+
+.quest-card-complete:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
