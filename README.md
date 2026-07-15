@@ -6,7 +6,9 @@ Show of Hands aims to bridge the gap between learning and school communities. It
 
 ## What is a Quest?
 
-Non academic tasks/deliverables that encourage students to practice with each other, have fun, etc… Include examples:
+Non academic tasks/deliverables that encourage students to practice with each other, have fun, help others who may not understand course content, and/or have learning experiences outside of the classroom.
+
+Examples:
 
 * Find a study group and schedule a meeting  
 * Go to library  
@@ -47,16 +49,16 @@ Modern K-12 education has drifted toward standardized testing and rigid, one-siz
 
 * **Age/Grade:** 15, 10th grade  
 * **Role:** Student  
-* **Background:** Maya is bright but bored. She does fine on tests through last-minute cramming but doesn't feel like she *understands* half of what she's tested on. She's constantly on her phone during class, and when she gets stuck on homework, she defaults to searching the answer online rather than asking a classmate — it feels faster and less embarrassing.  
+* **Background:** Maya is bright but bored. She does fine on tests through last-minute cramming but doesn't feel like she *understands* half of what she's tested on. She's constantly on her phone during class, and when she gets stuck on homework, she defaults to searching the answer online rather than asking a classmate. For her, it feels faster and less embarrassing.  
 * **Goals:** Wants school to feel less like a chore and more like something she's actually invested in. Wants recognition for effort, not just grades.  
 * **Frustrations:** Standardized pacing that doesn't match how she learns; feels anonymous in a large class; doesn't see the point of "office hours" since no one goes.  
-* **How Show of Hands helps:** The anonymous bulletin board lets her post a help request without the social risk of asking in class out loud. Quests and points make small wins visible and rewarding, giving her a reason to engage instead of disengage.
+* **How Show of Hands helps:** The anonymous bulletin board lets her post a help request without the social risk of asking in class out loud. Quests and points make small wins visible and rewarding, giving her a reason to engage.
 
 #### **2\. Jordan Reyes — The Quiet Struggler**
 
 * **Age/Grade:** 13, 8th grade  
 * **Role:** Student  
-* **Background:** Jordan is falling behind in math but is too self-conscious to raise his hand or admit confusion in front of the class. He doesn't reach out to classmates because he doesn't want to seem "behind," and he doesn't read or study outside of school. Virtual learning days make it worse — no hallway conversations, no casual "hey, did you get \#7?"  
+* **Background:** Jordan is falling behind in math but is too self-conscious to raise his hand or admit confusion in front of the class. He doesn't reach out to classmates because he doesn't want to seem "behind," and he doesn't read or study outside of school. Virtual learning days make it worse, with no opportunity for hallway conversations. No casual "Hey, did you get \#7 on the test?"  
 * **Goals:** Wants to catch up without feeling singled out. Wants low-stakes ways to get help.  
 * **Frustrations:** Fear of judgment from peers; teachers can't always tell he's struggling until a bad grade shows up.  
 * **How Show of Hands helps:** Anonymous help requests remove the social risk. Being rewarded (points) for reaching out reframes asking for help as a positive, active behavior rather than an admission of weakness. Teacher-side visibility into help-request topics also flags struggling areas before a graded assignment does.
