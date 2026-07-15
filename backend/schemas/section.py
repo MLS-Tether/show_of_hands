@@ -52,6 +52,7 @@ class SectionListResponse(BaseModel):
 
     section_id: int
     class_name: str
+    teacher_id: Optional[int]
     teacher_name: Optional[str]
     period: str
     enrolled_count: int

@@ -11,7 +11,6 @@ function RosterPanel({ section }) {
           {students.map((s) => (
             <div className="teacher-panel-row" key={s.user_id}>
               <span>{s.username}</span>
-              <span className="teacher-panel-row-sub">id: {s.user_id}</span>
             </div>
           ))}
         </div>

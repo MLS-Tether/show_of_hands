@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import api from '../api'
 import { formatDueDate } from '../utils/formatDueDate'
 import { useAutoRefresh } from '../utils/autoRefresh'
+import { isTeacher } from '../utils/auth'
 import './Assignments.css'
 
 function Assignments() {
@@ -36,6 +37,13 @@ function Assignments() {
 
   useEffect(() => load(), [load])
   useAutoRefresh(load)
+
+  // This page's data endpoint is student-only; teachers manage assignments
+  // per-section instead, so redirect rather than let them land on a
+  // silently-empty, always-403ing list.
+  if (isTeacher()) {
+    return <Navigate to="/dashboard" replace />
+  }
 
   const loading = assignments === null
   const rows = loading ? [] : assignments[tab]

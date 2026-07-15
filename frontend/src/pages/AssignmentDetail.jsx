@@ -34,6 +34,7 @@ function toDatetimeLocalValue(iso) {
 function EditAssignmentForm({ assignment, onSaved, onCancel }) {
   const [title, setTitle] = useState(assignment.title)
   const [description, setDescription] = useState(assignment.description || '')
+  const [url, setUrl] = useState(assignment.url || '')
   const [dueDate, setDueDate] = useState(toDatetimeLocalValue(assignment.due_date))
   const [pointValue, setPointValue] = useState(assignment.point_value)
   const [error, setError] = useState('')
@@ -47,6 +48,7 @@ function EditAssignmentForm({ assignment, onSaved, onCancel }) {
       await api.patch(`/assignments/${assignment.assignment_id}`, {
         title,
         description: description || null,
+        url: url || null,
         due_date: new Date(dueDate).toISOString(),
         point_value: Number(pointValue),
       })
@@ -67,6 +69,10 @@ function EditAssignmentForm({ assignment, onSaved, onCancel }) {
       <label className="submission-form-field">
         Description
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+      </label>
+      <label className="submission-form-field">
+        URL (optional)
+        <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
       </label>
       <label className="submission-form-field">
         Due date
@@ -387,6 +393,13 @@ function TeacherAssignmentView({ assignmentId, assignment, onAssignmentChanged }
           {assignment.description && (
             <p className="assignment-detail-description">{assignment.description}</p>
           )}
+          {assignment.url && (
+            <p className="assignment-detail-description">
+              <a href={assignment.url} target="_blank" rel="noreferrer">
+                {assignment.url}
+              </a>
+            </p>
+          )}
           <div className="assignment-detail-actions">
             <button type="button" onClick={() => setEditing(true)}>
               Edit
@@ -484,6 +497,13 @@ function AssignmentDetail() {
       </p>
       {assignment.description && (
         <p className="assignment-detail-description">{assignment.description}</p>
+      )}
+      {assignment.url && (
+        <p className="assignment-detail-description">
+          <a href={assignment.url} target="_blank" rel="noreferrer">
+            {assignment.url}
+          </a>
+        </p>
       )}
 
       <div className="widget-label">submission</div>

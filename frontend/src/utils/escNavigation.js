@@ -14,7 +14,16 @@ const ROUTE_PARENTS = [
   { pattern: /^\/profile$/, parent: '/dashboard' },
 ]
 
-export function getParentPath(pathname) {
+// Teachers don't have a student-facing /assignments list to land on (it's
+// 403-gated for them) and there's no section id in this URL to route to
+// directly, so send them back through history instead of to a fixed parent.
+const TEACHER_ROUTE_OVERRIDES = [{ pattern: /^\/assignments\/[^/]+$/, parent: 'BACK' }]
+
+export function getParentPath(pathname, { isTeacher = false } = {}) {
+  if (isTeacher) {
+    const override = TEACHER_ROUTE_OVERRIDES.find((r) => r.pattern.test(pathname))
+    if (override) return override.parent
+  }
   const match = ROUTE_PARENTS.find((r) => r.pattern.test(pathname))
   return match ? match.parent : null
 }

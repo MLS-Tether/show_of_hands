@@ -31,6 +31,20 @@
   border-color: var(--text-h);
 }
 
+.teacher-section-card-readonly {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.teacher-section-card-readonly:hover {
+  border-color: var(--border-strong);
+}
+
+.teacher-dashboard h2 {
+  font-size: 16px;
+  margin: 24px 0 12px;
+}
+
 .teacher-section-card-title {
   font-size: 15px;
   color: var(--text-h);

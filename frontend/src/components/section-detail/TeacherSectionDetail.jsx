@@ -81,6 +81,8 @@ function TeacherSectionDetail() {
   const [loadedSectionId, setLoadedSectionId] = useState(null)
   const [activeCard, setActiveCard] = useState(null)
   const [editing, setEditing] = useState(false)
+  const [pendingRequests, setPendingRequests] = useState(0)
+  const [ungraded, setUngraded] = useState(0)
 
   const load = useCallback(() => {
     let cancelled = false
@@ -97,6 +99,27 @@ function TeacherSectionDetail() {
         setNotFound(true)
         setLoadedSectionId(sectionId)
       })
+
+    Promise.all([
+      api.get(`/sections/${sectionId}/enrollment-requests`),
+      api.get(`/sections/${sectionId}/analytics`),
+    ])
+      .then(([enrollmentRequestsRes, analyticsRes]) => {
+        if (cancelled) return
+        setPendingRequests(enrollmentRequestsRes.data.length)
+        setUngraded(
+          analyticsRes.data.assignments.reduce(
+            (sum, a) => sum + (a.submitted_count - a.graded_count),
+            0
+          )
+        )
+      })
+      .catch(() => {
+        if (cancelled) return
+        setPendingRequests(0)
+        setUngraded(0)
+      })
+
     return () => {
       cancelled = true
     }
@@ -169,16 +192,21 @@ function TeacherSectionDetail() {
         </div>
       ) : (
         <div className="teacher-section-grid">
-          {CARDS.map((c) => (
-            <button
-              type="button"
-              className="teacher-section-card-tile"
-              key={c.key}
-              onClick={() => setActiveCard(c.key)}
-            >
-              {c.label}
-            </button>
-          ))}
+          {CARDS.map((c) => {
+            const badgeCount =
+              c.key === 'enrollment-requests' ? pendingRequests : c.key === 'assignments' ? ungraded : 0
+            return (
+              <button
+                type="button"
+                className="teacher-section-card-tile"
+                key={c.key}
+                onClick={() => setActiveCard(c.key)}
+              >
+                {badgeCount > 0 && <span className="teacher-section-card-badge">{badgeCount}</span>}
+                {c.label}
+              </button>
+            )
+          })}
         </div>
       )}
     </section>

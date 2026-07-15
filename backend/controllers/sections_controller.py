@@ -32,6 +32,7 @@ def _build_list_item(section: Section, enrolled_count: int) -> dict:
     return {
         "section_id": section.section_id,
         "class_name": section.class_.name,
+        "teacher_id": section.teacher_id,
         "teacher_name": section.teacher.username if section.teacher else None,
         "period": section.period,
         "enrolled_count": enrolled_count,
