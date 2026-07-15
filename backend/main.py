@@ -29,7 +29,7 @@ from controllers.quests_controller import router as quests_router
 from controllers.quest_completions_controller import router as quest_completions_router
 from controllers.points_controller import router as points_router
 from controllers.help_requests_controller import router as help_requests_router
-from controllers.rooms_controller import router as rooms_router, room_registry
+from controllers.rooms_controller import router as rooms_router, room_registry, room_messages
 from controllers.notifications_controller import (
     router as notifications_router,
     deliver_notifications,
@@ -122,7 +122,7 @@ async def lifespan(app: FastAPI):
 
     loop = asyncio.get_event_loop()
     start_listener(loop)
-    delivery_task = asyncio.create_task(deliver_loop(room_registry))
+    delivery_task = asyncio.create_task(deliver_loop(room_registry, room_messages))
     notifications_task = asyncio.create_task(deliver_notifications())
 
     yield

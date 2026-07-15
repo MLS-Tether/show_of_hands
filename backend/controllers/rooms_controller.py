@@ -347,8 +347,10 @@ async def chat(websocket: WebSocket, room_id: int, token: str):
                 "content": content,
                 "sent_at": datetime.now(timezone.utc).isoformat(),
             }
-            room_messages.setdefault(room_id, []).append(message_out)
-
+            # Not appended to room_messages directly here — every backend
+            # process (including this one) receives its own NOTIFY back via
+            # deliver_loop, which is the single place history gets recorded.
+            # See deliver_loop's docstring for why.
             notify_room_message(db, room_id, message_out, sender_id=user_id)
 
     except WebSocketDisconnect:

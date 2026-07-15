@@ -63,9 +63,21 @@ def stop_listener():
     _stop_event.set()
 
 
-async def deliver_loop(room_registry: dict):
+async def deliver_loop(room_registry: dict, room_messages: dict):
     """Runs as an asyncio task. Reads relayed messages off the queue and
-    delivers them to any locally-connected WebSocket clients in that room."""
+    delivers them to any locally-connected WebSocket clients in that room.
+
+    Also records genuine chat messages (anything without a "type" key —
+    control events like timer_extended/room_deleted are excluded) into this
+    process's own room_messages history. This is the ONLY place that writes
+    history, on purpose: every backend process listens for every NOTIFY,
+    including the one it just issued itself, so a message always round-trips
+    back here regardless of which process the sender was connected to. That
+    keeps every process's replay history consistent even when different
+    members of the same room are connected to different backend instances
+    (e.g. two developers each running their own local server against the
+    same shared database) — without this, a process would only have replay
+    history for messages that originated on itself."""
     while True:
         raw_payload = await broadcast_queue.get()
         try:
@@ -77,6 +89,9 @@ async def deliver_loop(room_registry: dict):
         sender_id = data.pop("sender_id", None)
         if room_id is None:
             continue
+
+        if "type" not in data:
+            room_messages.setdefault(room_id, []).append(data)
 
         dead_connections = []
         for other_user_id, other_ws in list(room_registry.get(room_id, {}).items()):
