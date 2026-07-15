@@ -199,9 +199,29 @@ def finalize_submission(
         additional = 0
 
     student = db.query(User).filter(User.user_id == submission.student_id).first()
-    _award_points(student, additional, TransactionSourceEnum.assignment, submission.assignment_id, db)
 
-    submission.points_awarded += additional
+    original_txn = db.query(PointTransaction).filter(
+        PointTransaction.user_id == student.user_id,
+        PointTransaction.source == TransactionSourceEnum.assignment,
+        PointTransaction.source_id == submission.assignment_id,
+    ).first()
+
+    new_total = submission.points_awarded + additional
+
+    if original_txn:
+        student.total_points -= original_txn.amount
+        db.delete(original_txn)
+
+    if new_total > 0:
+        db.add(PointTransaction(
+            user_id=student.user_id,
+            amount=new_total,
+            source=TransactionSourceEnum.assignment,
+            source_id=submission.assignment_id,
+        ))
+        student.total_points += new_total
+
+    submission.points_awarded = new_total
     submission.status = SubmissionStatusEnum.graded
     submission.finalized_at = datetime.now(timezone.utc)
 

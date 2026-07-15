@@ -1,5 +1,6 @@
 # tests/test_submissions.py
 from models.assignment_model import Assignment
+from models.point_transaction_model import PointTransaction, TransactionSourceEnum
 from models.submission_model import Submission
 from tests.conftest import unique, auth_header
 
@@ -94,6 +95,15 @@ def test_grade_and_finalize_submission_high_grade_bonus(client, world, cleanup):
     assert body["status"] == "graded"
     # 25 initial (25% of 100) + 75 bonus (75% of 100, grade >= 85) = 100
     assert body["points_awarded"] == 100
+
+    # the initial 25% transaction is replaced in place, not appended to
+    txns = db.query(PointTransaction).filter(
+        PointTransaction.user_id == world.student_id,
+        PointTransaction.source == TransactionSourceEnum.assignment,
+        PointTransaction.source_id == assignment_id,
+    ).all()
+    assert len(txns) == 1
+    assert txns[0].amount == 100
 
 
 def test_finalize_without_grade_fails(client, world, cleanup):
