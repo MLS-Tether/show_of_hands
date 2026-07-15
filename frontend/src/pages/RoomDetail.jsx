@@ -99,6 +99,10 @@ function RoomDetail() {
             alert('This room was deleted by its creator.').then(() => navigate('/study-rooms'))
             return
           }
+          if (data.type === 'timer_extended') {
+            setRoom((prev) => (prev ? { ...prev, timer_ends_at: data.timer_ends_at } : prev))
+            return
+          }
           setMessages((prev) => [...prev, data])
         }
 

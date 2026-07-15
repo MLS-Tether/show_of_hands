@@ -218,6 +218,14 @@ def extend_room(
     room.timer_ends_at = room.timer_ends_at + timedelta(minutes=10)
     db.commit()
     db.refresh(room)
+
+    notify_room_message(
+        db,
+        room_id,
+        {"type": "timer_extended", "timer_ends_at": room.timer_ends_at.isoformat()},
+        sender_id=current_user.user_id,
+    )
+
     return room
 
 
@@ -308,7 +316,6 @@ async def chat(websocket: WebSocket, room_id: int, token: str):
             return
 
         username = user.username
-        requester_id = room.help_request.requester_id
     finally:
         db.close()
 
@@ -355,18 +362,5 @@ async def chat(websocket: WebSocket, room_id: int, token: str):
         # out the room (and its chat history) on a transient disconnect.
         if room_id in room_registry:
             room_registry[room_id].pop(user_id, None)
-
-            # If only the requester remains in WS registry, auto-close the room
-            remaining_ids = set(room_registry.get(room_id, {}).keys())
-            if remaining_ids and remaining_ids == {requester_id}:
-                cleanup_db = SessionLocal()
-                try:
-                    db_room = cleanup_db.query(StudyRoom).filter(StudyRoom.room_id == room_id).first()
-                    if db_room and db_room.status == StudyRoomStatusEnum.active:
-                        db_room.status = StudyRoomStatusEnum.closed
-                        cleanup_db.commit()
-                finally:
-                    cleanup_db.close()
-                await _close_room_connections(room_id, requester_id=requester_id)
-            elif not remaining_ids:
+            if not room_registry.get(room_id):
                 room_registry.pop(room_id, None)
