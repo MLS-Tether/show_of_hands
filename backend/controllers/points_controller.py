@@ -3,9 +3,18 @@ from sqlalchemy.orm import Session
 
 from db.pool import get_db
 from dependencies import get_current_user
-from models.point_transaction_model import PointTransaction
+from models.assignment_model import Assignment
+from models.help_request_model import HelpRequest
+from models.point_transaction_model import PointTransaction, TransactionSourceEnum
+from models.quest_model import Quest
 from models.user_model import User, RoleEnum
 from schemas.point_transaction import PointBalanceResponse
+
+_SOURCE_LOOKUPS = {
+    TransactionSourceEnum.assignment: (Assignment, "assignment_id", "title"),
+    TransactionSourceEnum.quest: (Quest, "quest_id", "title"),
+    TransactionSourceEnum.help_request: (HelpRequest, "help_request_id", "topic"),
+}
 
 router = APIRouter(prefix="/users", tags=["points"])
 
@@ -39,6 +48,14 @@ def get_user_points(
         .all()
     )
 
+    labels_by_source = {}
+    for source, (model, pk_name, label_field) in _SOURCE_LOOKUPS.items():
+        source_ids = [t.source_id for t in transactions if t.source == source]
+        if not source_ids:
+            continue
+        rows = db.query(model).filter(getattr(model, pk_name).in_(source_ids)).all()
+        labels_by_source[source] = {getattr(row, pk_name): getattr(row, label_field) for row in rows}
+
     return {
         "user_id": user.user_id,
         "total_points": user.total_points,
@@ -48,6 +65,7 @@ def get_user_points(
                 "amount": t.amount,
                 "source": t.source,
                 "source_id": t.source_id,
+                "source_label": labels_by_source.get(t.source, {}).get(t.source_id),
                 "awarded_at": t.awarded_at,
             }
             for t in transactions

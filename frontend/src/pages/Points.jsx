@@ -73,6 +73,9 @@ function Points() {
                   <span className="points-row-source">
                     {SOURCE_LABELS[t.source] ?? t.source}
                   </span>
+                  {t.source_label && (
+                    <span className="points-row-label">{t.source_label}</span>
+                  )}
                   <span className="points-row-date">{formatAwardedAt(t.awarded_at)}</span>
                   <span className="points-row-amount">+{t.amount}</span>
                 </div>

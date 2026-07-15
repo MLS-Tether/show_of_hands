@@ -11,7 +11,7 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin: -16px 0 20px;
+  margin: 8px 0 24px;
 }
 
 .points-balance-value {
@@ -40,11 +40,17 @@
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   padding: 12px 14px;
+  line-height: 1.3;
 }
 
 .points-row-source {
   font-size: 14px;
   color: var(--text-h);
+}
+
+.points-row-label {
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 .points-row-date {
