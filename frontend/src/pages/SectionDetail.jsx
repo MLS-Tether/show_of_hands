@@ -1,15 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../api'
+import { useAutoRefresh } from '../utils/autoRefresh'
+import { isTeacher } from '../utils/auth'
+import TeacherSectionDetail from '../components/section-detail/TeacherSectionDetail'
 import './SectionDetail.css'
 
 function SectionDetail() {
+  if (isTeacher()) return <TeacherSectionDetail />
+  return <StudentSectionDetail />
+}
+
+function StudentSectionDetail() {
   const { sectionId } = useParams()
   const [section, setSection] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [loadedSectionId, setLoadedSectionId] = useState(null)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false
     api
       .get(`/sections/${sectionId}`)
@@ -28,6 +36,9 @@ function SectionDetail() {
       cancelled = true
     }
   }, [sectionId])
+
+  useEffect(() => load(), [load])
+  useAutoRefresh(load)
 
   const loading = loadedSectionId !== sectionId
 

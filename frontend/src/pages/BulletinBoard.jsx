@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
-import { getMyHelpRequestIds, getMyRooms, rememberHelpRequestId, rememberRoom } from '../utils/roomTracking'
+import Modal from '../components/Modal'
+import { useDialog } from '../components/DialogProvider'
+import { useAutoRefresh } from '../utils/autoRefresh'
+import { forgetRoom, getMyHelpRequestIds, getMyRooms, rememberHelpRequestId, rememberRoom } from '../utils/roomTracking'
 import './BulletinBoard.css'
 
 const STATUS_LABELS = {
@@ -95,27 +98,89 @@ function NewRequestForm({ sections, onCreated }) {
   )
 }
 
+function EditRequestForm({ hr, onSaved, onCancel }) {
+  const [topic, setTopic] = useState(hr.topic)
+  const [description, setDescription] = useState(hr.description || '')
+  const [groupSize, setGroupSize] = useState(hr.group_size)
+  const [durationMinutes, setDurationMinutes] = useState(hr.duration_minutes)
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    setSubmitting(true)
+    try {
+      const { data } = await api.patch(`/help-requests/${hr.help_request_id}`, {
+        topic,
+        description: description || null,
+        group_size: Number(groupSize),
+        duration_minutes: Number(durationMinutes),
+      })
+      onSaved(data)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not save changes.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="bulletin-request-form" onSubmit={handleSubmit}>
+      <label className="bulletin-request-form-field">
+        Topic
+        <input value={topic} onChange={(e) => setTopic(e.target.value)} required />
+      </label>
+      <label className="bulletin-request-form-field">
+        Description (optional)
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+      </label>
+      <div className="bulletin-request-form-row">
+        <label className="bulletin-request-form-field">
+          Group size
+          <input
+            type="number"
+            min={2}
+            value={groupSize}
+            onChange={(e) => setGroupSize(e.target.value)}
+            required
+          />
+        </label>
+        <label className="bulletin-request-form-field">
+          Duration (minutes)
+          <input
+            type="number"
+            min={5}
+            value={durationMinutes}
+            onChange={(e) => setDurationMinutes(e.target.value)}
+            required
+          />
+        </label>
+      </div>
+      {error && <p className="bulletin-request-form-error">{error}</p>}
+      <div className="bulletin-request-form-row">
+        <button type="submit" disabled={submitting}>
+          {submitting ? 'Saving…' : 'Save changes'}
+        </button>
+        <button type="button" onClick={onCancel} disabled={submitting}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
 function BulletinBoard() {
   const navigate = useNavigate()
+  const { confirm, alert } = useDialog()
   const [sections, setSections] = useState(null)
   const [requests, setRequests] = useState(null)
   const [joiningId, setJoiningId] = useState(null)
-  const [refreshTick, setRefreshTick] = useState(0)
+  const [deletingId, setDeletingId] = useState(null)
+  const [droppingId, setDroppingId] = useState(null)
+  const [editingRequest, setEditingRequest] = useState(null)
 
-  useEffect(() => {
-    function handleRefresh() {
-      if (document.visibilityState !== 'visible') return
-      setRefreshTick((t) => t + 1)
-    }
-    window.addEventListener('focus', handleRefresh)
-    document.addEventListener('visibilitychange', handleRefresh)
-    return () => {
-      window.removeEventListener('focus', handleRefresh)
-      document.removeEventListener('visibilitychange', handleRefresh)
-    }
-  }, [])
-
-  useEffect(() => {
+  const loadSections = useCallback(() => {
     let cancelled = false
     api
       .get('/sections')
@@ -123,40 +188,38 @@ function BulletinBoard() {
         if (!cancelled) setSections(data)
       })
       .catch(() => {
-        if (!cancelled) setSections([])
+        if (!cancelled) setSections((prev) => prev ?? [])
       })
     return () => {
       cancelled = true
     }
-  }, [refreshTick])
+  }, [])
 
-  useEffect(() => {
-    if (!sections) return
+  useEffect(() => loadSections(), [loadSections])
+  useAutoRefresh(loadSections)
+
+  const loadRequests = useCallback(() => {
     let cancelled = false
-    Promise.allSettled(
-      sections.map((s) => api.get(`/sections/${s.section_id}/help-requests`))
-    ).then((results) => {
-      if (cancelled) return
-      const myHelpRequestIds = getMyHelpRequestIds()
-      const merged = results.flatMap((r, i) => {
-        if (r.status !== 'fulfilled') return []
-        const section = sections[i]
-        return r.value.data.map((hr) => ({
-          ...hr,
-          section_id: section.section_id,
-          section_name: section.class_name,
-        }))
+    api
+      .get('/help-requests')
+      .then(({ data }) => {
+        if (cancelled) return
+        const myHelpRequestIds = getMyHelpRequestIds()
+        data
+          .filter((hr) => myHelpRequestIds.includes(hr.help_request_id) && hr.room_id)
+          .forEach((hr) => rememberRoom({ room_id: hr.room_id, topic: hr.topic }))
+        setRequests(data)
       })
-      merged
-        .filter((hr) => myHelpRequestIds.includes(hr.help_request_id) && hr.room_id)
-        .forEach((hr) => rememberRoom({ room_id: hr.room_id, topic: hr.topic }))
-      merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      setRequests(merged)
-    })
+      .catch(() => {
+        if (!cancelled) setRequests((prev) => prev ?? [])
+      })
     return () => {
       cancelled = true
     }
-  }, [sections])
+  }, [])
+
+  useEffect(() => loadRequests(), [loadRequests])
+  useAutoRefresh(loadRequests)
 
   async function handleJoin(hr) {
     setJoiningId(hr.help_request_id)
@@ -165,9 +228,44 @@ function BulletinBoard() {
       rememberRoom({ room_id: data.room_id, topic: hr.topic })
       navigate(`/rooms/${data.room_id}`)
     } catch (err) {
-      window.alert(err.response?.data?.message || 'Could not join this request.')
+      await alert(err.response?.data?.message || 'Could not join this request.')
     } finally {
       setJoiningId(null)
+    }
+  }
+
+  async function handleDelete(hr) {
+    const warning =
+      hr.status === 'active'
+        ? 'Delete this room? Everyone still connected will be disconnected immediately. This cannot be undone.'
+        : 'Delete this room? This cannot be undone.'
+    if (!(await confirm(warning))) return
+
+    setDeletingId(hr.help_request_id)
+    try {
+      await api.delete(`/rooms/${hr.room_id}`)
+      forgetRoom(hr.room_id)
+      setRequests((prev) =>
+        prev.map((r) => (r.help_request_id === hr.help_request_id ? { ...r, room_id: null, status: 'closed' } : r))
+      )
+    } catch (err) {
+      await alert(err.response?.data?.message || 'Could not delete the room.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  async function handleDrop(hr) {
+    if (!(await confirm('Delete this help request? This cannot be undone.'))) return
+
+    setDroppingId(hr.help_request_id)
+    try {
+      await api.post(`/help-requests/${hr.help_request_id}/drop`)
+      setRequests((prev) => prev.filter((r) => r.help_request_id !== hr.help_request_id))
+    } catch (err) {
+      await alert(err.response?.data?.message || 'Could not delete this help request.')
+    } finally {
+      setDroppingId(null)
     }
   }
 
@@ -203,6 +301,7 @@ function BulletinBoard() {
                 const isMine = myHelpRequestIds.includes(hr.help_request_id)
                 const canJoin = hr.status === 'open' && hr.current_size < hr.group_size && !isMine
                 const canOpen = hr.room_id && (isMine || myRoomIds.includes(hr.room_id))
+                const canManageUnclaimed = isMine && !hr.room_id && hr.status === 'open' && hr.current_size <= 1
                 return (
                   <div className="bulletin-request-card" key={hr.help_request_id}>
                     <div className="bulletin-request-card-main">
@@ -236,6 +335,29 @@ function BulletinBoard() {
                           {joiningId === hr.help_request_id ? 'Joining…' : 'Join'}
                         </button>
                       )}
+                      {isMine && hr.room_id && (
+                        <button
+                          type="button"
+                          disabled={deletingId === hr.help_request_id}
+                          onClick={() => handleDelete(hr)}
+                        >
+                          {deletingId === hr.help_request_id ? 'Deleting…' : 'Delete room'}
+                        </button>
+                      )}
+                      {canManageUnclaimed && (
+                        <>
+                          <button type="button" onClick={() => setEditingRequest(hr)}>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            disabled={droppingId === hr.help_request_id}
+                            onClick={() => handleDrop(hr)}
+                          >
+                            {droppingId === hr.help_request_id ? 'Deleting…' : 'Delete request'}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )
@@ -243,6 +365,24 @@ function BulletinBoard() {
             </div>
           )}
         </>
+      )}
+
+      {editingRequest && (
+        <Modal onClose={() => setEditingRequest(null)}>
+          <h2 className="bulletin-board-subheading">Edit help request</h2>
+          <EditRequestForm
+            hr={editingRequest}
+            onCancel={() => setEditingRequest(null)}
+            onSaved={(updated) => {
+              setRequests((prev) =>
+                prev.map((r) =>
+                  r.help_request_id === updated.help_request_id ? { ...r, ...updated } : r
+                )
+              )
+              setEditingRequest(null)
+            }}
+          />
+        </Modal>
       )}
     </section>
   )

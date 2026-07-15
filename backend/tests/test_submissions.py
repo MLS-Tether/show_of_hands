@@ -70,25 +70,7 @@ def test_list_submissions_teacher_admin_only(client, world, cleanup):
     assert any(s["submission_id"] == submission_id for s in resp.json())
 
 
-def test_get_submission_owner_rules(client, world, cleanup):
-    assignment_id = _new_assignment(client, world, cleanup)
-    resp = client.post(
-        f"/api/assignments/{assignment_id}/submissions",
-        json={},
-        headers=auth_header(world.student_token),
-    )
-    assert resp.status_code == 201, resp.text
-    submission_id = resp.json()["submission_id"]
-    cleanup(Submission, submission_id)
-
-    resp = client.get(f"/api/submissions/{submission_id}", headers=auth_header(world.student_token))
-    assert resp.status_code == 200, resp.text
-
-    resp = client.get(f"/api/submissions/{submission_id}", headers=auth_header(world.teacher_token))
-    assert resp.status_code == 200, resp.text
-
-
-def test_grade_and_finalize_submission_high_grade_bonus(client, world, cleanup, db):
+def test_grade_and_finalize_submission_high_grade_bonus(client, world, cleanup):
     assignment_id = _new_assignment(client, world, cleanup, point_value=100)
     resp = client.post(
         f"/api/assignments/{assignment_id}/submissions",

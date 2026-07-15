@@ -6,10 +6,15 @@ function Modal({ onClose, children }) {
 
   useEffect(() => {
     function handleKeyDown(e) {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape') return
+      // Capture phase, so this always runs before Layout.jsx's page-level
+      // Escape-to-go-back handler (a bubble-phase listener) regardless of
+      // mount order — closing this modal should never also navigate away.
+      e.stopPropagation()
+      onClose()
     }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    document.addEventListener('keydown', handleKeyDown, true)
+    return () => document.removeEventListener('keydown', handleKeyDown, true)
   }, [onClose])
 
   function handleBackdropClick(e) {

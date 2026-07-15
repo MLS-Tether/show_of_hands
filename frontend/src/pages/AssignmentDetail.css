@@ -72,6 +72,10 @@
   cursor: default;
 }
 
+.submission-summary + .submission-summary {
+  margin-top: 8px;
+}
+
 .submission-summary-card {
   display: flex;
   align-items: center;
@@ -144,4 +148,59 @@
 .submission-detail-label {
   color: var(--text-muted);
   white-space: nowrap;
+}
+
+.submission-detail button {
+  font-size: 13px;
+  padding: 6px 14px;
+  margin: 8px 12px 12px 0;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: none;
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.submission-detail button:hover {
+  background: var(--surface-1);
+}
+
+.submission-detail button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.submission-detail .submission-form-field {
+  padding: 8px 12px 0;
+}
+
+.grading-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 12px 0;
+}
+
+.assignment-detail-actions {
+  display: flex;
+  gap: 8px;
+  margin: -14px 0 24px;
+}
+
+.assignment-detail-actions button {
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: none;
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.assignment-detail-actions button:hover {
+  background: var(--surface-1);
+}
+
+.assignment-detail-actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }

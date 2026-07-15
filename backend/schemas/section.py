@@ -92,3 +92,38 @@ class SectionUpdateResponse(BaseModel):
     section_id: int
     status: SectionStatusEnum
     updated_at: datetime
+
+
+class AssignmentAnalytics(BaseModel):
+    assignment_id: int
+    title: str
+    point_value: int
+    submitted_count: int
+    graded_count: int
+    average_grade: Optional[float]
+    completion_rate: float
+
+
+class PointsDistribution(BaseModel):
+    min: Optional[int]
+    max: Optional[int]
+    median: Optional[float]
+
+
+class StudentNeedingAttention(BaseModel):
+    user_id: int
+    username: str
+    reason: str
+    assignment_id: int
+    assignment_title: Optional[str] = None
+    grade: Optional[float] = None
+
+
+class SectionAnalyticsResponse(BaseModel):
+    section_id: int
+    enrolled_count: int
+    assignment_count: int
+    average_grade: Optional[float]
+    assignments: List[AssignmentAnalytics]
+    points_distribution: PointsDistribution
+    students_needing_attention: List[StudentNeedingAttention]

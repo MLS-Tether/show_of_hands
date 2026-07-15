@@ -1,10 +1,13 @@
+import json
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from db.pool import get_db
+from auth_utils import decode_token
+from db.pool import get_db, SessionLocal
+from db.ws_broadcast import notification_queue
 from dependencies import get_current_user, require_role
 from models.enrollment_model import Enrollment
 from models.notification_model import Notification, NotificationTypeEnum
@@ -13,6 +16,11 @@ from models.user_model import User
 from schemas.notification import NotificationResponse, NotificationReadResponse
 
 router = APIRouter(tags=["notifications"])
+
+# In-memory registry — never persisted to DB.
+# Structure: { user_id: [WebSocket, ...] } — a list since a user may have
+# several tabs/devices open at once.
+notification_registry: dict = {}
 
 
 class SectionNotifyRequest(BaseModel):
@@ -95,3 +103,82 @@ def notify_section(
 
     db.commit()
     return {"message": f"Notification sent to {len(enrolled)} student(s)."}
+
+
+@router.websocket("/notifications/stream")
+async def notifications_stream(websocket: WebSocket, token: str):
+    try:
+        payload = decode_token(token)
+        user_id: int = payload["user_id"]
+    except Exception:
+        await websocket.close(code=4001)
+        return
+
+    await websocket.accept()
+    notification_registry.setdefault(user_id, []).append(websocket)
+
+    try:
+        while True:
+            # The client never sends anything meaningful over this socket —
+            # it exists purely for server -> client push. Just keep it open.
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        connections = notification_registry.get(user_id)
+        if connections and websocket in connections:
+            connections.remove(websocket)
+        if connections is not None and not connections:
+            notification_registry.pop(user_id, None)
+
+
+async def deliver_notifications():
+    """Runs as an asyncio task. Reads relayed {user_id, notification_id}
+    payloads off the queue (fired by a Postgres trigger on every notifications
+    insert) and pushes the full notification to any of that user's locally-
+    connected WebSocket clients."""
+    while True:
+        raw_payload = await notification_queue.get()
+        try:
+            data = json.loads(raw_payload)
+        except json.JSONDecodeError:
+            continue
+
+        user_id = data.get("user_id")
+        notification_id = data.get("notification_id")
+        if user_id is None or notification_id is None:
+            continue
+
+        connections = notification_registry.get(user_id)
+        if not connections:
+            continue
+
+        db = SessionLocal()
+        try:
+            notification = db.query(Notification).filter(
+                Notification.notification_id == notification_id,
+            ).first()
+        finally:
+            db.close()
+        if not notification:
+            continue
+
+        message = {
+            "type": "new_notification",
+            "notification": {
+                "notification_id": notification.notification_id,
+                "type": notification.type.value,
+                "message": notification.message,
+                "is_read": notification.is_read,
+                "created_at": notification.created_at.isoformat(),
+            },
+        }
+
+        dead_connections = []
+        for ws in list(connections):
+            try:
+                await ws.send_json(message)
+            except Exception:
+                dead_connections.append(ws)
+        for ws in dead_connections:
+            connections.remove(ws)

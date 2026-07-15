@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../api'
+import { useDialog } from '../components/DialogProvider'
+import { useAutoRefresh } from '../utils/autoRefresh'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
+import { wsUrlWithFreshToken } from '../utils/ws'
 import './RoomDetail.css'
 
 function formatCountdown(ms) {
@@ -12,15 +15,10 @@ function formatCountdown(ms) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`
 }
 
-function wsUrlFor(roomId) {
-  const wsBase = api.defaults.baseURL.replace(/^http/, 'ws')
-  const token = localStorage.getItem('access_token')
-  return `${wsBase}/rooms/${roomId}/chat?token=${encodeURIComponent(token)}`
-}
-
 function RoomDetail() {
   const { roomId } = useParams()
   const navigate = useNavigate()
+  const { confirm, alert } = useDialog()
   const currentUserId = Number(localStorage.getItem('user_id'))
 
   const [room, setRoom] = useState(null)
@@ -38,7 +36,7 @@ function RoomDetail() {
   const reconnectAttemptRef = useRef(0)
   const closingIntentionallyRef = useRef(false)
 
-  useEffect(() => {
+  const loadRoom = useCallback(() => {
     let cancelled = false
     api
       .get(`/rooms/${roomId}`)
@@ -59,6 +57,12 @@ function RoomDetail() {
     }
   }, [roomId])
 
+  useEffect(() => loadRoom(), [loadRoom])
+  // Kicks/leaves/status changes from other members aren't pushed in real
+  // time (only chat is) — keep this one on a shorter interval than the app
+  // default so room state doesn't feel stale for minutes at a time.
+  useAutoRefresh(loadRoom, 20000)
+
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
@@ -68,6 +72,7 @@ function RoomDetail() {
 
   useEffect(() => {
     if (!activeRoomId) return
+<<<<<<< HEAD
     closingIntentionallyRef.current = false
     reconnectAttemptRef.current = 0
 
@@ -81,12 +86,22 @@ function RoomDetail() {
         setConnectionStatus('open')
       }
 
+=======
+    let cancelled = false
+
+    wsUrlWithFreshToken(`/rooms/${activeRoomId}/chat`).then((url) => {
+      if (cancelled) return
+      const ws = new WebSocket(url)
+      wsRef.current = ws
+
+>>>>>>> 7c3eca9d5cb04259a1e84ec91597425f9c3de778
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data)
         if (data.type === 'session_confirmation_required') {
           setConfirmPending(true)
           return
         }
+<<<<<<< HEAD
         setMessages((prev) => [...prev, data])
       }
 
@@ -103,12 +118,26 @@ function RoomDetail() {
         reconnectTimeoutRef.current = setTimeout(connect, delay)
       }
     }
+=======
+        if (data.type === 'room_deleted') {
+          forgetRoom(Number(roomId))
+          alert('This room was deleted by its creator.').then(() => navigate('/study-rooms'))
+          return
+        }
+        setMessages((prev) => [...prev, data])
+      }
+    })
+>>>>>>> 7c3eca9d5cb04259a1e84ec91597425f9c3de778
 
     connect()
 
     return () => {
+<<<<<<< HEAD
       closingIntentionallyRef.current = true
       clearTimeout(reconnectTimeoutRef.current)
+=======
+      cancelled = true
+>>>>>>> 7c3eca9d5cb04259a1e84ec91597425f9c3de778
       wsRef.current?.close()
       wsRef.current = null
     }
@@ -141,7 +170,7 @@ function RoomDetail() {
   }
 
   async function handleClose() {
-    if (!window.confirm('Close this study room for everyone?')) return
+    if (!(await confirm('Close this study room for everyone?'))) return
     setActionError('')
     try {
       await api.post(`/rooms/${roomId}/close`)
@@ -153,7 +182,7 @@ function RoomDetail() {
   }
 
   async function handleKick(userId) {
-    if (!window.confirm('Remove this member from the room?')) return
+    if (!(await confirm('Remove this member from the room?'))) return
     setActionError('')
     try {
       await api.post(`/rooms/${roomId}/kick`, { user_id: userId })
@@ -163,8 +192,24 @@ function RoomDetail() {
     }
   }
 
+  async function handleDelete() {
+    const warning =
+      room.status === 'active'
+        ? 'Delete this room? Everyone still connected will be disconnected immediately. This cannot be undone.'
+        : 'Delete this room? This cannot be undone.'
+    if (!(await confirm(warning))) return
+    setActionError('')
+    try {
+      await api.delete(`/rooms/${roomId}`)
+      forgetRoom(Number(roomId))
+      navigate('/study-rooms')
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not delete the room.')
+    }
+  }
+
   async function handleLeave() {
-    if (!window.confirm('Leave this study room?')) return
+    if (!(await confirm('Leave this study room?'))) return
     setActionError('')
     try {
       await api.post(`/rooms/${roomId}/leave`)
@@ -184,7 +229,7 @@ function RoomDetail() {
       setConfirmPending(false)
       setConfirmResult(data.points_awarded)
     } catch (err) {
-      window.alert(err.response?.data?.message || 'Could not confirm the session.')
+      await alert(err.response?.data?.message || 'Could not confirm the session.')
     }
   }
 
@@ -229,6 +274,11 @@ function RoomDetail() {
               Close room
             </button>
           </>
+        )}
+        {isRequester && (
+          <button type="button" onClick={handleDelete}>
+            Delete room
+          </button>
         )}
         <button type="button" onClick={handleLeave}>
           Leave room
@@ -285,12 +335,7 @@ function RoomDetail() {
             </p>
           )}
           <div className="room-detail-chat">
-            {messages.length === 0 && (
-              <p className="room-detail-placeholder">
-                No messages yet. Chat history isn't saved — messages sent before you joined won't
-                appear.
-              </p>
-            )}
+            {messages.length === 0 && <p className="room-detail-placeholder">No messages yet.</p>}
             {messages.map((m, i) => (
               <div className="room-detail-message" key={i}>
                 <span className="room-detail-message-author">{m.username}</span>
