@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 class AssignmentCreate(BaseModel):
     title: str
     description: Optional[str] = None
+    url: Optional[str] = None
     due_date: datetime
     point_value: int
 
@@ -13,6 +14,7 @@ class AssignmentCreate(BaseModel):
 class AssignmentUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    url: Optional[str] = None
     due_date: Optional[datetime] = None
     point_value: Optional[int] = None
 
@@ -33,6 +35,7 @@ class AssignmentResponse(BaseModel):
     section_id: int
     title: str
     description: Optional[str]
+    url: Optional[str] = None
     due_date: datetime
     point_value: int
     created_at: datetime

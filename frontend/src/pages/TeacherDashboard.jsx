@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import { useAutoRefresh } from '../utils/autoRefresh'
+import { getUserId } from '../utils/auth'
 import AddSectionForm from '../components/dashboard/AddSectionForm'
 import './TeacherDashboard.css'
 
@@ -28,6 +29,7 @@ function TeacherDashboard() {
   const navigate = useNavigate()
   const [sections, setSections] = useState(null)
   const [pending, setPending] = useState({})
+  const userId = getUserId()
 
   const load = useCallback(() => {
     let cancelled = false
@@ -37,7 +39,9 @@ function TeacherDashboard() {
         if (cancelled) return
         setSections(data)
 
-        mapWithConcurrency(data, BADGE_FETCH_CONCURRENCY, async (s) => {
+        const owned = data.filter((s) => s.teacher_id === userId)
+
+        mapWithConcurrency(owned, BADGE_FETCH_CONCURRENCY, async (s) => {
           try {
             const [enrollmentRequestsRes, analyticsRes] = await Promise.all([
               api.get(`/sections/${s.section_id}/enrollment-requests`),
@@ -70,24 +74,27 @@ function TeacherDashboard() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [userId])
 
   useEffect(() => load(), [load])
   useAutoRefresh(load)
 
   const loading = sections === null
+  const ownedSections = loading ? [] : sections.filter((s) => s.teacher_id === userId)
+  const otherSections = loading ? [] : sections.filter((s) => s.teacher_id !== userId)
 
   return (
     <section className="teacher-dashboard">
       <h1>My Sections</h1>
 
       {loading && <p className="teacher-dashboard-placeholder">Loading sections…</p>}
-      {!loading && sections.length === 0 && (
+
+      {!loading && ownedSections.length === 0 && (
         <p className="teacher-dashboard-placeholder">No sections yet.</p>
       )}
       {!loading && (
         <div className="teacher-dashboard-grid">
-          {sections.map((s) => {
+          {ownedSections.map((s) => {
             const badge = pending[s.section_id]
             const badgeCount = badge ? badge.pendingRequests + badge.ungraded : 0
             return (
@@ -110,6 +117,25 @@ function TeacherDashboard() {
           })}
           <AddSectionForm onCreated={load} />
         </div>
+      )}
+
+      {!loading && otherSections.length > 0 && (
+        <>
+          <h2>Other Sections in Your School</h2>
+          <div className="teacher-dashboard-grid">
+            {otherSections.map((s) => (
+              <div className="teacher-section-card teacher-section-card-readonly" key={s.section_id}>
+                <div className="teacher-section-card-title">{s.class_name}</div>
+                <div className="teacher-section-card-sub">
+                  {s.period} · {s.teacher_name || 'Unassigned teacher'}
+                </div>
+                <div className="teacher-section-card-meta">
+                  {s.enrolled_count}/{s.capacity} students
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </section>
   )

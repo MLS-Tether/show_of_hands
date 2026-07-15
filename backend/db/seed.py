@@ -1,4 +1,5 @@
 import os
+import random
 from datetime import datetime, timezone, timedelta
 
 from db.pool import SessionLocal
@@ -276,6 +277,115 @@ def seed_dev_data():
         ]
         for ntype, message in notification_specs:
             db.add(Notification(user_id=student_hero.user_id, type=ntype, message=message))
+
+        db.commit()
+    finally:
+        db.close()
+
+
+def seed_second_teacher_data():
+    """Adds a second teacher (teacher_demo2) with 3 sections of her own, each
+    with 3 assignments, 3 quests, and a random subset of the existing seeded
+    students enrolled.
+
+    Runs independently of seed_dev_data()'s DEV001-existence short-circuit --
+    guarded on teacher_demo2 already existing instead -- so it still
+    populates an already-seeded database on the next restart rather than
+    only ever applying to a brand-new one. teacher_demo is never referenced
+    here; this is entirely teacher_demo2's own roster of sections.
+    """
+    if os.getenv("ENV") != "development":
+        return
+
+    db = SessionLocal()
+    try:
+        school = db.query(School).filter(School.school_code == DEV_SCHOOL_CODE).first()
+        if not school:
+            return  # seed_dev_data() hasn't run yet -- nothing to attach to
+
+        if db.query(User).filter(
+            User.school_id == school.school_id,
+            User.username == "teacher_demo2",
+        ).first():
+            return
+
+        now = datetime.now(timezone.utc)
+        password_hash = hash_password(DEV_PASSWORD)
+
+        def make_user(username: str, role: RoleEnum) -> User:
+            user = User(
+                school_id=school.school_id,
+                username=username,
+                password_hash=password_hash,
+                role=role,
+                is_verified=True,
+            )
+            db.add(user)
+            db.flush()
+            return user
+
+        teacher = make_user("teacher_demo2", RoleEnum.teacher)
+
+        existing_students = db.query(User).filter(
+            User.school_id == school.school_id,
+            User.role == RoleEnum.student,
+        ).all()
+
+        # Distinct from teacher_demo's classes (Computer Science, Biology).
+        class_names = ["Chemistry", "Physics", "Economics"]
+        classes = []
+        for name in class_names:
+            cls = db.query(Class_).filter(Class_.name == name).first()
+            if not cls:
+                raise RuntimeError(f"seed_second_teacher_data requires seed_classes() to have seeded '{name}'")
+            classes.append(cls)
+
+        sections = []
+        for i, cls in enumerate(classes):
+            section = Section(
+                class_id=cls.class_id,
+                school_id=school.school_id,
+                teacher_id=teacher.user_id,
+                period=str(i + 4),
+                capacity=30,
+                status=SectionStatusEnum.active,
+            )
+            db.add(section)
+            sections.append(section)
+        db.flush()
+
+        for i, (section, cls) in enumerate(zip(sections, classes)):
+            # Random subset per section so coverage varies but nobody's empty.
+            sample_size = min(len(existing_students), random.randint(2, 5))
+            for student in random.sample(existing_students, k=sample_size):
+                db.add(Enrollment(section_id=section.section_id, student_id=student.user_id))
+
+            for j in range(3):
+                db.add(Assignment(
+                    section_id=section.section_id,
+                    title=f"{cls.name} Assignment {j + 1}",
+                    description=f"Assignment {j + 1} for {cls.name}.",
+                    due_date=now + timedelta(days=(j - 1) * 5),
+                    point_value=20 + j * 10,
+                ))
+
+            quest_specs = [
+                (QuestCategoryEnum.academic, QuestTypeEnum.daily, 10),
+                (QuestCategoryEnum.academic, QuestTypeEnum.weekly, 20),
+                # Stored post-multiplier (10 base * 1.5), matching what
+                # create_quest() would persist for a social-category quest.
+                (QuestCategoryEnum.social, QuestTypeEnum.weekly, 15),
+            ]
+            for k, (category, quest_type, point_value) in enumerate(quest_specs):
+                db.add(Quest(
+                    section_id=section.section_id,
+                    title=f"{cls.name} Quest {k + 1}",
+                    description=f"Quest {k + 1} for {cls.name}.",
+                    category=category,
+                    point_value=point_value,
+                    quest_type=quest_type,
+                    source=QuestSourceEnum.teacher,
+                ))
 
         db.commit()
     finally:

@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import TopBar from './TopBar'
 import Sidebar from './Sidebar'
 import { getParentPath } from '../utils/escNavigation'
+import { isTeacher } from '../utils/auth'
 import './Layout.css'
 
 function Layout() {
@@ -12,8 +13,13 @@ function Layout() {
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.key !== 'Escape') return
-      const parent = getParentPath(location.pathname)
-      if (parent) navigate(parent)
+      const parent = getParentPath(location.pathname, { isTeacher: isTeacher() })
+      if (!parent) return
+      if (parent === 'BACK') {
+        navigate(-1)
+      } else {
+        navigate(parent)
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)

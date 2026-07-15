@@ -5,3 +5,7 @@ export function getRole() {
 export function isTeacher() {
   return getRole() === 'teacher'
 }
+
+export function getUserId() {
+  return Number(localStorage.getItem('user_id'))
+}

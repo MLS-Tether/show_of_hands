@@ -5,6 +5,7 @@
 }
 
 .teacher-section-card-tile {
+  position: relative;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   padding: 20px 14px;
@@ -19,6 +20,21 @@
 
 .teacher-section-card-tile:hover {
   border-color: var(--text-h);
+}
+
+.teacher-section-card-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
 }
 
 .teacher-section-back {
@@ -115,6 +131,7 @@
 
 .teacher-panel-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   width: 100%;
@@ -127,7 +144,12 @@
   background: none;
   cursor: default;
   text-align: left;
-  gap: 10px;
+  gap: 4px 10px;
+}
+
+.teacher-panel-row > * {
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 button.teacher-panel-row {

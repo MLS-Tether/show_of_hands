@@ -7,6 +7,7 @@ function AssignmentsPanel({ sectionId, assignments, onChange }) {
   const [showForm, setShowForm] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [url, setUrl] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [pointValue, setPointValue] = useState(100)
   const [error, setError] = useState('')
@@ -20,11 +21,13 @@ function AssignmentsPanel({ sectionId, assignments, onChange }) {
       await api.post(`/sections/${sectionId}/assignments`, {
         title,
         description: description || null,
+        url: url || null,
         due_date: new Date(dueDate).toISOString(),
         point_value: Number(pointValue),
       })
       setTitle('')
       setDescription('')
+      setUrl('')
       setDueDate('')
       setPointValue(100)
       setShowForm(false)
@@ -59,6 +62,15 @@ function AssignmentsPanel({ sectionId, assignments, onChange }) {
           <label>
             Description (optional)
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          </label>
+          <label>
+            URL (optional)
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://…"
+            />
           </label>
           <div className="teacher-panel-form-row">
             <label>

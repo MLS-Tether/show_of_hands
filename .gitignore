@@ -1,0 +1,5 @@
+# SuperDesign (VS Code extension) drops these at the repo root when
+# initialized — tool artifacts, not project code, so keep them untracked.
+.cursor/
+.windsurfrules
+.superdesign/

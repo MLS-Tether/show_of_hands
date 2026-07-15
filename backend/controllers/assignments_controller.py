@@ -108,6 +108,7 @@ def create_assignment(
         section_id=section_id,
         title=body.title,
         description=body.description,
+        url=body.url,
         due_date=body.due_date,
         point_value=body.point_value,
     )
@@ -172,6 +173,8 @@ def update_assignment(
         assignment.title = body.title
     if body.description is not None:
         assignment.description = body.description
+    if body.url is not None:
+        assignment.url = body.url
     if body.due_date is not None:
         assignment.due_date = body.due_date
     if body.point_value is not None:

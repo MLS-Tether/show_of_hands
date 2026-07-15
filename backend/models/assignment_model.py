@@ -12,6 +12,7 @@ class Assignment(Base):
     section_id = Column(Integer, ForeignKey("sections.section_id"), nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
+    url = Column(String, nullable=True)
     due_date = Column(DateTime(timezone=True), nullable=False)
     point_value = Column(Integer, nullable=False)
     is_archived = Column(Boolean, nullable=False, default=False)
