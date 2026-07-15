@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
-import { useDialog } from '../components/DialogProvider'
+import { useDialog } from '../components/DialogContext'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import './Sections.css'
 

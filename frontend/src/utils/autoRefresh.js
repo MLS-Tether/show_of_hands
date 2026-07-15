@@ -17,7 +17,9 @@ export function broadcastRefresh() {
 // interval, on tab focus/visibility, and whenever broadcastRefresh() fires.
 export function useAutoRefresh(refetch, intervalMs = DEFAULT_INTERVAL_MS) {
   const refetchRef = useRef(refetch)
-  refetchRef.current = refetch
+  useEffect(() => {
+    refetchRef.current = refetch
+  })
 
   useEffect(() => {
     function run() {

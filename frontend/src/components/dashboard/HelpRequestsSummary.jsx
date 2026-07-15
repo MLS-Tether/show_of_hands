@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../../api'
-import { useDialog } from '../DialogProvider'
+import { useDialog } from '../DialogContext'
 import { useAutoRefresh } from '../../utils/autoRefresh'
 import { getMyHelpRequestIds, rememberRoom } from '../../utils/roomTracking'
 import './HelpRequestsSummary.css'

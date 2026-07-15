@@ -1,8 +1,7 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import Modal from './Modal'
+import { DialogContext } from './DialogContext'
 import './DialogProvider.css'
-
-const DialogContext = createContext(null)
 
 export function DialogProvider({ children }) {
   const [dialog, setDialog] = useState(null)
@@ -53,10 +52,4 @@ export function DialogProvider({ children }) {
       )}
     </DialogContext.Provider>
   )
-}
-
-export function useDialog() {
-  const ctx = useContext(DialogContext)
-  if (!ctx) throw new Error('useDialog must be used within a DialogProvider')
-  return ctx
 }

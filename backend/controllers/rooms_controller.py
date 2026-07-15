@@ -355,7 +355,6 @@ async def chat(websocket: WebSocket, room_id: int, token: str):
         # out the room (and its chat history) on a transient disconnect.
         if room_id in room_registry:
             room_registry[room_id].pop(user_id, None)
-<<<<<<< HEAD
 
             # If only the requester remains in WS registry, auto-close the room
             remaining_ids = set(room_registry.get(room_id, {}).keys())
@@ -370,7 +369,4 @@ async def chat(websocket: WebSocket, room_id: int, token: str):
                     cleanup_db.close()
                 await _close_room_connections(room_id, requester_id=requester_id)
             elif not remaining_ids:
-=======
-            if not room_registry.get(room_id):
->>>>>>> 7c3eca9d5cb04259a1e84ec91597425f9c3de778
                 room_registry.pop(room_id, None)

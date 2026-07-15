@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../api'
-import { useDialog } from '../components/DialogProvider'
+import { useDialog } from '../components/DialogContext'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
 import { wsUrlWithFreshToken } from '../utils/ws'
@@ -72,76 +72,61 @@ function RoomDetail() {
 
   useEffect(() => {
     if (!activeRoomId) return
-<<<<<<< HEAD
     closingIntentionallyRef.current = false
     reconnectAttemptRef.current = 0
+    let cancelled = false
 
     function connect() {
       setConnectionStatus('connecting')
-      const ws = new WebSocket(wsUrlFor(activeRoomId))
-      wsRef.current = ws
+      wsUrlWithFreshToken(`/rooms/${activeRoomId}/chat`).then((url) => {
+        if (cancelled) return
+        const ws = new WebSocket(url)
+        wsRef.current = ws
 
-      ws.onopen = () => {
-        reconnectAttemptRef.current = 0
-        setConnectionStatus('open')
-      }
-
-=======
-    let cancelled = false
-
-    wsUrlWithFreshToken(`/rooms/${activeRoomId}/chat`).then((url) => {
-      if (cancelled) return
-      const ws = new WebSocket(url)
-      wsRef.current = ws
-
->>>>>>> 7c3eca9d5cb04259a1e84ec91597425f9c3de778
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data)
-        if (data.type === 'session_confirmation_required') {
-          setConfirmPending(true)
-          return
+        ws.onopen = () => {
+          reconnectAttemptRef.current = 0
+          setConnectionStatus('open')
         }
-<<<<<<< HEAD
-        setMessages((prev) => [...prev, data])
-      }
 
-      ws.onerror = () => {
-        setConnectionStatus('closed')
-      }
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data)
+          if (data.type === 'session_confirmation_required') {
+            setConfirmPending(true)
+            return
+          }
+          if (data.type === 'room_deleted') {
+            forgetRoom(Number(roomId))
+            alert('This room was deleted by its creator.').then(() => navigate('/study-rooms'))
+            return
+          }
+          setMessages((prev) => [...prev, data])
+        }
 
-      ws.onclose = () => {
-        setConnectionStatus('closed')
-        if (closingIntentionallyRef.current) return
-        const attempt = reconnectAttemptRef.current + 1
-        reconnectAttemptRef.current = attempt
-        const delay = Math.min(1000 * 2 ** (attempt - 1), 10000)
-        reconnectTimeoutRef.current = setTimeout(connect, delay)
-      }
+        ws.onerror = () => {
+          setConnectionStatus('closed')
+        }
+
+        ws.onclose = () => {
+          setConnectionStatus('closed')
+          if (closingIntentionallyRef.current) return
+          const attempt = reconnectAttemptRef.current + 1
+          reconnectAttemptRef.current = attempt
+          const delay = Math.min(1000 * 2 ** (attempt - 1), 10000)
+          reconnectTimeoutRef.current = setTimeout(connect, delay)
+        }
+      })
     }
-=======
-        if (data.type === 'room_deleted') {
-          forgetRoom(Number(roomId))
-          alert('This room was deleted by its creator.').then(() => navigate('/study-rooms'))
-          return
-        }
-        setMessages((prev) => [...prev, data])
-      }
-    })
->>>>>>> 7c3eca9d5cb04259a1e84ec91597425f9c3de778
 
     connect()
 
     return () => {
-<<<<<<< HEAD
       closingIntentionallyRef.current = true
       clearTimeout(reconnectTimeoutRef.current)
-=======
       cancelled = true
->>>>>>> 7c3eca9d5cb04259a1e84ec91597425f9c3de778
       wsRef.current?.close()
       wsRef.current = null
     }
-  }, [activeRoomId])
+  }, [activeRoomId, roomId, navigate, alert])
 
   function handleSend(e) {
     e.preventDefault()
