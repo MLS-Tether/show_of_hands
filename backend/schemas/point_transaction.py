@@ -26,3 +26,6 @@ class PointBalanceResponse(BaseModel):
     user_id: int
     total_points: int
     transactions: List[PointTransactionResponse]
+    page: int
+    page_size: int
+    total_count: int

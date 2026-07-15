@@ -1,0 +1,95 @@
+.points-page {
+  text-align: left;
+}
+
+.points-placeholder {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.points-balance {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: -16px 0 20px;
+}
+
+.points-balance-value {
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--text-h);
+  letter-spacing: -0.5px;
+}
+
+.points-balance-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.points-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.points-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.points-row-source {
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.points-row-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.points-row-amount {
+  font-size: 13px;
+  color: var(--text-h);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+.points-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.points-pagination button {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: none;
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.points-pagination button:hover:not(:disabled) {
+  background: var(--surface-1);
+}
+
+.points-pagination button:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.points-pagination-status {
+  font-size: 13px;
+  color: var(--text-muted);
+}
