@@ -1,7 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Modal from './Modal'
+import ToastStack from './ToastStack'
 import api from '../api'
+import { broadcastRefresh, useAutoRefresh } from '../utils/autoRefresh'
+import { playNotificationChime } from '../utils/notificationSound'
+import { wsUrlWithFreshToken } from '../utils/ws'
 import './NotificationBell.css'
+
+// Real-time push does the heavy lifting now (a Postgres trigger fires on
+// every notification insert, relayed over this WebSocket) — this is just a
+// rare safety net in case the socket was disconnected and missed something.
+const FALLBACK_POLL_INTERVAL_MS = 180000
+const TOAST_DURATION_MS = 6000
+const RECONNECT_DELAY_MS = 3000
 
 function formatTimestamp(dateStr) {
   return new Intl.DateTimeFormat('en-US', {
@@ -21,22 +32,101 @@ function NotificationBell() {
   const [notifications, setNotifications] = useState(null)
   const [open, setOpen] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState(null)
+  const [toasts, setToasts] = useState([])
   const menuRef = useRef(null)
+  const seenIdsRef = useRef(new Set())
+  const wsRef = useRef(null)
+  const reconnectTimerRef = useRef(null)
 
-  useEffect(() => {
+  const dismissToast = useCallback((toastId) => {
+    setToasts((prev) => prev.filter((t) => t.id !== toastId))
+  }, [])
+
+  // Handles a notification arriving from either the live WebSocket push or
+  // the fallback poll catching something the socket missed — same treatment
+  // either way: surface a toast + chime and tell every open page to refresh.
+  const showIncoming = useCallback(
+    (notification) => {
+      if (seenIdsRef.current.has(notification.notification_id)) return
+      seenIdsRef.current.add(notification.notification_id)
+
+      setNotifications((prev) => [notification, ...(prev || [])])
+      broadcastRefresh()
+      playNotificationChime()
+      setToasts((prev) => [...prev, { id: notification.notification_id, message: notification.message }])
+      setTimeout(() => dismissToast(notification.notification_id), TOAST_DURATION_MS)
+    },
+    [dismissToast]
+  )
+
+  const hasLoadedRef = useRef(false)
+
+  const load = useCallback(() => {
     let cancelled = false
     api
       .get('/notifications')
       .then(({ data }) => {
-        if (!cancelled) setNotifications(data)
+        if (cancelled) return
+        const isFirstLoad = !hasLoadedRef.current
+        hasLoadedRef.current = true
+        data.forEach((n) => seenIdsRef.current.add(n.notification_id))
+
+        if (isFirstLoad) {
+          setNotifications(data)
+          return
+        }
+
+        // Merge rather than replace: a WS push may have already added a
+        // notification locally that this fallback fetch also just returned.
+        setNotifications((prev) => {
+          const existingIds = new Set((prev || []).map((n) => n.notification_id))
+          const missed = data.filter((n) => !existingIds.has(n.notification_id))
+          if (missed.length === 0) return prev
+          return [...missed, ...(prev || [])]
+        })
       })
       .catch(() => {
-        if (!cancelled) setNotifications([])
+        if (!cancelled) setNotifications((prev) => prev ?? [])
       })
     return () => {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => load(), [load])
+  useAutoRefresh(load, FALLBACK_POLL_INTERVAL_MS)
+
+  useEffect(() => {
+    let unmounted = false
+
+    async function connect() {
+      const url = await wsUrlWithFreshToken('/notifications/stream')
+      if (unmounted) return
+      const ws = new WebSocket(url)
+      wsRef.current = ws
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+        if (data.type === 'new_notification') {
+          showIncoming(data.notification)
+        }
+      }
+
+      ws.onclose = () => {
+        if (unmounted) return
+        reconnectTimerRef.current = setTimeout(connect, RECONNECT_DELAY_MS)
+      }
+    }
+
+    connect()
+
+    return () => {
+      unmounted = true
+      clearTimeout(reconnectTimerRef.current)
+      wsRef.current?.close()
+      wsRef.current = null
+    }
+  }, [showIncoming])
 
   useEffect(() => {
     if (!open) return
@@ -131,6 +221,8 @@ function NotificationBell() {
           </div>
         </Modal>
       )}
+
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }

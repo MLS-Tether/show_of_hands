@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../api'
+import { useAutoRefresh } from '../utils/autoRefresh'
 import './AssignmentDetail.css'
 
 const STATUS_LABELS = {
@@ -148,7 +149,7 @@ function AssignmentDetail() {
   const [assignmentFailed, setAssignmentFailed] = useState(false)
   const [submission, setSubmission] = useState(undefined)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false
 
     api
@@ -166,13 +167,16 @@ function AssignmentDetail() {
         if (!cancelled) setSubmission(data)
       })
       .catch(() => {
-        if (!cancelled) setSubmission(null)
+        if (!cancelled) setSubmission((prev) => (prev === undefined ? null : prev))
       })
 
     return () => {
       cancelled = true
     }
   }, [assignmentId])
+
+  useEffect(() => load(), [load])
+  useAutoRefresh(load)
 
   if (assignmentFailed) {
     return (

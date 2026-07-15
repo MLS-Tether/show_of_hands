@@ -46,6 +46,24 @@ def test_list_assignments_access_rules(client, world, cleanup):
     assert resp.status_code == 200, resp.text
 
 
+def test_list_my_assignments_across_sections(client, world, cleanup):
+    resp = client.post(
+        f"/api/sections/{world.section_id}/assignments",
+        json={"title": unique("HW"), "due_date": _due_date(), "point_value": 50},
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 201, resp.text
+    assignment_id = resp.json()["assignment_id"]
+    cleanup(Assignment, assignment_id)
+
+    resp = client.get("/api/assignments", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+    assert any(a["assignment_id"] == assignment_id for a in resp.json())
+
+    resp = client.get("/api/assignments", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 403
+
+
 def test_get_assignment_detail(client, world, cleanup):
     resp = client.post(
         f"/api/sections/{world.section_id}/assignments",

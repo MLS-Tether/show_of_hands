@@ -1,32 +1,36 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../api'
 import { formatDueDate } from '../../utils/formatDueDate'
+import { useAutoRefresh } from '../../utils/autoRefresh'
 import './AssignmentsSummary.css'
 
-function AssignmentsSummary({ sections }) {
+function AssignmentsSummary() {
   const navigate = useNavigate()
   const [assignments, setAssignments] = useState(null)
 
-  useEffect(() => {
-    if (!sections) return
+  const load = useCallback(() => {
     let cancelled = false
-    Promise.allSettled(
-      sections.map((s) => api.get(`/sections/${s.section_id}/assignments`))
-    ).then((results) => {
-      if (cancelled) return
-      const now = Date.now()
-      const merged = results
-        .filter((r) => r.status === 'fulfilled')
-        .flatMap((r) => r.value.data)
-        .filter((a) => new Date(a.due_date).getTime() >= now)
-        .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
-      setAssignments(merged.slice(0, 3))
-    })
+    api
+      .get('/assignments')
+      .then(({ data }) => {
+        if (cancelled) return
+        const now = Date.now()
+        const merged = data
+          .filter((a) => new Date(a.due_date).getTime() >= now)
+          .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
+        setAssignments(merged.slice(0, 3))
+      })
+      .catch(() => {
+        if (!cancelled) setAssignments((prev) => prev ?? [])
+      })
     return () => {
       cancelled = true
     }
-  }, [sections])
+  }, [])
+
+  useEffect(() => load(), [load])
+  useAutoRefresh(load)
 
   const loading = assignments === null
 

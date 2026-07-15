@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import NotificationBell from './NotificationBell'
+import { useAutoRefresh } from '../utils/autoRefresh'
 import './TopBar.css'
 
 function TopBar() {
@@ -10,9 +11,9 @@ function TopBar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
 
-  useEffect(() => {
+  const loadPoints = useCallback(() => {
     const userId = localStorage.getItem('user_id')
-    if (!userId) return
+    if (!userId) return undefined
     let cancelled = false
 
     api
@@ -21,13 +22,16 @@ function TopBar() {
         if (!cancelled) setPoints(data.total_points)
       })
       .catch(() => {
-        if (!cancelled) setPoints(null)
+        if (!cancelled) setPoints((prev) => prev ?? null)
       })
 
     return () => {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => loadPoints(), [loadPoints])
+  useAutoRefresh(loadPoints)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -70,6 +74,16 @@ function TopBar() {
           />
           {menuOpen && (
             <div className="topbar-menu" role="menu">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false)
+                  navigate('/profile')
+                }}
+              >
+                My profile
+              </button>
               <button type="button" role="menuitem" onClick={handleLogout}>
                 Log out
               </button>

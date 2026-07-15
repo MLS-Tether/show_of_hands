@@ -2,7 +2,8 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from db.pool import get_db
 from dependencies import get_current_user, require_role
@@ -21,27 +22,20 @@ from schemas.section import (
 router = APIRouter(prefix="/sections", tags=["sections"])
 
 
-def _approved_enrollments(section_id: int, db: Session):
-    return db.query(Enrollment).filter(
-        Enrollment.section_id == section_id,
-        Enrollment.is_archived == False,
-    ).all()
-
-
-def _build_list_item(section: Section, db: Session) -> dict:
+def _build_list_item(section: Section, enrolled_count: int) -> dict:
     return {
         "section_id": section.section_id,
         "class_name": section.class_.name,
         "teacher_name": section.teacher.username if section.teacher else None,
         "period": section.period,
-        "enrolled_count": len(_approved_enrollments(section.section_id, db)),
+        "enrolled_count": enrolled_count,
         "capacity": section.capacity,
         "status": section.status,
     }
 
 
-def _build_detail(section: Section, db: Session) -> dict:
-    approved = _approved_enrollments(section.section_id, db)
+def _build_detail(section: Section) -> dict:
+    approved = [e for e in section.enrollments if not e.is_archived]
     assignments = [a for a in section.assignments if not a.is_archived]
     quests = [q for q in section.quests if not q.is_archived]
     return {
@@ -78,7 +72,10 @@ def list_sections(
     if scope not in ("mine", "all"):
         raise HTTPException(status_code=400, detail="Invalid scope. Must be 'mine' or 'all'.")
 
-    query = db.query(Section).filter(
+    query = db.query(Section).options(
+        joinedload(Section.class_),
+        joinedload(Section.teacher),
+    ).filter(
         Section.school_id == current_user.school_id,
         Section.is_archived == False,
     )
@@ -95,7 +92,24 @@ def list_sections(
         }
         query = query.filter(Section.section_id.in_(enrolled_section_ids))
 
-    return [_build_list_item(s, db) for s in query.all()]
+    sections = query.all()
+
+    # One grouped query for all enrolled-counts instead of one query per
+    # section — this and the joinedload above are what turn this endpoint
+    # from O(N) round-trips into a fixed 2, regardless of section count.
+    counts = {}
+    if sections:
+        counts = dict(
+            db.query(Enrollment.section_id, func.count(Enrollment.enrollment_id))
+            .filter(
+                Enrollment.section_id.in_([s.section_id for s in sections]),
+                Enrollment.is_archived == False,
+            )
+            .group_by(Enrollment.section_id)
+            .all()
+        )
+
+    return [_build_list_item(s, counts.get(s.section_id, 0)) for s in sections]
 
 
 @router.post("", response_model=SectionResponse, status_code=201)
@@ -130,7 +144,13 @@ def get_section(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    section = db.query(Section).filter(
+    section = db.query(Section).options(
+        joinedload(Section.class_),
+        joinedload(Section.teacher),
+        selectinload(Section.enrollments),
+        selectinload(Section.assignments),
+        selectinload(Section.quests),
+    ).filter(
         Section.section_id == section_id,
         Section.is_archived == False,
     ).first()
@@ -151,7 +171,7 @@ def get_section(
         if section.teacher_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="Not your section.")
 
-    return _build_detail(section, db)
+    return _build_detail(section)
 
 
 @router.patch("/{section_id}", response_model=SectionUpdateResponse)

@@ -1,0 +1,39 @@
+.dialog-message {
+  font-size: 14px;
+  color: var(--text-h);
+  margin: 4px 0 20px;
+  white-space: pre-line;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dialog-actions button {
+  font-size: 13px;
+  padding: 7px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+}
+
+.dialog-button-secondary {
+  background: none;
+  color: var(--text-h);
+}
+
+.dialog-button-secondary:hover {
+  background: var(--surface-1);
+}
+
+.dialog-button-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.dialog-button-primary:hover {
+  opacity: 0.9;
+}

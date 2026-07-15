@@ -1,4 +1,5 @@
 # tests/test_rooms.py
+from db.pool import SessionLocal
 from models.help_request_model import HelpRequest, HelpRequestAcceptance
 from models.study_room_model import StudyRoom, RoomMember
 from tests.conftest import auth_header
@@ -106,3 +107,41 @@ def test_close_room(client, world, cleanup):
 
     resp = client.post(f"/api/rooms/{room_id}/close", headers=auth_header(world.student_token))
     assert resp.status_code == 409
+
+
+def test_delete_room_requester_only(client, world, cleanup):
+    hr_id, room_id, classmate_id, classmate_token = _new_room(client, world, cleanup)
+
+    resp = client.delete(f"/api/rooms/{room_id}", headers=auth_header(classmate_token))
+    assert resp.status_code == 403
+
+    resp = client.delete(f"/api/rooms/{room_id}", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+
+    # Room is gone entirely, not just closed.
+    resp = client.get(f"/api/rooms/{room_id}", headers=auth_header(world.student_token))
+    assert resp.status_code == 404
+
+    # Deletion archives the help request too, so it drops off the bulletin
+    # board entirely rather than lingering there as "closed" forever.
+    resp = client.get(
+        f"/api/sections/{world.section_id}/help-requests",
+        headers=auth_header(world.teacher_token),
+    )
+    assert not any(r["help_request_id"] == hr_id for r in resp.json())
+
+    db = SessionLocal()
+    hr = db.query(HelpRequest).filter(HelpRequest.help_request_id == hr_id).first()
+    assert hr.status.value == "closed"
+    assert hr.is_archived is True
+    db.close()
+
+
+def test_delete_room_allowed_while_active(client, world, cleanup):
+    hr_id, room_id, classmate_id, classmate_token = _new_room(client, world, cleanup)
+
+    resp = client.get(f"/api/rooms/{room_id}", headers=auth_header(world.student_token))
+    assert resp.json()["status"] == "active"
+
+    resp = client.delete(f"/api/rooms/{room_id}", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text

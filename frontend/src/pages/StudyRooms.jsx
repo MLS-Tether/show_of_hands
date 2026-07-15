@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api'
+import { useAutoRefresh } from '../utils/autoRefresh'
 import { forgetRoom, getMyRooms } from '../utils/roomTracking'
 import './StudyRooms.css'
 
 function StudyRooms() {
   const [rooms, setRooms] = useState(null)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false
     const tracked = getMyRooms()
     Promise.allSettled(tracked.map((r) => api.get(`/rooms/${r.room_id}`))).then((results) => {
@@ -26,6 +27,9 @@ function StudyRooms() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => load(), [load])
+  useAutoRefresh(load)
 
   const loading = rooms === null
 
