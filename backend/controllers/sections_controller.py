@@ -1,3 +1,4 @@
+import statistics
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -9,6 +10,7 @@ from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.enrollment_model import Enrollment
 from models.section_model import Section, SectionStatusEnum
+from models.submission_model import SubmissionStatusEnum
 from models.user_model import User, RoleEnum
 from schemas.section import (
     SectionCreate,
@@ -17,7 +19,11 @@ from schemas.section import (
     SectionResponse,
     SectionDetailResponse,
     SectionUpdateResponse,
+    SectionAnalyticsResponse,
 )
+
+LOW_GRADE_THRESHOLD = 70
+MAX_STUDENTS_NEEDING_ATTENTION = 50
 
 router = APIRouter(prefix="/sections", tags=["sections"])
 
@@ -172,6 +178,98 @@ def get_section(
             raise HTTPException(status_code=403, detail="Not your section.")
 
     return _build_detail(section)
+
+
+@router.get("/{section_id}/analytics", response_model=SectionAnalyticsResponse)
+def get_section_analytics(
+    section_id: int,
+    current_user: User = Depends(require_role(["teacher", "admin"])),
+    db: Session = Depends(get_db),
+):
+    section = db.query(Section).options(
+        selectinload(Section.enrollments),
+        selectinload(Section.assignments),
+    ).filter(
+        Section.section_id == section_id,
+        Section.is_archived == False,
+    ).first()
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found.")
+    if section.school_id != current_user.school_id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+    if current_user.role == RoleEnum.teacher and section.teacher_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not your section.")
+
+    approved_enrollments = [e for e in section.enrollments if not e.is_archived]
+    enrolled_count = len(approved_enrollments)
+    assignments = [a for a in section.assignments if not a.is_archived]
+
+    now = datetime.now(timezone.utc)
+    all_graded_grades = []
+    per_student_points = {}
+    assignment_analytics = []
+    students_needing_attention = []
+
+    for assignment in assignments:
+        submissions = [s for s in assignment.submissions if not s.is_archived]
+        graded = [s for s in submissions if s.status == SubmissionStatusEnum.graded]
+        graded_grades = [s.grade for s in graded if s.grade is not None]
+        all_graded_grades.extend(graded_grades)
+
+        for s in submissions:
+            per_student_points[s.student_id] = per_student_points.get(s.student_id, 0) + s.points_awarded
+
+        assignment_analytics.append({
+            "assignment_id": assignment.assignment_id,
+            "title": assignment.title,
+            "point_value": assignment.point_value,
+            "submitted_count": len(submissions),
+            "graded_count": len(graded),
+            "average_grade": statistics.mean(graded_grades) if graded_grades else None,
+            "completion_rate": (len(submissions) / enrolled_count) if enrolled_count else 0.0,
+        })
+
+        for s in graded:
+            if s.grade is not None and s.grade < LOW_GRADE_THRESHOLD:
+                students_needing_attention.append({
+                    "user_id": s.student_id,
+                    "username": s.student.username,
+                    "reason": "low_grade",
+                    "assignment_id": assignment.assignment_id,
+                    "assignment_title": assignment.title,
+                    "grade": s.grade,
+                })
+
+        if assignment.due_date < now:
+            submitted_student_ids = {s.student_id for s in submissions}
+            for enrollment in approved_enrollments:
+                if enrollment.student_id not in submitted_student_ids:
+                    students_needing_attention.append({
+                        "user_id": enrollment.student_id,
+                        "username": enrollment.student.username,
+                        "reason": "no_submission",
+                        "assignment_id": assignment.assignment_id,
+                        "assignment_title": assignment.title,
+                    })
+
+    students_needing_attention = students_needing_attention[:MAX_STUDENTS_NEEDING_ATTENTION]
+
+    points_totals = list(per_student_points.values())
+    points_distribution = {
+        "min": min(points_totals) if points_totals else None,
+        "max": max(points_totals) if points_totals else None,
+        "median": statistics.median(points_totals) if points_totals else None,
+    }
+
+    return {
+        "section_id": section.section_id,
+        "enrolled_count": enrolled_count,
+        "assignment_count": len(assignments),
+        "average_grade": statistics.mean(all_graded_grades) if all_graded_grades else None,
+        "assignments": assignment_analytics,
+        "points_distribution": points_distribution,
+        "students_needing_attention": students_needing_attention,
+    }
 
 
 @router.patch("/{section_id}", response_model=SectionUpdateResponse)
