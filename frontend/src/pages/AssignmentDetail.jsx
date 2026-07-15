@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import api from '../api'
 import { useAutoRefresh } from '../utils/autoRefresh'
+import { isTeacher } from '../utils/auth'
 import './AssignmentDetail.css'
 
 const STATUS_LABELS = {
@@ -22,6 +23,76 @@ function formatFullDate(dateStr) {
 
 function isUrl(value) {
   return /^https?:\/\//i.test(value || '')
+}
+
+function toDatetimeLocalValue(iso) {
+  const d = new Date(iso)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function EditAssignmentForm({ assignment, onSaved, onCancel }) {
+  const [title, setTitle] = useState(assignment.title)
+  const [description, setDescription] = useState(assignment.description || '')
+  const [dueDate, setDueDate] = useState(toDatetimeLocalValue(assignment.due_date))
+  const [pointValue, setPointValue] = useState(assignment.point_value)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    setSaving(true)
+    try {
+      await api.patch(`/assignments/${assignment.assignment_id}`, {
+        title,
+        description: description || null,
+        due_date: new Date(dueDate).toISOString(),
+        point_value: Number(pointValue),
+      })
+      onSaved()
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Could not save changes.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form className="submission-form" onSubmit={handleSubmit}>
+      <label className="submission-form-field">
+        Title
+        <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+      </label>
+      <label className="submission-form-field">
+        Description
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+      </label>
+      <label className="submission-form-field">
+        Due date
+        <input type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+      </label>
+      <label className="submission-form-field">
+        Points
+        <input
+          type="number"
+          min="1"
+          value={pointValue}
+          onChange={(e) => setPointValue(e.target.value)}
+          required
+        />
+      </label>
+      {error && <p className="submission-form-error">{error}</p>}
+      <div className="assignment-detail-actions">
+        <button type="button" onClick={onCancel} disabled={saving}>
+          Cancel
+        </button>
+        <button type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </form>
+  )
 }
 
 function SubmissionForm({ assignmentId, onSubmitted }) {
@@ -143,11 +214,210 @@ function SubmissionSummary({ submission }) {
   )
 }
 
+function GradingRow({ submission, onGraded }) {
+  const [expanded, setExpanded] = useState(false)
+  const [grade, setGrade] = useState(submission.grade ?? '')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const isGraded = submission.status === 'graded'
+
+  async function handleSaveGrade() {
+    setError('')
+    setSaving(true)
+    try {
+      const { data } = await api.patch(`/submissions/${submission.submission_id}/grade`, {
+        grade: Number(grade),
+      })
+      onGraded({ ...submission, grade: data.grade, status: data.status })
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Could not save grade.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleFinalize() {
+    setError('')
+    setSaving(true)
+    try {
+      const { data } = await api.post(`/submissions/${submission.submission_id}/finalize`)
+      onGraded({
+        ...submission,
+        grade: data.grade,
+        status: data.status,
+        points_awarded: data.points_awarded,
+      })
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Could not finalize this submission.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="submission-summary">
+      <button
+        type="button"
+        className="submission-summary-card"
+        onClick={() => setExpanded((e) => !e)}
+      >
+        <span>{submission.username}</span>
+        <span className={`submission-status submission-status-${submission.status}`}>
+          {STATUS_LABELS[submission.status] || submission.status}
+        </span>
+        <span className="submission-summary-points">{submission.points_awarded} pts</span>
+        {submission.grade != null && (
+          <span className="submission-summary-grade">Grade: {submission.grade}</span>
+        )}
+      </button>
+
+      {expanded && (
+        <div className="submission-detail">
+          <div className="submission-detail-row">
+            <span className="submission-detail-label">Submitted</span>
+            <span>{formatFullDate(submission.submitted_at)}</span>
+          </div>
+
+          {isGraded ? (
+            <div className="submission-detail-row">
+              <span className="submission-detail-label">Grade</span>
+              <span>
+                {submission.grade} — {submission.points_awarded} pts (finalized)
+              </span>
+            </div>
+          ) : (
+            <>
+              <label className="submission-form-field">
+                Grade
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={grade}
+                  onChange={(e) => setGrade(e.target.value)}
+                />
+              </label>
+              <p className="grading-hint">
+                25% was already awarded on submission. Finalizing adds +75% at grade ≥ 85, +50% at
+                grade ≥ 70, or +0% below 70.
+              </p>
+              {error && <p className="submission-form-error">{error}</p>}
+              <button type="button" disabled={saving || grade === ''} onClick={handleSaveGrade}>
+                {saving ? 'Saving…' : 'Save grade'}
+              </button>
+              <button
+                type="button"
+                disabled={saving || submission.grade == null}
+                onClick={handleFinalize}
+              >
+                {saving ? 'Finalizing…' : 'Finalize'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TeacherAssignmentView({ assignmentId, assignment, onAssignmentChanged }) {
+  const navigate = useNavigate()
+  const [submissions, setSubmissions] = useState(null)
+  const [editing, setEditing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
+  const load = useCallback(() => {
+    let cancelled = false
+    api
+      .get(`/assignments/${assignmentId}/submissions`)
+      .then(({ data }) => {
+        if (!cancelled) setSubmissions(data)
+      })
+      .catch(() => {
+        if (!cancelled) setSubmissions((prev) => prev ?? [])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [assignmentId])
+
+  useEffect(() => load(), [load])
+  useAutoRefresh(load)
+
+  function handleGraded(updated) {
+    setSubmissions((prev) =>
+      prev.map((s) => (s.submission_id === updated.submission_id ? updated : s))
+    )
+  }
+
+  async function handleDelete() {
+    if (!window.confirm('Delete this assignment? This cannot be undone.')) return
+    setDeleteError('')
+    setDeleting(true)
+    try {
+      await api.delete(`/assignments/${assignmentId}`)
+      navigate(`/sections/${assignment.section_id}`)
+    } catch (err) {
+      setDeleteError(err.response?.data?.detail || 'Could not delete this assignment.')
+      setDeleting(false)
+    }
+  }
+
+  const loading = submissions === null
+
+  return (
+    <section className="assignment-detail">
+      {editing ? (
+        <EditAssignmentForm
+          assignment={assignment}
+          onCancel={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false)
+            onAssignmentChanged()
+          }}
+        />
+      ) : (
+        <>
+          <h1>{assignment.title}</h1>
+          <p className="assignment-detail-due">
+            Due {formatFullDate(assignment.due_date)} · {assignment.point_value} pts
+          </p>
+          {assignment.description && (
+            <p className="assignment-detail-description">{assignment.description}</p>
+          )}
+          <div className="assignment-detail-actions">
+            <button type="button" onClick={() => setEditing(true)}>
+              Edit
+            </button>
+            <button type="button" disabled={deleting} onClick={handleDelete}>
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          </div>
+          {deleteError && <p className="submission-form-error">{deleteError}</p>}
+        </>
+      )}
+
+      <div className="widget-label">submissions</div>
+      {loading && <p className="assignment-detail-placeholder">Loading submissions…</p>}
+      {!loading && submissions.length === 0 && (
+        <p className="assignment-detail-placeholder">No submissions yet.</p>
+      )}
+      {!loading &&
+        submissions.map((s) => (
+          <GradingRow key={s.submission_id} submission={s} onGraded={handleGraded} />
+        ))}
+    </section>
+  )
+}
+
 function AssignmentDetail() {
   const { assignmentId } = useParams()
   const [assignment, setAssignment] = useState(null)
   const [assignmentFailed, setAssignmentFailed] = useState(false)
   const [submission, setSubmission] = useState(undefined)
+  const teacher = isTeacher()
 
   const load = useCallback(() => {
     let cancelled = false
@@ -161,19 +431,21 @@ function AssignmentDetail() {
         if (!cancelled) setAssignmentFailed(true)
       })
 
-    api
-      .get(`/assignments/${assignmentId}/my-submission`)
-      .then(({ data }) => {
-        if (!cancelled) setSubmission(data)
-      })
-      .catch(() => {
-        if (!cancelled) setSubmission((prev) => (prev === undefined ? null : prev))
-      })
+    if (!teacher) {
+      api
+        .get(`/assignments/${assignmentId}/my-submission`)
+        .then(({ data }) => {
+          if (!cancelled) setSubmission(data)
+        })
+        .catch(() => {
+          if (!cancelled) setSubmission((prev) => (prev === undefined ? null : prev))
+        })
+    }
 
     return () => {
       cancelled = true
     }
-  }, [assignmentId])
+  }, [assignmentId, teacher])
 
   useEffect(() => load(), [load])
   useAutoRefresh(load)
@@ -186,11 +458,21 @@ function AssignmentDetail() {
     )
   }
 
-  if (!assignment || submission === undefined) {
+  if (!assignment || (!teacher && submission === undefined)) {
     return (
       <section className="assignment-detail">
         <p className="assignment-detail-placeholder">Loading assignment…</p>
       </section>
+    )
+  }
+
+  if (teacher) {
+    return (
+      <TeacherAssignmentView
+        assignmentId={assignmentId}
+        assignment={assignment}
+        onAssignmentChanged={load}
+      />
     )
   }
 

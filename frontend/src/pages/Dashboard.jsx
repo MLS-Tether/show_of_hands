@@ -4,10 +4,17 @@ import SectionsSummary from '../components/dashboard/SectionsSummary'
 import AssignmentsSummary from '../components/dashboard/AssignmentsSummary'
 import QuestsSummary from '../components/dashboard/QuestsSummary'
 import HelpRequestsSummary from '../components/dashboard/HelpRequestsSummary'
+import TeacherDashboard from './TeacherDashboard'
+import { isTeacher } from '../utils/auth'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import './Dashboard.css'
 
 function Dashboard() {
+  if (isTeacher()) return <TeacherDashboard />
+  return <StudentDashboard />
+}
+
+function StudentDashboard() {
   const [sections, setSections] = useState(null)
 
   const load = useCallback(() => {
