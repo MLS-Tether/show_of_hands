@@ -32,7 +32,11 @@ function RoomDetail() {
   const [confirmPending, setConfirmPending] = useState(false)
   const [confirmResult, setConfirmResult] = useState(null)
   const [actionError, setActionError] = useState('')
+  const [connectionStatus, setConnectionStatus] = useState('connecting')
   const wsRef = useRef(null)
+  const reconnectTimeoutRef = useRef(null)
+  const reconnectAttemptRef = useRef(0)
+  const closingIntentionallyRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -64,27 +68,60 @@ function RoomDetail() {
 
   useEffect(() => {
     if (!activeRoomId) return
-    const ws = new WebSocket(wsUrlFor(activeRoomId))
-    wsRef.current = ws
+    closingIntentionallyRef.current = false
+    reconnectAttemptRef.current = 0
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      if (data.type === 'session_confirmation_required') {
-        setConfirmPending(true)
-        return
+    function connect() {
+      setConnectionStatus('connecting')
+      const ws = new WebSocket(wsUrlFor(activeRoomId))
+      wsRef.current = ws
+
+      ws.onopen = () => {
+        reconnectAttemptRef.current = 0
+        setConnectionStatus('open')
       }
-      setMessages((prev) => [...prev, data])
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+        if (data.type === 'session_confirmation_required') {
+          setConfirmPending(true)
+          return
+        }
+        setMessages((prev) => [...prev, data])
+      }
+
+      ws.onerror = () => {
+        setConnectionStatus('closed')
+      }
+
+      ws.onclose = () => {
+        setConnectionStatus('closed')
+        if (closingIntentionallyRef.current) return
+        const attempt = reconnectAttemptRef.current + 1
+        reconnectAttemptRef.current = attempt
+        const delay = Math.min(1000 * 2 ** (attempt - 1), 10000)
+        reconnectTimeoutRef.current = setTimeout(connect, delay)
+      }
     }
 
+    connect()
+
     return () => {
-      ws.close()
+      closingIntentionallyRef.current = true
+      clearTimeout(reconnectTimeoutRef.current)
+      wsRef.current?.close()
       wsRef.current = null
     }
   }, [activeRoomId])
 
   function handleSend(e) {
     e.preventDefault()
-    if (!draft.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    if (!draft.trim()) return
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      setActionError("Not connected to the chat right now — reconnecting, please try again in a moment.")
+      return
+    }
+    setActionError('')
     wsRef.current.send(JSON.stringify({ content: draft }))
     setMessages((prev) => [
       ...prev,
@@ -242,6 +279,11 @@ function RoomDetail() {
       )}
       {room.status === 'active' && (
         <>
+          {connectionStatus !== 'open' && (
+            <p className="room-detail-connection-status">
+              {connectionStatus === 'connecting' ? 'Connecting to chat…' : 'Disconnected — reconnecting…'}
+            </p>
+          )}
           <div className="room-detail-chat">
             {messages.length === 0 && (
               <p className="room-detail-placeholder">

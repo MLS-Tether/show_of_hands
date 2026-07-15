@@ -10,6 +10,7 @@ class NotificationTypeEnum(str, enum.Enum):
     enrollment_rejected = "enrollment_rejected"
     new_assignment = "new_assignment"
     new_quest = "new_quest"
+    new_help_request = "new_help_request"
     help_request_accepted = "help_request_accepted"
     section_status = "section_status"
     class_request_approved = "class_request_approved"

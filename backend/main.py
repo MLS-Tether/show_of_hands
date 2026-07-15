@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 
@@ -138,6 +139,16 @@ async def http_exception_handler(request, exc):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
     return JSONResponse(status_code=422, content={"message": str(exc)})
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request, exc):
+    # Without this, an unhandled exception falls through to Starlette's
+    # ServerErrorMiddleware, which builds its 500 response outside of
+    # CORSMiddleware — the browser then sees a CORS error instead of the
+    # real 500, which hides the actual bug.
+    logging.getLogger(__name__).exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"message": "Internal server error."})
 
 
 @app.get("/")

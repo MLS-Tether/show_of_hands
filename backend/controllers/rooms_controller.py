@@ -219,7 +219,7 @@ async def close_room(
 
 
 @router.websocket("/{room_id}/chat")
-async def chat(websocket: WebSocket, room_id: int, token: str, db: Session = Depends(get_db)):
+async def chat(websocket: WebSocket, room_id: int, token: str):
     # Validate JWT
     try:
         payload = decode_token(token)
@@ -228,25 +228,32 @@ async def chat(websocket: WebSocket, room_id: int, token: str, db: Session = Dep
         await websocket.close(code=4001)
         return
 
-    # Verify room exists and is active
-    room = db.query(StudyRoom).filter(StudyRoom.room_id == room_id).first()
-    if not room or room.status != StudyRoomStatusEnum.active:
-        await websocket.close(code=4003)
-        return
+    # Verify room/membership with a short-lived session — not held for the
+    # life of the connection, since the socket can stay open a long time.
+    db = SessionLocal()
+    try:
+        room = db.query(StudyRoom).filter(StudyRoom.room_id == room_id).first()
+        if not room or room.status != StudyRoomStatusEnum.active:
+            await websocket.close(code=4003)
+            return
 
-    # Verify user is a room member
-    member = db.query(RoomMember).filter(
-        RoomMember.room_id == room_id,
-        RoomMember.user_id == user_id,
-    ).first()
-    if not member:
-        await websocket.close(code=4001)
-        return
+        member = db.query(RoomMember).filter(
+            RoomMember.room_id == room_id,
+            RoomMember.user_id == user_id,
+        ).first()
+        if not member:
+            await websocket.close(code=4001)
+            return
 
-    user = db.query(User).filter(User.user_id == user_id).first()
-    if not user:
-        await websocket.close(code=4001)
-        return
+        user = db.query(User).filter(User.user_id == user_id).first()
+        if not user:
+            await websocket.close(code=4001)
+            return
+
+        username = user.username
+        requester_id = room.help_request.requester_id
+    finally:
+        db.close()
 
     await websocket.accept()
 
@@ -264,7 +271,7 @@ async def chat(websocket: WebSocket, room_id: int, token: str, db: Session = Dep
 
             message_out = {
                 "user_id": user_id,
-                "username": user.username,
+                "username": username,
                 "content": content,
                 "sent_at": datetime.now(timezone.utc).isoformat(),
             }
@@ -289,13 +296,16 @@ async def chat(websocket: WebSocket, room_id: int, token: str, db: Session = Dep
             room_registry[room_id].pop(user_id, None)
 
             # If only the requester remains in WS registry, auto-close the room
-            requester_id = room.help_request.requester_id
             remaining_ids = set(room_registry.get(room_id, {}).keys())
             if remaining_ids and remaining_ids == {requester_id}:
-                db_room = db.query(StudyRoom).filter(StudyRoom.room_id == room_id).first()
-                if db_room and db_room.status == StudyRoomStatusEnum.active:
-                    db_room.status = StudyRoomStatusEnum.closed
-                    db.commit()
+                cleanup_db = SessionLocal()
+                try:
+                    db_room = cleanup_db.query(StudyRoom).filter(StudyRoom.room_id == room_id).first()
+                    if db_room and db_room.status == StudyRoomStatusEnum.active:
+                        db_room.status = StudyRoomStatusEnum.closed
+                        cleanup_db.commit()
+                finally:
+                    cleanup_db.close()
                 await _close_room_connections(room_id, requester_id=requester_id)
             elif not remaining_ids:
                 room_registry.pop(room_id, None)
