@@ -5,7 +5,14 @@ import { useDialog } from '../components/DialogContext'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
 import { wsUrlWithFreshToken } from '../utils/ws'
+import '../styles/shared-ui.css'
 import './RoomDetail.css'
+
+const STATUS_BADGE_CLASS = {
+  active: 'status-active',
+  closed: 'status-archived',
+  expired: 'status-archived',
+}
 
 function formatCountdown(ms) {
   if (ms <= 0) return '0:00'
@@ -227,7 +234,7 @@ function RoomDetail() {
   if (loading) {
     return (
       <section className="room-detail">
-        <p className="room-detail-placeholder">Loading study room…</p>
+        <p className="admin-empty-card">Loading study room…</p>
       </section>
     )
   }
@@ -235,7 +242,7 @@ function RoomDetail() {
   if (loadFailed) {
     return (
       <section className="room-detail">
-        <p className="room-detail-placeholder">Room not found, or you're not a member.</p>
+        <p className="admin-empty-card">Room not found, or you're not a member.</p>
       </section>
     )
   }
@@ -245,9 +252,11 @@ function RoomDetail() {
 
   return (
     <section className="room-detail">
-      <h1>Study room #{room.room_id}</h1>
+      <h1 className="admin-page-h1">Study room #{room.room_id}</h1>
       <div className="room-detail-meta">
-        <span className={`room-detail-status room-detail-status-${room.status}`}>{room.status}</span>
+        <span className={`admin-status-badge ${STATUS_BADGE_CLASS[room.status] || ''}`}>
+          {room.status}
+        </span>
         {room.status === 'active' && <span>{formatCountdown(remainingMs)} left</span>}
       </div>
 
@@ -256,20 +265,20 @@ function RoomDetail() {
       <div className="room-detail-controls">
         {isRequester && room.status === 'active' && (
           <>
-            <button type="button" onClick={handleExtend}>
+            <button type="button" className="admin-btn-secondary" onClick={handleExtend}>
               +10 min
             </button>
-            <button type="button" onClick={handleClose}>
+            <button type="button" className="admin-btn-secondary" onClick={handleClose}>
               Close room
             </button>
           </>
         )}
         {isRequester && (
-          <button type="button" onClick={handleDelete}>
+          <button type="button" className="admin-btn-danger" onClick={handleDelete}>
             Delete room
           </button>
         )}
-        <button type="button" onClick={handleLeave}>
+        <button type="button" className="admin-btn-secondary" onClick={handleLeave}>
           Leave room
         </button>
       </div>
@@ -278,10 +287,10 @@ function RoomDetail() {
         <div className="room-detail-confirm">
           <p>Did this study session happen?</p>
           <div className="room-detail-confirm-actions">
-            <button type="button" onClick={() => handleConfirm(true)}>
+            <button type="button" className="admin-btn-primary" onClick={() => handleConfirm(true)}>
               Yes
             </button>
-            <button type="button" onClick={() => handleConfirm(false)}>
+            <button type="button" className="admin-btn-secondary" onClick={() => handleConfirm(false)}>
               No
             </button>
           </div>
@@ -304,7 +313,7 @@ function RoomDetail() {
               {m.user_id === room.requester_id ? ' (requester)' : ''}
             </span>
             {isRequester && m.user_id !== currentUserId && (
-              <button type="button" onClick={() => handleKick(m.user_id)}>
+              <button type="button" className="admin-btn-text" onClick={() => handleKick(m.user_id)}>
                 Kick
               </button>
             )}
@@ -314,7 +323,7 @@ function RoomDetail() {
 
       <div className="widget-label">chat</div>
       {room.status !== 'active' && (
-        <p className="room-detail-placeholder">Chat is closed for this room.</p>
+        <p className="admin-empty-card">Chat is closed for this room.</p>
       )}
       {room.status === 'active' && (
         <>
@@ -324,7 +333,7 @@ function RoomDetail() {
             </p>
           )}
           <div className="room-detail-chat">
-            {messages.length === 0 && <p className="room-detail-placeholder">No messages yet.</p>}
+            {messages.length === 0 && <p className="admin-empty-card">No messages yet.</p>}
             {messages.map((m, i) => (
               <div className="room-detail-message" key={i}>
                 <span className="room-detail-message-author">{m.username}</span>
@@ -334,7 +343,9 @@ function RoomDetail() {
           </div>
           <form className="room-detail-chat-form" onSubmit={handleSend}>
             <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Message…" />
-            <button type="submit">Send</button>
+            <button type="submit" className="admin-btn-primary">
+              Send
+            </button>
           </form>
         </>
       )}

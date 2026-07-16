@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import { useDialog } from '../components/DialogContext'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { forgetRoom, getMyHelpRequestIds, getMyRooms, rememberHelpRequestId, rememberRoom } from '../utils/roomTracking'
+import '../styles/shared-ui.css'
 import './BulletinBoard.css'
 
 const STATUS_LABELS = {
@@ -91,7 +92,7 @@ function NewRequestForm({ sections, onCreated }) {
         </label>
       </div>
       {error && <p className="bulletin-request-form-error">{error}</p>}
-      <button type="submit" disabled={submitting}>
+      <button type="submit" className="admin-btn-primary" disabled={submitting}>
         {submitting ? 'Posting…' : 'Post request'}
       </button>
     </form>
@@ -159,10 +160,10 @@ function EditRequestForm({ hr, onSaved, onCancel }) {
       </div>
       {error && <p className="bulletin-request-form-error">{error}</p>}
       <div className="bulletin-request-form-row">
-        <button type="submit" disabled={submitting}>
+        <button type="submit" className="admin-btn-primary" disabled={submitting}>
           {submitting ? 'Saving…' : 'Save changes'}
         </button>
-        <button type="button" onClick={onCancel} disabled={submitting}>
+        <button type="button" className="admin-btn-secondary" onClick={onCancel} disabled={submitting}>
           Cancel
         </button>
       </div>
@@ -275,13 +276,13 @@ function BulletinBoard() {
 
   return (
     <section className="bulletin-board">
-      <h1>Bulletin board</h1>
+      <h1 className="admin-page-h1">Bulletin board</h1>
 
       {!loading && sections.length === 0 && (
-        <p className="bulletin-board-placeholder">Join a section to see help requests.</p>
+        <p className="admin-empty-card">Join a section to see help requests.</p>
       )}
 
-      {loading && <p className="bulletin-board-placeholder">Loading help requests…</p>}
+      {loading && <p className="admin-empty-card">Loading help requests…</p>}
 
       {!loading && sections.length > 0 && (
         <>
@@ -293,7 +294,7 @@ function BulletinBoard() {
 
           <h2 className="bulletin-board-subheading">Help requests</h2>
           {requests.length === 0 && (
-            <p className="bulletin-board-placeholder">No help requests yet.</p>
+            <p className="admin-empty-card">No help requests yet.</p>
           )}
           {requests.length > 0 && (
             <div className="bulletin-request-list">
@@ -322,13 +323,18 @@ function BulletinBoard() {
                     </div>
                     <div className="bulletin-request-card-actions">
                       {canOpen && (
-                        <button type="button" onClick={() => navigate(`/rooms/${hr.room_id}`)}>
+                        <button
+                          type="button"
+                          className="admin-btn-secondary"
+                          onClick={() => navigate(`/rooms/${hr.room_id}`)}
+                        >
                           Open room
                         </button>
                       )}
                       {canJoin && (
                         <button
                           type="button"
+                          className="admin-btn-primary"
                           disabled={joiningId === hr.help_request_id}
                           onClick={() => handleJoin(hr)}
                         >
@@ -338,6 +344,7 @@ function BulletinBoard() {
                       {isMine && hr.room_id && (
                         <button
                           type="button"
+                          className="admin-btn-danger"
                           disabled={deletingId === hr.help_request_id}
                           onClick={() => handleDelete(hr)}
                         >
@@ -346,11 +353,16 @@ function BulletinBoard() {
                       )}
                       {canManageUnclaimed && (
                         <>
-                          <button type="button" onClick={() => setEditingRequest(hr)}>
+                          <button
+                            type="button"
+                            className="admin-btn-secondary"
+                            onClick={() => setEditingRequest(hr)}
+                          >
                             Edit
                           </button>
                           <button
                             type="button"
+                            className="admin-btn-danger"
                             disabled={droppingId === hr.help_request_id}
                             onClick={() => handleDrop(hr)}
                           >

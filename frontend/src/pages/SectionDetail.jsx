@@ -4,7 +4,14 @@ import api from '../api'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { isTeacher } from '../utils/auth'
 import TeacherSectionDetail from '../components/section-detail/TeacherSectionDetail'
+import '../styles/shared-ui.css'
 import './SectionDetail.css'
+
+const STATUS_BADGE_CLASS = {
+  active: 'status-active',
+  pending_reassignment: 'status-pending',
+  archived: 'status-archived',
+}
 
 function SectionDetail() {
   if (isTeacher()) return <TeacherSectionDetail />
@@ -45,7 +52,7 @@ function StudentSectionDetail() {
   if (loading) {
     return (
       <section className="section-detail">
-        <p className="section-detail-placeholder">Loading section…</p>
+        <p className="admin-empty-card">Loading section…</p>
       </section>
     )
   }
@@ -53,21 +60,23 @@ function StudentSectionDetail() {
   if (notFound) {
     return (
       <section className="section-detail">
-        <p className="section-detail-placeholder">Section not found.</p>
+        <p className="admin-empty-card">Section not found.</p>
       </section>
     )
   }
 
   return (
     <section className="section-detail">
-      <h1>{section.class_name}</h1>
+      <h1 className="admin-page-h1">{section.class_name}</h1>
       <div className="section-detail-meta">
         <span>{section.teacher_name || 'Unassigned teacher'}</span>
         <span>{section.period}</span>
         <span>
           {section.enrolled_count}/{section.capacity} students
         </span>
-        <span className="section-detail-status">{section.status}</span>
+        <span className={`admin-status-badge ${STATUS_BADGE_CLASS[section.status] || ''}`}>
+          {section.status}
+        </span>
         <span>Created {new Date(section.created_at).toLocaleDateString()}</span>
       </div>
 
@@ -75,7 +84,7 @@ function StudentSectionDetail() {
         <div>
           <div className="widget-label">assignments</div>
           {section.assignments.length === 0 ? (
-            <p className="section-detail-placeholder">No assignments</p>
+            <p className="admin-empty-card">No assignments</p>
           ) : (
             <div className="section-detail-list">
               {section.assignments.map((a) => (
@@ -93,7 +102,7 @@ function StudentSectionDetail() {
         <div>
           <div className="widget-label">quests</div>
           {section.quests.length === 0 ? (
-            <p className="section-detail-placeholder">No quests</p>
+            <p className="admin-empty-card">No quests</p>
           ) : (
             <div className="section-detail-list">
               {section.quests.map((q) => (

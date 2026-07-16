@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import api from '../../api'
 import { useToast } from '../../components/ToastContext'
-import './admin-shared.css'
+import '../../styles/shared-ui.css'
 import './AdminSettings.css'
 
 function AdminSettings() {

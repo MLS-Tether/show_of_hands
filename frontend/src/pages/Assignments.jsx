@@ -4,6 +4,7 @@ import api from '../api'
 import { formatDueDate } from '../utils/formatDueDate'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { isTeacher } from '../utils/auth'
+import '../styles/shared-ui.css'
 import './Assignments.css'
 
 function Assignments() {
@@ -51,13 +52,13 @@ function Assignments() {
 
   return (
     <section className="assignments-page">
-      <h1>Assignments</h1>
-      <div role="tablist" aria-label="Assignment status" className="assignments-tabs">
+      <h1 className="admin-page-h1">Assignments</h1>
+      <div role="tablist" aria-label="Assignment status" className="admin-filter-chips">
         <button
           type="button"
           role="tab"
           aria-selected={tab === 'upcoming'}
-          className={`assignments-tab${tab === 'upcoming' ? ' active' : ''}`}
+          className={`admin-chip${tab === 'upcoming' ? ' active' : ''}`}
           onClick={() => setTab('upcoming')}
         >
           Upcoming
@@ -66,15 +67,15 @@ function Assignments() {
           type="button"
           role="tab"
           aria-selected={tab === 'past'}
-          className={`assignments-tab${tab === 'past' ? ' active' : ''}`}
+          className={`admin-chip${tab === 'past' ? ' active' : ''}`}
           onClick={() => setTab('past')}
         >
           Past
         </button>
       </div>
 
-      {loading && <p className="assignments-placeholder">Loading assignments…</p>}
-      {!loading && rows.length === 0 && <p className="assignments-placeholder">{emptyMessage}</p>}
+      {loading && <p className="admin-empty-card">Loading assignments…</p>}
+      {!loading && rows.length === 0 && <p className="admin-empty-card">{emptyMessage}</p>}
       {!loading && rows.length > 0 && (
         <div className="assignments-list">
           {rows.map((a) => (

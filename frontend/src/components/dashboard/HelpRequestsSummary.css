@@ -17,9 +17,10 @@
 }
 
 .help-request-card {
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  padding: 10px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
   text-align: left;
 }
 
@@ -46,13 +47,13 @@
 }
 
 .help-request-join:hover {
-  background: var(--surface-1);
+  background: var(--surface-2);
 }
 
 .post-request-card {
   border: 1px dashed var(--border-strong);
-  border-radius: 6px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -63,5 +64,5 @@
 
 .post-request-card:hover {
   color: var(--text-h);
-  border-color: var(--text-h);
+  border-color: var(--border-strong);
 }

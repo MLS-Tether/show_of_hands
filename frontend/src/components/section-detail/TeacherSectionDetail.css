@@ -6,20 +6,20 @@
 
 .teacher-section-card-tile {
   position: relative;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   padding: 20px 14px;
   min-height: 70px;
   text-align: left;
   color: var(--text-h);
-  background: none;
   cursor: pointer;
   font: inherit;
   font-size: 14px;
 }
 
 .teacher-section-card-tile:hover {
-  border-color: var(--text-h);
+  border-color: var(--border-strong);
 }
 
 .teacher-section-card-badge {
@@ -51,13 +51,18 @@
 }
 
 .teacher-panel-placeholder {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--text-muted);
+  text-align: center;
+  padding: 24px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .teacher-panel-error {
   font-size: 12px;
-  color: #d33;
+  color: var(--danger);
   margin-top: 6px;
 }
 
@@ -65,9 +70,10 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  padding: 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
   margin-bottom: 14px;
 }
 
@@ -75,7 +81,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-muted);
 }
 
@@ -83,10 +89,11 @@
 .teacher-panel-form textarea,
 .teacher-panel-form select {
   font: inherit;
-  padding: 6px 8px;
+  font-size: 13px;
+  padding: 6px 10px;
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  background: var(--bg);
+  border-radius: 6px;
+  background: var(--surface-2);
   color: var(--text-h);
 }
 
@@ -108,7 +115,7 @@
 .teacher-panel-button {
   border: 1px solid var(--border-strong);
   border-radius: 6px;
-  padding: 6px 12px;
+  padding: 7px 14px;
   font-size: 13px;
   color: var(--text-h);
   background: none;
@@ -116,7 +123,7 @@
 }
 
 .teacher-panel-button:hover {
-  background: var(--surface-1);
+  background: var(--surface-2);
 }
 
 .teacher-panel-button:disabled {
@@ -152,12 +159,26 @@
   overflow-wrap: break-word;
 }
 
+.teacher-panel-row-stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.teacher-panel-row-header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.widget-label-spaced {
+  margin-top: 16px;
+}
+
 button.teacher-panel-row {
   cursor: pointer;
 }
 
 button.teacher-panel-row:hover {
-  background: var(--surface-1);
+  background: var(--surface-2);
 }
 
 .teacher-panel-row:last-child {
@@ -165,8 +186,9 @@ button.teacher-panel-row:hover {
 }
 
 .teacher-panel-list {
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .teacher-panel-row-actions {

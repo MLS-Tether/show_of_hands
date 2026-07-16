@@ -26,12 +26,14 @@ function Layout() {
   }, [location.pathname, navigate])
 
   return (
-    <div className="app-shell">
-      <TopBar />
-      <div className="app-body">
-        <Sidebar />
-        <main className="app-content">
-          <Outlet />
+    <div className="admin-shell">
+      <Sidebar />
+      <div className="admin-main">
+        <TopBar />
+        <main className="admin-content">
+          <div className="admin-content-inner">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

@@ -3,11 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import { useDialog } from '../components/DialogContext'
 import { useAutoRefresh } from '../utils/autoRefresh'
+import { getUserId, isTeacher } from '../utils/auth'
+import '../styles/shared-ui.css'
 import './Sections.css'
 
 function Sections() {
   const navigate = useNavigate()
   const { confirm, alert } = useDialog()
+  const teacher = isTeacher()
+  const userId = getUserId()
   const [sections, setSections] = useState(null)
   const [allSections, setAllSections] = useState(null)
   const [requestedIds, setRequestedIds] = useState(() => new Set())
@@ -28,6 +32,7 @@ function Sections() {
   }, [])
 
   const loadAllSections = useCallback(() => {
+    if (teacher) return () => {}
     let cancelled = false
     api
       .get('/sections', { params: { scope: 'all' } })
@@ -40,7 +45,7 @@ function Sections() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [teacher])
 
   useEffect(() => loadSections(), [loadSections])
   useEffect(() => loadAllSections(), [loadAllSections])
@@ -63,19 +68,26 @@ function Sections() {
   const loading = sections === null
   const allLoading = allSections === null
 
+  const ownedSections = teacher ? (sections || []).filter((s) => s.teacher_id === userId) : sections || []
+  const otherTeacherSections = teacher
+    ? (sections || []).filter((s) => s.teacher_id !== userId)
+    : []
+
   const enrolledIds = new Set((sections || []).map((s) => s.section_id))
   const browsableSections = (allSections || []).filter((s) => !enrolledIds.has(s.section_id))
 
   return (
     <section className="sections-page">
-      <h1>My sections</h1>
-      {loading && <p className="sections-placeholder">Loading sections…</p>}
-      {!loading && sections.length === 0 && (
-        <p className="sections-placeholder">You're not enrolled in any sections yet.</p>
+      <h1 className="admin-page-h1">My sections</h1>
+      {loading && <p className="admin-empty-card">Loading sections…</p>}
+      {!loading && ownedSections.length === 0 && (
+        <p className="admin-empty-card">
+          {teacher ? 'No sections yet.' : "You're not enrolled in any sections yet."}
+        </p>
       )}
-      {!loading && sections.length > 0 && (
+      {!loading && ownedSections.length > 0 && (
         <div className="sections-list">
-          {sections.map((s) => (
+          {ownedSections.map((s) => (
             <button
               key={s.section_id}
               type="button"
@@ -91,33 +103,57 @@ function Sections() {
         </div>
       )}
 
-      <h2 className="sections-subheading">All sections</h2>
-      {allLoading && <p className="sections-placeholder">Loading sections…</p>}
-      {!allLoading && browsableSections.length === 0 && (
-        <p className="sections-placeholder">No other sections to join right now.</p>
-      )}
-      {!allLoading && browsableSections.length > 0 && (
-        <div className="sections-list">
-          {browsableSections.map((s) => (
-            <button
-              key={s.section_id}
-              type="button"
-              className="section-row"
-              disabled={requestedIds.has(s.section_id)}
-              onClick={() => handleEnroll(s)}
-            >
-              <span className="section-row-name">
-                {s.class_name}
-                <span className="section-row-teacher"> · {s.teacher_name || 'Unassigned'}</span>
-              </span>
-              <span className="section-row-meta">
-                {requestedIds.has(s.section_id)
-                  ? 'Requested'
-                  : `${s.enrolled_count}/${s.capacity} students`}
-              </span>
-            </button>
-          ))}
-        </div>
+      {teacher ? (
+        <>
+          <h2 className="sections-subheading">Other Sections in Your School</h2>
+          {loading && <p className="admin-empty-card">Loading sections…</p>}
+          {!loading && otherTeacherSections.length === 0 && (
+            <p className="admin-empty-card">No other sections in your school.</p>
+          )}
+          {!loading && otherTeacherSections.length > 0 && (
+            <div className="sections-list">
+              {otherTeacherSections.map((s) => (
+                <div className="section-row section-row-readonly" key={s.section_id}>
+                  <span className="section-row-name">{s.class_name}</span>
+                  <span className="section-row-meta">
+                    {s.period} · {s.teacher_name || 'Unassigned'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <h2 className="sections-subheading">All sections</h2>
+          {allLoading && <p className="admin-empty-card">Loading sections…</p>}
+          {!allLoading && browsableSections.length === 0 && (
+            <p className="admin-empty-card">No other sections to join right now.</p>
+          )}
+          {!allLoading && browsableSections.length > 0 && (
+            <div className="sections-list">
+              {browsableSections.map((s) => (
+                <button
+                  key={s.section_id}
+                  type="button"
+                  className="section-row"
+                  disabled={requestedIds.has(s.section_id)}
+                  onClick={() => handleEnroll(s)}
+                >
+                  <span className="section-row-name">
+                    {s.class_name}
+                    <span className="section-row-teacher"> · {s.teacher_name || 'Unassigned'}</span>
+                  </span>
+                  <span className="section-row-meta">
+                    {requestedIds.has(s.section_id)
+                      ? 'Requested'
+                      : `${s.enrolled_count}/${s.capacity} students`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </section>
   )
