@@ -41,6 +41,12 @@ class UserListResponse(BaseModel):
 
     user_id: int
     username: str
+    email: Optional[str] = None
     role: RoleEnum
     is_verified: bool
+    is_active: bool
+    rejection_reason: Optional[str] = None
+    signup_note: Optional[str] = None
+    total_points: int
+    last_active_at: Optional[datetime] = None
     created_at: datetime

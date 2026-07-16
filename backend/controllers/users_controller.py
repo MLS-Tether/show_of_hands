@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,10 @@ from models.notification_model import Notification, NotificationTypeEnum
 from models.section_model import Section, SectionStatusEnum
 from models.user_model import User, RoleEnum
 from schemas.user import UserResponse, UserListResponse
+
+
+class RejectSignupRequest(BaseModel):
+    reason: Optional[str] = None
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -70,6 +75,68 @@ def verify_user(
     user.is_verified = True
     db.commit()
     return {"message": "User verified successfully."}
+
+
+@router.patch("/{user_id}/reject")
+def reject_signup(
+    user_id: int,
+    body: RejectSignupRequest,
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(
+        User.user_id == user_id,
+        User.school_id == current_user.school_id,
+        User.is_archived == False,
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if user.is_verified:
+        raise HTTPException(status_code=409, detail="User is already verified.")
+
+    user.rejection_reason = body.reason or "Rejected by admin"
+    db.commit()
+    return {"message": "Signup rejected."}
+
+
+@router.patch("/{user_id}/deactivate")
+def deactivate_user(
+    user_id: int,
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db),
+):
+    if user_id == current_user.user_id:
+        raise HTTPException(status_code=400, detail="Cannot deactivate your own account.")
+
+    user = db.query(User).filter(
+        User.user_id == user_id,
+        User.school_id == current_user.school_id,
+        User.is_archived == False,
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    user.is_active = False
+    db.commit()
+    return {"message": "User deactivated successfully."}
+
+
+@router.patch("/{user_id}/reactivate")
+def reactivate_user(
+    user_id: int,
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(
+        User.user_id == user_id,
+        User.school_id == current_user.school_id,
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    user.is_active = True
+    db.commit()
+    return {"message": "User reactivated successfully."}
 
 
 @router.delete("/{user_id}")

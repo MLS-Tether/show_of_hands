@@ -1,0 +1,124 @@
+.admin-overview-greeting {
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--text-h);
+  margin: 0;
+}
+
+.admin-overview-subtitle {
+  font-size: 15px;
+  color: var(--text-muted);
+  margin: 8px 0 0;
+}
+
+.admin-overview-section {
+  margin-top: 34px;
+}
+
+.admin-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.admin-attention-grid,
+.admin-quick-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.admin-attention-card {
+  text-align: left;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 22px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.admin-attention-card:hover {
+  border-color: var(--border-strong);
+}
+
+.admin-attention-number {
+  font-size: 38px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.admin-attention-link {
+  font-size: 13px;
+  color: var(--accent);
+  margin-top: 4px;
+}
+
+.admin-attention-title {
+  font-size: 14px;
+  color: var(--text-h);
+  margin-top: 10px;
+}
+
+.admin-attention-detail {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.admin-stat-tile {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 20px;
+}
+
+.admin-stat-number {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.admin-stat-label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.admin-quick-action {
+  text-align: left;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.admin-quick-action:hover {
+  border-color: var(--border-strong);
+}
+
+.admin-quick-action-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.admin-quick-action-desc {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}

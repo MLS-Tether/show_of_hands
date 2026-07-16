@@ -11,6 +11,10 @@ function storeSession(data) {
   localStorage.setItem('role', data.role)
 }
 
+function homePathForRole(role) {
+  return role === 'admin' ? '/admin/overview' : '/dashboard'
+}
+
 function LoginForm() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
@@ -23,7 +27,7 @@ function LoginForm() {
     try {
       const { data } = await api.post('/auth/login', { username, password })
       storeSession(data)
-      navigate('/dashboard')
+      navigate(homePathForRole(data.role))
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed.')
     }
@@ -56,6 +60,7 @@ function RegisterForm({ onPendingVerification }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [email, setEmail] = useState('')
+  const [note, setNote] = useState('')
   const [schoolCode, setSchoolCode] = useState('')
   const [error, setError] = useState('')
 
@@ -67,6 +72,7 @@ function RegisterForm({ onPendingVerification }) {
         username,
         password,
         email: email || undefined,
+        note: note || undefined,
         school_code: schoolCode,
         role,
       })
@@ -78,7 +84,7 @@ function RegisterForm({ onPendingVerification }) {
     try {
       const { data } = await api.post('/auth/login', { username, password })
       storeSession(data)
-      navigate('/dashboard')
+      navigate(homePathForRole(data.role))
     } catch {
       // Account created but not immediately usable (e.g. teacher/admin pending verification).
       onPendingVerification()
@@ -118,6 +124,12 @@ function RegisterForm({ onPendingVerification }) {
           Email (optional)
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
+        {role !== 'student' && (
+          <label>
+            Note for the admin (optional)
+            <input value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+        )}
         <label>
           School code
           <input value={schoolCode} onChange={(e) => setSchoolCode(e.target.value)} required />

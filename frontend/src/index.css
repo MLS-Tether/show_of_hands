@@ -4,6 +4,7 @@
   --text-muted: #a09aa8;
   --bg: #fff;
   --surface-1: #f4f3f6;
+  --surface-2: #f6f6f8;
   --border: #e5e4e7;
   --border-strong: #d8d6db;
   --code-bg: #f4f3ec;
@@ -40,6 +41,7 @@
     --text-muted: #6b6d78;
     --bg: #16171d;
     --surface-1: #1f2028;
+    --surface-2: #1d1d22;
     --border: #2e303a;
     --border-strong: #3a3c48;
     --code-bg: #1f2028;
@@ -54,6 +56,36 @@
   #social .button-icon {
     filter: invert(1) brightness(2);
   }
+}
+
+/* Explicit theme override (admin console theme toggle) — takes precedence
+   over the prefers-color-scheme default above once a user picks a theme. */
+:root[data-theme='light'] {
+  --text: #34343b;
+  --text-h: #1a1a1f;
+  --text-muted: #8b8b93;
+  --bg: #fbfbfc;
+  --surface-1: #ffffff;
+  --surface-2: #f6f6f8;
+  --border: #e8e8ed;
+  --border-strong: #d6d6dd;
+  --accent: #aa3bff;
+  --accent-bg: rgba(170, 59, 255, 0.1);
+  --accent-border: rgba(170, 59, 255, 0.5);
+}
+
+:root[data-theme='dark'] {
+  --text: #cbcbd3;
+  --text-h: #f4f4f7;
+  --text-muted: #7f7f88;
+  --bg: #0d0d10;
+  --surface-1: #161619;
+  --surface-2: #1d1d22;
+  --border: #28282e;
+  --border-strong: #3a3a43;
+  --accent: #c084fc;
+  --accent-bg: rgba(192, 132, 252, 0.13);
+  --accent-border: rgba(192, 132, 252, 0.5);
 }
 
 body {

@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from db.pool import Base
 
@@ -21,6 +21,10 @@ class User(Base):
     email = Column(String, nullable=True)
     role = Column(Enum(RoleEnum), nullable=False)
     is_verified = Column(Boolean, nullable=False, default=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    rejection_reason = Column(Text, nullable=True)
+    last_active_at = Column(DateTime(timezone=True), nullable=True)
+    signup_note = Column(Text, nullable=True)
     total_points = Column(Integer, nullable=False, default=0)
     is_archived = Column(Boolean, nullable=False, default=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)

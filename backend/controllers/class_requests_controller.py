@@ -27,6 +27,8 @@ def create_class_request(
 ):
     req = ClassRequest(
         class_name=body.class_name,
+        subject=body.subject,
+        description=body.description,
         requested_by=current_user.user_id,
         school_id=current_user.school_id,
     )
@@ -41,12 +43,40 @@ def list_class_requests(
     current_user: User = Depends(require_role(["admin"])),
     db: Session = Depends(get_db),
 ):
-    return (
+    requests = (
         db.query(ClassRequest)
         .filter(ClassRequest.school_id == current_user.school_id)
         .order_by(ClassRequest.created_at.desc())
         .all()
     )
+
+    # Existing catalog is small and global (Class_.name has no school scoping
+    # elsewhere in this app either), so one fetch + an in-Python substring
+    # check in both directions is simpler and more correct than a single-
+    # direction SQL ilike, which would miss e.g. "AP Biology" vs "Biology".
+    existing_names = [name for (name,) in db.query(Class_.name).all()]
+
+    results = []
+    for req in requests:
+        requested_lower = req.class_name.lower()
+        similar = [
+            name
+            for name in existing_names
+            if requested_lower in name.lower() or name.lower() in requested_lower
+        ]
+        results.append(
+            ClassRequestListResponse(
+                class_request_id=req.class_request_id,
+                class_name=req.class_name,
+                subject=req.subject,
+                description=req.description,
+                requested_by=req.requested_by,
+                status=req.status,
+                created_at=req.created_at,
+                similar_classes=similar,
+            )
+        )
+    return results
 
 
 @router.patch("/{class_request_id}", response_model=ClassRequestStatusResponse)

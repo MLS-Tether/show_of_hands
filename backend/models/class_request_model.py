@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Enum, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from db.pool import Base
 
@@ -16,6 +16,8 @@ class ClassRequest(Base):
 
     class_request_id = Column(Integer, primary_key=True)
     class_name = Column(String, nullable=False)
+    subject = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
     requested_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     school_id = Column(Integer, ForeignKey("schools.school_id"), nullable=False)
     status = Column(Enum(ClassRequestStatusEnum), nullable=False, default=ClassRequestStatusEnum.pending)

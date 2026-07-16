@@ -1,0 +1,23 @@
+.admin-shell {
+  display: flex;
+  min-height: 100svh;
+  width: 100%;
+}
+
+.admin-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 34px 40px 80px;
+}
+
+.admin-content-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}

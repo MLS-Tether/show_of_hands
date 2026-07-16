@@ -52,8 +52,83 @@ def test_verify_user(client, world, cleanup):
     assert resp.status_code == 200, resp.text
 
 
+def test_reject_signup(client, world, cleanup):
+    username = unique("rejectme")
+    resp = client.post("/api/auth/register", json={
+        "username": username,
+        "password": "password123",
+        "school_code": world.school_code,
+        "role": "teacher",
+    })
+    assert resp.status_code == 201, resp.text
+    user_id = resp.json()["user_id"]
+    cleanup(User, user_id)
+
+    resp = client.patch(
+        f"/api/users/{user_id}/reject",
+        json={"reason": "Not affiliated with this school."},
+        headers=auth_header(world.admin_token),
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = client.get(f"/api/users?role=teacher", headers=auth_header(world.admin_token))
+    assert resp.status_code == 200, resp.text
+    rejected = next(u for u in resp.json() if u["user_id"] == user_id)
+    assert rejected["rejection_reason"] == "Not affiliated with this school."
+    assert rejected["is_verified"] is False
+
+    resp = client.post("/api/auth/login", json={"username": username, "password": "password123"})
+    assert resp.status_code == 403
+
+    resp = client.patch(f"/api/users/{user_id}/verify", headers=auth_header(world.admin_token))
+    assert resp.status_code == 200, resp.text
+    resp = client.patch(
+        f"/api/users/{user_id}/reject",
+        json={},
+        headers=auth_header(world.admin_token),
+    )
+    assert resp.status_code == 409
+
+
+def test_deactivate_and_reactivate_user(client, world, cleanup):
+    username = unique("togglable")
+    resp = client.post("/api/auth/register", json={
+        "username": username,
+        "password": "password123",
+        "school_code": world.school_code,
+        "role": "student",
+    })
+    assert resp.status_code == 201, resp.text
+    user_id = resp.json()["user_id"]
+    cleanup(User, user_id)
+
+    resp = client.post("/api/auth/login", json={"username": username, "password": "password123"})
+    assert resp.status_code == 200, resp.text
+    user_token = resp.json()["access_token"]
+
+    resp = client.patch(f"/api/users/{user_id}/deactivate", headers=auth_header(world.admin_token))
+    assert resp.status_code == 200, resp.text
+
+    resp = client.get(f"/api/users/{user_id}", headers=auth_header(user_token))
+    assert resp.status_code == 403
+
+    resp = client.post("/api/auth/login", json={"username": username, "password": "password123"})
+    assert resp.status_code == 403
+
+    resp = client.patch(f"/api/users/{user_id}/reactivate", headers=auth_header(world.admin_token))
+    assert resp.status_code == 200, resp.text
+
+    resp = client.post("/api/auth/login", json={"username": username, "password": "password123"})
+    assert resp.status_code == 200, resp.text
+
+
 def test_delete_own_account_forbidden(client, world):
     resp = client.delete(f"/api/users/{world.admin_id}", headers=auth_header(world.admin_token))
+    assert resp.status_code == 400
+
+
+def test_deactivate_own_account_forbidden(client, world):
+    resp = client.patch(f"/api/users/{world.admin_id}/deactivate", headers=auth_header(world.admin_token))
     assert resp.status_code == 400
 
 

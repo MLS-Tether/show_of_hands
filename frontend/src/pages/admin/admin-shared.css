@@ -1,0 +1,173 @@
+.admin-page-h1 {
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-h);
+  margin: 0;
+}
+
+.admin-page-subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 8px 0 22px;
+}
+
+.admin-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.admin-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 18px;
+  padding: 6px 13px;
+  cursor: pointer;
+}
+
+.admin-chip.active {
+  background: var(--text-h);
+  color: var(--bg);
+  border-color: var(--text-h);
+}
+
+.admin-chip-count {
+  font-size: 11.5px;
+  opacity: 0.75;
+}
+
+.admin-bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+  color: var(--text-h);
+}
+
+.admin-bulk-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-btn-primary,
+.admin-btn-secondary,
+.admin-btn-text {
+  font-size: 13px;
+  border-radius: 6px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.admin-btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+}
+
+.admin-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.admin-btn-secondary {
+  background: transparent;
+  color: var(--text-h);
+  border: 1px solid var(--border-strong);
+}
+
+.admin-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.admin-btn-danger {
+  background: transparent;
+  color: #dc2626;
+  border: 1px solid var(--border-strong);
+}
+
+.admin-btn-text {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 7px 6px;
+}
+
+.admin-empty-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+.admin-kind-badge {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+}
+
+.kind-teacher {
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.13);
+  border-color: rgba(168, 85, 247, 0.3);
+}
+
+.kind-admin {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.13);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.kind-class {
+  color: #14b8a6;
+  background: rgba(20, 184, 166, 0.13);
+  border-color: rgba(20, 184, 166, 0.3);
+}
+
+.admin-detail-row {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text);
+  padding: 4px 0;
+}
+
+.admin-detail-label {
+  flex-shrink: 0;
+  width: 130px;
+  color: var(--text-muted);
+}
+
+.admin-chevron {
+  display: inline-block;
+  color: var(--text-muted);
+  font-size: 12px;
+  transition: transform 0.15s ease;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.admin-chevron.rotated {
+  transform: rotate(180deg);
+}

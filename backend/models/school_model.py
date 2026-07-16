@@ -10,6 +10,8 @@ class School(Base):
     school_id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, unique=True)
     school_code = Column(String, nullable=False, unique=True)
+    district = Column(String, nullable=True)
+    grades = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     users = relationship("User", back_populates="school")
