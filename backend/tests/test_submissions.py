@@ -70,7 +70,7 @@ def test_list_submissions_teacher_admin_only(client, world, cleanup):
     assert any(s["submission_id"] == submission_id for s in resp.json())
 
 
-def test_grade_and_finalize_submission_high_grade_bonus(client, world, cleanup):
+def test_grade_and_finalize_submission_high_grade_bonus(client, world, cleanup, db):
     assignment_id = _new_assignment(client, world, cleanup, point_value=100)
     resp = client.post(
         f"/api/assignments/{assignment_id}/submissions",

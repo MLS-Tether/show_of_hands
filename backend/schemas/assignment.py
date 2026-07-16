@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
+from models.assignment_model import AssignmentCategoryEnum
+
 
 class AssignmentCreate(BaseModel):
     title: str
@@ -9,6 +11,7 @@ class AssignmentCreate(BaseModel):
     url: Optional[str] = None
     due_date: datetime
     point_value: int
+    category: AssignmentCategoryEnum = AssignmentCategoryEnum.homework
 
 
 class AssignmentUpdate(BaseModel):
@@ -17,6 +20,7 @@ class AssignmentUpdate(BaseModel):
     url: Optional[str] = None
     due_date: Optional[datetime] = None
     point_value: Optional[int] = None
+    category: Optional[AssignmentCategoryEnum] = None
 
 
 class AssignmentListResponse(BaseModel):
@@ -26,6 +30,7 @@ class AssignmentListResponse(BaseModel):
     title: str
     due_date: datetime
     point_value: int
+    category: AssignmentCategoryEnum
 
 
 class AssignmentResponse(BaseModel):
@@ -38,6 +43,7 @@ class AssignmentResponse(BaseModel):
     url: Optional[str] = None
     due_date: datetime
     point_value: int
+    category: AssignmentCategoryEnum
     created_at: datetime
 
 
@@ -48,4 +54,5 @@ class AssignmentUpdateResponse(BaseModel):
     title: str
     due_date: datetime
     point_value: int
+    category: AssignmentCategoryEnum
     updated_at: datetime

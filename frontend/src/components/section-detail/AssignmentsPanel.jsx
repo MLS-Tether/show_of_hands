@@ -10,6 +10,7 @@ function AssignmentsPanel({ sectionId, assignments, onChange }) {
   const [url, setUrl] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [pointValue, setPointValue] = useState(100)
+  const [category, setCategory] = useState('homework')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -24,12 +25,14 @@ function AssignmentsPanel({ sectionId, assignments, onChange }) {
         url: url || null,
         due_date: new Date(dueDate).toISOString(),
         point_value: Number(pointValue),
+        category,
       })
       setTitle('')
       setDescription('')
       setUrl('')
       setDueDate('')
       setPointValue(100)
+      setCategory('homework')
       setShowForm(false)
       onChange?.()
     } catch (err) {
@@ -91,6 +94,14 @@ function AssignmentsPanel({ sectionId, assignments, onChange }) {
                 onChange={(e) => setPointValue(e.target.value)}
                 required
               />
+            </label>
+            <label>
+              Category
+              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                <option value="homework">Homework</option>
+                <option value="quizzes">Quizzes</option>
+                <option value="tests">Tests</option>
+              </select>
             </label>
           </div>
           {error && <p className="teacher-panel-error">{error}</p>}

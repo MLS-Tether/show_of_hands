@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../../api'
 import { useDialog } from '../../components/DialogContext'
 import { useToast } from '../../components/ToastContext'
@@ -35,6 +36,7 @@ function formatLastActive(dateStr) {
 }
 
 function AdminUsers() {
+  const navigate = useNavigate()
   const { confirm } = useDialog()
   const { showToast } = useToast()
   const [users, setUsers] = useState(null)
@@ -142,10 +144,12 @@ function AdminUsers() {
         {filtered.map((user) => {
           const isDeactivated = !user.is_active
           const roleBadge = ROLE_BADGE[user.role]
+          const isClickable = user.role === 'student'
           return (
             <div
-              className={`admin-user-row${isDeactivated ? ' deactivated' : ''}`}
+              className={`admin-user-row${isDeactivated ? ' deactivated' : ''}${isClickable ? ' clickable' : ''}`}
               key={user.user_id}
+              onClick={isClickable ? () => navigate(`/admin/users/${user.user_id}`) : undefined}
             >
               <div className="admin-user-avatar">{initials(user.username)}</div>
               <div className="admin-user-main">
@@ -167,12 +171,22 @@ function AdminUsers() {
                   <button
                     type="button"
                     className="admin-btn-secondary admin-btn-danger-text"
-                    onClick={() => deactivate(user)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      deactivate(user)
+                    }}
                   >
                     Deactivate
                   </button>
                 ) : (
-                  <button type="button" className="admin-btn-secondary" onClick={() => reactivate(user)}>
+                  <button
+                    type="button"
+                    className="admin-btn-secondary"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      reactivate(user)
+                    }}
+                  >
                     Reactivate
                   </button>
                 )}

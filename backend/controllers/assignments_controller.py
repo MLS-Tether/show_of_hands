@@ -111,6 +111,7 @@ def create_assignment(
         url=body.url,
         due_date=body.due_date,
         point_value=body.point_value,
+        category=body.category,
     )
     db.add(assignment)
     db.flush()
@@ -179,6 +180,8 @@ def update_assignment(
         assignment.due_date = body.due_date
     if body.point_value is not None:
         assignment.point_value = body.point_value
+    if body.category is not None:
+        assignment.category = body.category
 
     db.commit()
     db.refresh(assignment)

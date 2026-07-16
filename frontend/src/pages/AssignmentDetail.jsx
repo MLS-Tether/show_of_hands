@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import api from '../api'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { isTeacher } from '../utils/auth'
+import { formatPercent } from '../utils/format'
 import './AssignmentDetail.css'
 
 const STATUS_LABELS = {
@@ -172,7 +173,7 @@ function SubmissionSummary({ submission }) {
         </span>
         <span className="submission-summary-points">{submission.points_awarded} pts</span>
         {submission.grade != null && (
-          <span className="submission-summary-grade">Grade: {submission.grade}</span>
+          <span className="submission-summary-grade">Grade: {formatPercent(submission.grade)}</span>
         )}
       </button>
 
@@ -200,7 +201,7 @@ function SubmissionSummary({ submission }) {
           </div>
           <div className="submission-detail-row">
             <span className="submission-detail-label">Grade</span>
-            <span>{submission.grade != null ? submission.grade : 'Not graded yet'}</span>
+            <span>{submission.grade != null ? formatPercent(submission.grade) : 'Not graded yet'}</span>
           </div>
           <div className="submission-detail-row">
             <span className="submission-detail-label">Points awarded</span>
@@ -274,7 +275,7 @@ function GradingRow({ submission, onGraded }) {
         </span>
         <span className="submission-summary-points">{submission.points_awarded} pts</span>
         {submission.grade != null && (
-          <span className="submission-summary-grade">Grade: {submission.grade}</span>
+          <span className="submission-summary-grade">Grade: {formatPercent(submission.grade)}</span>
         )}
       </button>
 
@@ -289,7 +290,7 @@ function GradingRow({ submission, onGraded }) {
             <div className="submission-detail-row">
               <span className="submission-detail-label">Grade</span>
               <span>
-                {submission.grade} — {submission.points_awarded} pts (finalized)
+                {formatPercent(submission.grade)} — {submission.points_awarded} pts (finalized)
               </span>
             </div>
           ) : (

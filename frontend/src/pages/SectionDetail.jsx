@@ -4,6 +4,7 @@ import api from '../api'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { isTeacher } from '../utils/auth'
 import TeacherSectionDetail from '../components/section-detail/TeacherSectionDetail'
+import GradeSummary from '../components/section-detail/GradeSummary'
 import './SectionDetail.css'
 
 function SectionDetail() {
@@ -72,6 +73,11 @@ function StudentSectionDetail() {
       </div>
 
       <div className="section-detail-columns">
+        <div>
+          <div className="widget-label">my grade</div>
+          <GradeSummary sectionId={sectionId} />
+        </div>
+
         <div>
           <div className="widget-label">assignments</div>
           {section.assignments.length === 0 ? (

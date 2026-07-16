@@ -7,11 +7,12 @@ from sqlalchemy.orm import Session
 
 from db.pool import get_db
 from dependencies import get_current_user, require_role
+from grading import compute_section_grade_for_student
 from models.enrollment_model import Enrollment
 from models.notification_model import Notification, NotificationTypeEnum
 from models.section_model import Section, SectionStatusEnum
 from models.user_model import User, RoleEnum
-from schemas.user import UserResponse, UserListResponse
+from schemas.user import UserResponse, UserListResponse, StudentSectionGradeResponse
 
 
 class RejectSignupRequest(BaseModel):
@@ -57,6 +58,46 @@ def get_user(
     if user.school_id != current_user.school_id:
         raise HTTPException(status_code=403, detail="Cannot access users outside your school.")
     return user
+
+
+@router.get("/{user_id}/grades", response_model=List[StudentSectionGradeResponse])
+def get_student_grades(
+    user_id: int,
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db),
+):
+    student = db.query(User).filter(
+        User.user_id == user_id,
+        User.school_id == current_user.school_id,
+        User.is_archived == False,
+    ).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if student.role != RoleEnum.student:
+        raise HTTPException(status_code=400, detail="User is not a student.")
+
+    enrollments = db.query(Enrollment).filter(
+        Enrollment.student_id == user_id,
+        Enrollment.is_archived == False,
+    ).all()
+
+    results = []
+    for enrollment in enrollments:
+        section = db.query(Section).filter(
+            Section.section_id == enrollment.section_id,
+            Section.is_archived == False,
+        ).first()
+        if not section:
+            continue
+        grade = compute_section_grade_for_student(db, section.section_id, user_id)
+        results.append({
+            "section_id": section.section_id,
+            "class_name": section.class_.name,
+            "period": section.period,
+            "percentage": grade["percentage"],
+            "letter_grade": grade["letter_grade"],
+        })
+    return results
 
 
 @router.patch("/{user_id}/verify")

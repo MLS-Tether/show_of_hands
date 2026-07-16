@@ -37,6 +37,14 @@
   opacity: 0.55;
 }
 
+.admin-user-row.clickable {
+  cursor: pointer;
+}
+
+.admin-user-row.clickable:hover {
+  border-color: var(--border-strong);
+}
+
 .admin-user-avatar {
   width: 32px;
   height: 32px;

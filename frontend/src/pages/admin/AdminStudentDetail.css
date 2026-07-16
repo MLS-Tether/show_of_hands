@@ -1,0 +1,34 @@
+.admin-student-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-student-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-student-grades-table {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.admin-student-grades-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.admin-student-grades-row:last-child {
+  border-bottom: none;
+}
+
+.admin-student-grades-header {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--surface-1);
+}

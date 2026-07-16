@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from db.pool import get_db
 from dependencies import get_current_user, require_role
+from grading import compute_section_grade_for_student
 from models.enrollment_model import Enrollment
 from models.section_model import Section, SectionStatusEnum
 from models.submission_model import SubmissionStatusEnum
@@ -20,6 +21,7 @@ from schemas.section import (
     SectionDetailResponse,
     SectionUpdateResponse,
     SectionAnalyticsResponse,
+    StudentGradeResponse,
 )
 
 LOW_GRADE_THRESHOLD = 70
@@ -271,6 +273,61 @@ def get_section_analytics(
         "points_distribution": points_distribution,
         "students_needing_attention": students_needing_attention,
     }
+
+
+def _get_section_for_grade_check(section_id: int, db: Session) -> Section:
+    section = db.query(Section).filter(
+        Section.section_id == section_id,
+        Section.is_archived == False,
+    ).first()
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found.")
+    return section
+
+
+@router.get("/{section_id}/grades/me", response_model=StudentGradeResponse)
+def get_my_section_grade(
+    section_id: int,
+    current_user: User = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    section = _get_section_for_grade_check(section_id, db)
+    if section.school_id != current_user.school_id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    enrolled = db.query(Enrollment).filter(
+        Enrollment.section_id == section_id,
+        Enrollment.student_id == current_user.user_id,
+        Enrollment.is_archived == False,
+    ).first()
+    if not enrolled:
+        raise HTTPException(status_code=403, detail="Not enrolled in this section.")
+
+    return compute_section_grade_for_student(db, section_id, current_user.user_id)
+
+
+@router.get("/{section_id}/grades/{student_id}", response_model=StudentGradeResponse)
+def get_student_section_grade(
+    section_id: int,
+    student_id: int,
+    current_user: User = Depends(require_role(["teacher", "admin"])),
+    db: Session = Depends(get_db),
+):
+    section = _get_section_for_grade_check(section_id, db)
+    if section.school_id != current_user.school_id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+    if current_user.role == RoleEnum.teacher and section.teacher_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not your section.")
+
+    enrolled = db.query(Enrollment).filter(
+        Enrollment.section_id == section_id,
+        Enrollment.student_id == student_id,
+        Enrollment.is_archived == False,
+    ).first()
+    if not enrolled:
+        raise HTTPException(status_code=404, detail="Student is not enrolled in this section.")
+
+    return compute_section_grade_for_student(db, section_id, student_id)
 
 
 @router.patch("/{section_id}", response_model=SectionUpdateResponse)

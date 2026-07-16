@@ -128,3 +128,8 @@ class SectionAnalyticsResponse(BaseModel):
     assignments: List[AssignmentAnalytics]
     points_distribution: PointsDistribution
     students_needing_attention: List[StudentNeedingAttention]
+
+
+class StudentGradeResponse(BaseModel):
+    percentage: Optional[float]
+    letter_grade: Optional[str]

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from '../../api'
+import { formatPercent } from '../../utils/format'
 
 function AnalyticsPanel({ sectionId }) {
   const [analytics, setAnalytics] = useState(null)
@@ -36,7 +37,7 @@ function AnalyticsPanel({ sectionId }) {
 
       <p>
         Section average grade:{' '}
-        {average_grade != null ? average_grade.toFixed(1) : 'No graded submissions yet'}
+        {average_grade != null ? formatPercent(average_grade) : 'No graded submissions yet'}
       </p>
       <p>
         Points distribution — min {points_distribution.min ?? '—'}, max {points_distribution.max ?? '—'}, median{' '}
@@ -54,8 +55,8 @@ function AnalyticsPanel({ sectionId }) {
             <div className="teacher-panel-row" key={a.assignment_id}>
               <span>{a.title}</span>
               <span className="teacher-panel-row-sub">
-                {a.graded_count}/{a.submitted_count} graded · {(a.completion_rate * 100).toFixed(0)}% submitted
-                {a.average_grade != null ? ` · avg ${a.average_grade.toFixed(1)}` : ''}
+                {a.graded_count}/{a.submitted_count} graded · {formatPercent(a.completion_rate * 100, 0)} submitted
+                {a.average_grade != null ? ` · avg ${formatPercent(a.average_grade)}` : ''}
               </span>
             </div>
           ))}
@@ -75,7 +76,7 @@ function AnalyticsPanel({ sectionId }) {
               <span className="teacher-panel-row-sub">
                 {s.reason === 'no_submission'
                   ? `No submission for "${s.assignment_title}"`
-                  : `Low grade (${s.grade}) on "${s.assignment_title}"`}
+                  : `Low grade (${formatPercent(s.grade)}) on "${s.assignment_title}"`}
               </span>
             </div>
           ))}

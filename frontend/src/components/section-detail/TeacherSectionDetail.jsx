@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import api from '../../api'
 import { useAutoRefresh } from '../../utils/autoRefresh'
 import RosterPanel from './RosterPanel'
+import StudentGradeDetail from './StudentGradeDetail'
 import EnrollmentRequestsPanel from './EnrollmentRequestsPanel'
 import AssignmentsPanel from './AssignmentsPanel'
 import QuestsPanel from './QuestsPanel'
@@ -80,6 +81,7 @@ function TeacherSectionDetail() {
   const [notFound, setNotFound] = useState(false)
   const [loadedSectionId, setLoadedSectionId] = useState(null)
   const [activeCard, setActiveCard] = useState(null)
+  const [viewingStudent, setViewingStudent] = useState(null)
   const [editing, setEditing] = useState(false)
   const [pendingRequests, setPendingRequests] = useState(0)
   const [ungraded, setUngraded] = useState(0)
@@ -176,10 +178,26 @@ function TeacherSectionDetail() {
 
       {activeCard ? (
         <div>
-          <button type="button" className="teacher-section-back" onClick={() => setActiveCard(null)}>
+          <button
+            type="button"
+            className="teacher-section-back"
+            onClick={() => {
+              setActiveCard(null)
+              setViewingStudent(null)
+            }}
+          >
             ← Back
           </button>
-          {activeCard === 'roster' && <RosterPanel section={section} />}
+          {activeCard === 'roster' &&
+            (viewingStudent ? (
+              <StudentGradeDetail
+                sectionId={sectionId}
+                student={viewingStudent}
+                onBack={() => setViewingStudent(null)}
+              />
+            ) : (
+              <RosterPanel section={section} onSelectStudent={setViewingStudent} />
+            ))}
           {activeCard === 'enrollment-requests' && (
             <EnrollmentRequestsPanel sectionId={sectionId} onChange={load} />
           )}

@@ -1,8 +1,14 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Enum, ForeignKey
 from sqlalchemy.orm import relationship
 from db.pool import Base
+
+
+class AssignmentCategoryEnum(str, enum.Enum):
+    homework = "homework"
+    quizzes = "quizzes"
+    tests = "tests"
 
 
 class Assignment(Base):
@@ -15,6 +21,7 @@ class Assignment(Base):
     url = Column(String, nullable=True)
     due_date = Column(DateTime(timezone=True), nullable=False)
     point_value = Column(Integer, nullable=False)
+    category = Column(Enum(AssignmentCategoryEnum), nullable=False, default=AssignmentCategoryEnum.homework)
     is_archived = Column(Boolean, nullable=False, default=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))

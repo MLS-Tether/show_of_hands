@@ -50,3 +50,11 @@ class UserListResponse(BaseModel):
     total_points: int
     last_active_at: Optional[datetime] = None
     created_at: datetime
+
+
+class StudentSectionGradeResponse(BaseModel):
+    section_id: int
+    class_name: str
+    period: str
+    percentage: Optional[float]
+    letter_grade: Optional[str]

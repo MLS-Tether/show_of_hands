@@ -26,8 +26,28 @@
 
 .section-detail-columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 14px;
+}
+
+.section-detail-grade-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.section-detail-grade-percentage {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.section-detail-grade-letter {
+  font-size: 14px;
+  color: var(--text-muted);
 }
 
 .widget-label {

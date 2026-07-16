@@ -9,7 +9,7 @@ from models.school_model import School
 from models.user_model import User, RoleEnum
 from models.section_model import Section, SectionStatusEnum
 from models.enrollment_model import Enrollment
-from models.assignment_model import Assignment
+from models.assignment_model import Assignment, AssignmentCategoryEnum
 from models.submission_model import Submission, SubmissionStatusEnum
 from models.quest_model import Quest, QuestCategoryEnum, QuestTypeEnum, QuestSourceEnum
 from models.quest_completion_model import QuestCompletion
@@ -133,6 +133,7 @@ def seed_dev_data():
             description="Covers for-loops, while-loops, and nested iteration.",
             due_date=now - timedelta(days=5),
             point_value=30,
+            category=AssignmentCategoryEnum.quizzes,
         )
         binary_search_lab = Assignment(
             section_id=section_a.section_id,
@@ -140,6 +141,7 @@ def seed_dev_data():
             description="Implement binary search and analyze its time complexity.",
             due_date=now + timedelta(days=4),
             point_value=40,
+            category=AssignmentCategoryEnum.homework,
         )
         recursion_set = Assignment(
             section_id=section_a.section_id,
@@ -147,53 +149,79 @@ def seed_dev_data():
             description="A set of problems practicing recursive problem solving.",
             due_date=now + timedelta(days=7),
             point_value=50,
+            category=AssignmentCategoryEnum.tests,
         )
         db.add_all([loops_quiz, binary_search_lab, recursion_set])
 
         # Section B: one assignment, for API/demo consistency only
-        db.add(Assignment(
+        cell_worksheet = Assignment(
             section_id=section_b.section_id,
             title="Cell Structure Worksheet",
             description="Label and describe the parts of a eukaryotic cell.",
             due_date=now + timedelta(days=5),
             point_value=25,
-        ))
+            category=AssignmentCategoryEnum.homework,
+        )
+        db.add(cell_worksheet)
         db.flush()
 
-        # --- Pre-graded submission: student_hero already finished the Loops Quiz ---
-        # Mirrors what create_submission()/finalize_submission() would have produced:
-        # 25% on submit, then a grade->tier bonus on finalize (92 >= 85 -> 75% bonus).
-        submitted_at = now - timedelta(days=6)
-        finalized_at = now - timedelta(days=4)
-        initial_points = int(loops_quiz.point_value * 0.25)
-        bonus_points = int(loops_quiz.point_value * 0.75)
+        def seed_graded_submission(assignment, student, grade, submitted_days_ago, finalized_days_ago):
+            """Mirrors what create_submission()/finalize_submission() would have
+            produced: 25% on submit, then a grade->tier bonus on finalize
+            (grade >= 85 -> +75%, grade >= 70 -> +50%, else +0%)."""
+            submitted_at = now - timedelta(days=submitted_days_ago)
+            finalized_at = now - timedelta(days=finalized_days_ago)
+            initial_points = int(assignment.point_value * 0.25)
+            bonus_points = (
+                int(assignment.point_value * 0.75) if grade >= 85
+                else int(assignment.point_value * 0.50) if grade >= 70
+                else 0
+            )
+            db.add(Submission(
+                assignment_id=assignment.assignment_id,
+                student_id=student.user_id,
+                content="Submitted via demo seed data.",
+                status=SubmissionStatusEnum.graded,
+                grade=grade,
+                points_awarded=initial_points + bonus_points,
+                finalized_at=finalized_at,
+                created_at=submitted_at,
+                updated_at=finalized_at,
+            ))
+            db.add(PointTransaction(
+                user_id=student.user_id,
+                amount=initial_points,
+                source=TransactionSourceEnum.assignment,
+                source_id=assignment.assignment_id,
+                awarded_at=submitted_at,
+            ))
+            db.add(PointTransaction(
+                user_id=student.user_id,
+                amount=bonus_points,
+                source=TransactionSourceEnum.assignment,
+                source_id=assignment.assignment_id,
+                awarded_at=finalized_at,
+            ))
+            student.total_points += initial_points + bonus_points
 
-        db.add(Submission(
-            assignment_id=loops_quiz.assignment_id,
-            student_id=student_hero.user_id,
-            content="Submitted via demo seed data.",
-            status=SubmissionStatusEnum.graded,
-            grade=92,
-            points_awarded=initial_points + bonus_points,
-            finalized_at=finalized_at,
-            created_at=submitted_at,
-            updated_at=finalized_at,
-        ))
-        db.add(PointTransaction(
-            user_id=student_hero.user_id,
-            amount=initial_points,
-            source=TransactionSourceEnum.assignment,
-            source_id=loops_quiz.assignment_id,
-            awarded_at=submitted_at,
-        ))
-        db.add(PointTransaction(
-            user_id=student_hero.user_id,
-            amount=bonus_points,
-            source=TransactionSourceEnum.assignment,
-            source_id=loops_quiz.assignment_id,
-            awarded_at=finalized_at,
-        ))
-        student_hero.total_points += initial_points + bonus_points
+        # --- Pre-graded submissions across all three categories, spread across
+        # students so the cumulative-grade views land in different letter
+        # bands: student_hero -> A, student_chat -> B, student_three -> D,
+        # student_four -> C, student_five -> F.
+        seed_graded_submission(loops_quiz, student_hero, 95, 6, 4)
+        seed_graded_submission(binary_search_lab, student_hero, 92, 5, 3)
+        seed_graded_submission(recursion_set, student_hero, 90, 2, 1)
+
+        seed_graded_submission(loops_quiz, student_chat, 85, 6, 4)
+        seed_graded_submission(binary_search_lab, student_chat, 87, 5, 3)
+        seed_graded_submission(recursion_set, student_chat, 83, 2, 1)
+
+        seed_graded_submission(loops_quiz, student_three, 65, 6, 4)
+        seed_graded_submission(binary_search_lab, student_three, 68, 5, 3)
+        seed_graded_submission(recursion_set, student_three, 60, 2, 1)
+
+        seed_graded_submission(cell_worksheet, student_four, 75, 4, 2)
+        seed_graded_submission(cell_worksheet, student_five, 50, 4, 2)
 
         # --- Section A quests ---
         attendance_quest = Quest(
@@ -360,6 +388,11 @@ def seed_second_teacher_data():
             for student in random.sample(existing_students, k=sample_size):
                 db.add(Enrollment(section_id=section.section_id, student_id=student.user_id))
 
+            categories_cycle = [
+                AssignmentCategoryEnum.homework,
+                AssignmentCategoryEnum.quizzes,
+                AssignmentCategoryEnum.tests,
+            ]
             for j in range(3):
                 db.add(Assignment(
                     section_id=section.section_id,
@@ -367,6 +400,7 @@ def seed_second_teacher_data():
                     description=f"Assignment {j + 1} for {cls.name}.",
                     due_date=now + timedelta(days=(j - 1) * 5),
                     point_value=20 + j * 10,
+                    category=categories_cycle[j],
                 ))
 
             quest_specs = [

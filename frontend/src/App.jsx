@@ -17,6 +17,7 @@ import AdminOverview from './pages/admin/AdminOverview'
 import AdminInbox from './pages/admin/AdminInbox'
 import AdminSections from './pages/admin/AdminSections'
 import AdminUsers from './pages/admin/AdminUsers'
+import AdminStudentDetail from './pages/admin/AdminStudentDetail'
 import AdminSettings from './pages/admin/AdminSettings'
 import { isAdmin } from './utils/auth'
 import './App.css'
@@ -58,6 +59,7 @@ function App() {
         <Route path="/admin/inbox" element={<AdminInbox />} />
         <Route path="/admin/sections" element={<AdminSections />} />
         <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/admin/users/:studentId" element={<AdminStudentDetail />} />
         <Route path="/admin/settings" element={<AdminSettings />} />
         <Route path="/admin/profile" element={<Profile />} />
       </Route>

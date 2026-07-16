@@ -204,3 +204,57 @@ def test_delete_teacher_cascades_sections_to_pending_reassignment(client, world,
     resp = client.get("/api/notifications", headers=auth_header(student_token))
     assert resp.status_code == 200, resp.text
     assert any("pending teacher reassignment" in n["message"] for n in resp.json())
+
+
+def test_get_student_grades_across_sections(client, world, cleanup):
+    from models.assignment_model import Assignment
+    from models.submission_model import Submission
+
+    resp = client.post(
+        f"/api/sections/{world.section_id}/assignments",
+        json={
+            "title": unique("HW"),
+            "due_date": "2027-01-01T00:00:00Z",
+            "point_value": 100,
+            "category": "homework",
+        },
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 201, resp.text
+    assignment_id = resp.json()["assignment_id"]
+    cleanup(Assignment, assignment_id)
+
+    resp = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        json={},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 201, resp.text
+    submission_id = resp.json()["submission_id"]
+    cleanup(Submission, submission_id)
+
+    resp = client.patch(
+        f"/api/submissions/{submission_id}/grade",
+        json={"grade": 85},
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 200, resp.text
+    resp = client.post(f"/api/submissions/{submission_id}/finalize", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 200, resp.text
+
+    resp = client.get(f"/api/users/{world.student_id}/grades", headers=auth_header(world.admin_token))
+    assert resp.status_code == 200, resp.text
+    grades = resp.json()
+    section_grade = next(g for g in grades if g["section_id"] == world.section_id)
+    assert section_grade["percentage"] == 85.0
+    assert section_grade["letter_grade"] == "B"
+
+
+def test_get_student_grades_forbidden_for_non_admin(client, world):
+    resp = client.get(f"/api/users/{world.student_id}/grades", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 403
+
+
+def test_get_student_grades_rejects_non_student(client, world):
+    resp = client.get(f"/api/users/{world.teacher_id}/grades", headers=auth_header(world.admin_token))
+    assert resp.status_code == 400

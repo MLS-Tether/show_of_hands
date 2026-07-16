@@ -1,4 +1,4 @@
-function RosterPanel({ section }) {
+function RosterPanel({ section, onSelectStudent }) {
   const students = section.students
 
   return (
@@ -9,9 +9,14 @@ function RosterPanel({ section }) {
       ) : (
         <div className="teacher-panel-list">
           {students.map((s) => (
-            <div className="teacher-panel-row" key={s.user_id}>
+            <button
+              type="button"
+              className="teacher-panel-row"
+              key={s.user_id}
+              onClick={() => onSelectStudent(s)}
+            >
               <span>{s.username}</span>
-            </div>
+            </button>
           ))}
         </div>
       )}
