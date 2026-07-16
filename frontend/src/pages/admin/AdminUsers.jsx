@@ -4,6 +4,7 @@ import api from '../../api'
 import { useDialog } from '../../components/DialogContext'
 import { useToast } from '../../components/ToastContext'
 import { useAutoRefresh } from '../../utils/autoRefresh'
+import { initials } from '../../utils/format'
 import './admin-shared.css'
 import './AdminUsers.css'
 
@@ -18,11 +19,6 @@ const ROLE_BADGE = {
   student: { className: 'role-student' },
   teacher: { className: 'role-teacher' },
   admin: { className: 'role-admin' },
-}
-
-function initials(name) {
-  if (!name) return '?'
-  return name.slice(0, 2).toUpperCase()
 }
 
 function formatLastActive(dateStr) {

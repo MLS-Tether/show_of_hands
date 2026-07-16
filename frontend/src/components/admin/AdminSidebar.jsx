@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import api from '../../api'
 import { getUserId } from '../../utils/auth'
 import { useAutoRefresh } from '../../utils/autoRefresh'
+import { initials } from '../../utils/format'
 import './AdminSidebar.css'
 
 const NAV_GROUPS = [
@@ -17,11 +18,6 @@ const NAV_GROUPS = [
   },
   { label: 'School', items: [{ label: 'Settings', to: '/admin/settings' }] },
 ]
-
-function initials(name) {
-  if (!name) return '?'
-  return name.slice(0, 2).toUpperCase()
-}
 
 function AdminSidebar() {
   const navigate = useNavigate()
