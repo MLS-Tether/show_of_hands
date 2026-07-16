@@ -3,3 +3,6 @@
 .cursor/
 .windsurfrules
 .superdesign/
+
+# Local git worktrees for isolated feature work — not project code
+.worktrees/
