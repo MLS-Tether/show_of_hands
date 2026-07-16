@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from auth_utils import hash_password, create_access_token, create_refresh_token
@@ -8,7 +9,14 @@ from db.pool import get_db
 from dependencies import require_role
 from models.school_model import School
 from models.user_model import User, RoleEnum
-from schemas.school import SchoolResponse, SchoolCodeResponse, SchoolCreate, SchoolCreateResponse
+from schemas.school import (
+    SchoolResponse,
+    SchoolCodeResponse,
+    SchoolCreate,
+    SchoolCreateResponse,
+    SchoolUpdate,
+    SchoolPointsResponse,
+)
 
 router = APIRouter(prefix="/schools", tags=["schools"])
 
@@ -81,3 +89,38 @@ def get_my_school(
     current_user: User = Depends(require_role(["student", "teacher", "admin"])),
 ):
     return current_user.school
+
+
+@router.patch("/me", response_model=SchoolResponse)
+def update_my_school(
+    body: SchoolUpdate,
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db),
+):
+    school = db.query(School).filter(School.school_id == current_user.school_id).first()
+    if not school:
+        raise HTTPException(status_code=404, detail="School not found.")
+
+    if body.name is not None:
+        school.name = body.name
+    if body.district is not None:
+        school.district = body.district
+    if body.grades is not None:
+        school.grades = body.grades
+
+    db.commit()
+    db.refresh(school)
+    return school
+
+
+@router.get("/points", response_model=SchoolPointsResponse)
+def get_school_points(
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db),
+):
+    total = (
+        db.query(func.sum(User.total_points))
+        .filter(User.school_id == current_user.school_id, User.is_archived == False)
+        .scalar()
+    )
+    return SchoolPointsResponse(total_points=total or 0)

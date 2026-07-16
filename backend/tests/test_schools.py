@@ -57,3 +57,38 @@ def test_get_my_school(client, world):
         resp = client.get("/api/schools/me", headers=auth_header(token))
         assert resp.status_code == 200, resp.text
         assert resp.json()["school_id"] == world.school_id
+
+
+def test_update_my_school_requires_admin(client, world):
+    resp = client.patch(
+        "/api/schools/me",
+        json={"district": "NYC Geographic District 1"},
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 403
+
+
+def test_update_my_school(client, world):
+    resp = client.patch(
+        "/api/schools/me",
+        json={"district": "NYC Geographic District 1", "grades": "9-12"},
+        headers=auth_header(world.admin_token),
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["district"] == "NYC Geographic District 1"
+    assert body["grades"] == "9-12"
+
+    resp = client.get("/api/schools/me", headers=auth_header(world.admin_token))
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["district"] == "NYC Geographic District 1"
+    assert resp.json()["grades"] == "9-12"
+
+
+def test_get_school_points_requires_admin(client, world):
+    resp = client.get("/api/schools/points", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 403
+
+    resp = client.get("/api/schools/points", headers=auth_header(world.admin_token))
+    assert resp.status_code == 200, resp.text
+    assert isinstance(resp.json()["total_points"], int)

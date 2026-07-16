@@ -9,11 +9,23 @@ class SchoolResponse(BaseModel):
 
     school_id: int
     name: str
+    district: Optional[str] = None
+    grades: Optional[str] = None
     created_at: datetime
 
 
 class SchoolCodeResponse(BaseModel):
     school_code: str
+
+
+class SchoolUpdate(BaseModel):
+    name: Optional[str] = None
+    district: Optional[str] = None
+    grades: Optional[str] = None
+
+
+class SchoolPointsResponse(BaseModel):
+    total_points: int
 
 
 class SchoolCreate(BaseModel):

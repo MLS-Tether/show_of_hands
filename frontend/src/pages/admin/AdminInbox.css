@@ -1,0 +1,79 @@
+.admin-inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-inbox-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.admin-inbox-card.expanded {
+  border-color: var(--border-strong);
+}
+
+.admin-inbox-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 15px;
+}
+
+.admin-checkbox {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.admin-inbox-title-block {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.admin-inbox-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-inbox-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.admin-inbox-subtitle {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.admin-inbox-time {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.admin-inbox-panel {
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  padding: 14px 15px 15px;
+}
+
+.admin-inbox-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}

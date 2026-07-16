@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -6,6 +8,8 @@ from auth_utils import decode_token
 from models.user_model import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+_LAST_ACTIVE_THROTTLE = timedelta(minutes=5)
 
 
 def get_current_user(
@@ -18,6 +22,14 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="User not found.")
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="Account pending admin verification.")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account deactivated.")
+
+    now = datetime.now(timezone.utc)
+    if not user.last_active_at or now - user.last_active_at > _LAST_ACTIVE_THROTTLE:
+        user.last_active_at = now
+        db.commit()
+
     return user
 
 

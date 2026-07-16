@@ -53,6 +53,7 @@ class RegisterRequest(BaseModel):
     school_code: str
     role: RoleEnum
     email: Optional[str] = None
+    note: Optional[str] = None
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)
@@ -80,6 +81,7 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
         email=body.email,
         role=body.role,
         is_verified=body.role == RoleEnum.student,
+        signup_note=body.note,
     )
     db.add(user)
     db.commit()
@@ -97,6 +99,8 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials.")
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="Account pending admin verification.")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account deactivated.")
 
     access_token = create_access_token(user.user_id, user.role.value, user.school_id)
     refresh_token = create_refresh_token(user.user_id, db)

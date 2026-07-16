@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
+import AdminLayout from './components/admin/AdminLayout'
 import Dashboard from './pages/Dashboard'
 import Sections from './pages/Sections'
 import SectionDetail from './pages/SectionDetail'
@@ -12,6 +13,12 @@ import RoomDetail from './pages/RoomDetail'
 import Points from './pages/Points'
 import Profile from './pages/Profile'
 import Auth from './pages/Auth'
+import AdminOverview from './pages/admin/AdminOverview'
+import AdminInbox from './pages/admin/AdminInbox'
+import AdminSections from './pages/admin/AdminSections'
+import AdminUsers from './pages/admin/AdminUsers'
+import AdminSettings from './pages/admin/AdminSettings'
+import { isAdmin } from './utils/auth'
 import './App.css'
 
 function App() {
@@ -20,7 +27,16 @@ function App() {
       <Route
         path="/"
         element={
-          <Navigate to={localStorage.getItem('access_token') ? '/dashboard' : '/auth'} replace />
+          <Navigate
+            to={
+              !localStorage.getItem('access_token')
+                ? '/auth'
+                : isAdmin()
+                  ? '/admin/overview'
+                  : '/dashboard'
+            }
+            replace
+          />
         }
       />
       <Route path="/auth" element={<Auth />} />
@@ -36,6 +52,14 @@ function App() {
         <Route path="/rooms/:roomId" element={<RoomDetail />} />
         <Route path="/points" element={<Points />} />
         <Route path="/profile" element={<Profile />} />
+      </Route>
+      <Route element={<AdminLayout />}>
+        <Route path="/admin/overview" element={<AdminOverview />} />
+        <Route path="/admin/inbox" element={<AdminInbox />} />
+        <Route path="/admin/sections" element={<AdminSections />} />
+        <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/admin/settings" element={<AdminSettings />} />
+        <Route path="/admin/profile" element={<Profile />} />
       </Route>
     </Routes>
   )

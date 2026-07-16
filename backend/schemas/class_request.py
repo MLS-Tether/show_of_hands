@@ -1,5 +1,6 @@
 import enum
 from datetime import datetime
+from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 
@@ -11,6 +12,8 @@ class ClassRequestStatusEnum(str, enum.Enum):
 
 class ClassRequestCreate(BaseModel):
     class_name: str
+    subject: Optional[str] = None
+    description: Optional[str] = None
 
 
 class ClassRequestUpdateStatus(BaseModel):
@@ -22,6 +25,8 @@ class ClassRequestResponse(BaseModel):
 
     class_request_id: int
     class_name: str
+    subject: Optional[str] = None
+    description: Optional[str] = None
     status: ClassRequestStatusEnum
     created_at: datetime
 
@@ -31,9 +36,12 @@ class ClassRequestListResponse(BaseModel):
 
     class_request_id: int
     class_name: str
+    subject: Optional[str] = None
+    description: Optional[str] = None
     requested_by: int
     status: ClassRequestStatusEnum
     created_at: datetime
+    similar_classes: list[str] = []
 
 
 class ClassRequestStatusResponse(BaseModel):
