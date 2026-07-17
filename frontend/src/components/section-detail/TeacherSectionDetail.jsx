@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../../api'
 import { useAutoRefresh } from '../../utils/autoRefresh'
+import { useEscapeBack } from '../../utils/useEscapeBack'
 import RosterPanel from './RosterPanel'
 import StudentGradeDetail from './StudentGradeDetail'
 import EnrollmentRequestsPanel from './EnrollmentRequestsPanel'
@@ -130,6 +131,11 @@ function TeacherSectionDetail() {
   useEffect(() => load(), [load])
   useAutoRefresh(load)
 
+  useEscapeBack(() => {
+    if (viewingStudent) setViewingStudent(null)
+    else setActiveCard(null)
+  }, Boolean(activeCard))
+
   const loading = loadedSectionId !== sectionId
 
   if (loading) {
@@ -178,23 +184,10 @@ function TeacherSectionDetail() {
 
       {activeCard ? (
         <div>
-          <button
-            type="button"
-            className="teacher-section-back"
-            onClick={() => {
-              setActiveCard(null)
-              setViewingStudent(null)
-            }}
-          >
-            ← Back
-          </button>
+          {!viewingStudent && <p className="teacher-section-back">Press ESC to go back</p>}
           {activeCard === 'roster' &&
             (viewingStudent ? (
-              <StudentGradeDetail
-                sectionId={sectionId}
-                student={viewingStudent}
-                onBack={() => setViewingStudent(null)}
-              />
+              <StudentGradeDetail sectionId={sectionId} student={viewingStudent} />
             ) : (
               <RosterPanel section={section} onSelectStudent={setViewingStudent} />
             ))}

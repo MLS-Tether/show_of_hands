@@ -38,16 +38,9 @@
 }
 
 .teacher-section-back {
-  border: none;
-  background: none;
   color: var(--text-muted);
   font-size: 13px;
-  cursor: pointer;
-  padding: 0 0 14px;
-}
-
-.teacher-section-back:hover {
-  color: var(--text-h);
+  margin: 0 0 14px;
 }
 
 .teacher-panel-placeholder {
