@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import api from '../api'
 import NotificationBell from './NotificationBell'
 import { useAutoRefresh } from '../utils/autoRefresh'
+import { getParentPath } from '../utils/escNavigation'
+import { isTeacher } from '../utils/auth'
 import './TopBar.css'
 
 function TopBar() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [points, setPoints] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
+
+  const parentPath = getParentPath(location.pathname, { isTeacher: isTeacher() })
 
   const loadPoints = useCallback(() => {
     const userId = localStorage.getItem('user_id')
@@ -60,7 +65,10 @@ function TopBar() {
 
   return (
     <header className="topbar">
-      <div className="topbar-logo">Show of Hands</div>
+      <div className="topbar-logo">
+        Show of Hands
+        {parentPath && <span className="topbar-esc-hint">Press ESC to go back</span>}
+      </div>
       <div className="topbar-actions">
         <NotificationBell />
         <span className="topbar-points">{points === null ? '—' : points} pts</span>

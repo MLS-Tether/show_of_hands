@@ -4,6 +4,7 @@ import api from '../../api'
 import NotificationBell from '../NotificationBell'
 import { getTheme, setTheme } from '../../utils/theme'
 import { useAutoRefresh } from '../../utils/autoRefresh'
+import { getAdminParentPath } from '../../utils/escNavigation'
 import './AdminTopBar.css'
 
 const BREADCRUMBS = {
@@ -20,6 +21,7 @@ function AdminTopBar() {
   const [theme, setThemeState] = useState(getTheme())
   const [points, setPoints] = useState(null)
   const breadcrumb = BREADCRUMBS[location.pathname] || 'Admin'
+  const parentPath = getAdminParentPath(location.pathname)
 
   function toggleTheme() {
     const next = theme === 'dark' ? 'light' : 'dark'
@@ -47,7 +49,10 @@ function AdminTopBar() {
 
   return (
     <header className="admin-topbar">
-      <div className="admin-topbar-breadcrumb">{breadcrumb}</div>
+      <div className="admin-topbar-breadcrumb">
+        {breadcrumb}
+        {parentPath && <span className="admin-topbar-esc-hint">Press ESC to go back</span>}
+      </div>
       <div className="admin-topbar-actions">
         {points !== null && (
           <span className="admin-topbar-points">{points.toLocaleString()} school pts</span>

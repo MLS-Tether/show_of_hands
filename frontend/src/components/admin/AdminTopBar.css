@@ -15,6 +15,14 @@
 .admin-topbar-breadcrumb {
   font-size: 13.5px;
   color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-topbar-esc-hint {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .admin-topbar-actions {
