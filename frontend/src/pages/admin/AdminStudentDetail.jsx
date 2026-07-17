@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import api from '../../api'
 import { formatPercent } from '../../utils/format'
 import { downloadReportCard, printReportCard } from '../../utils/reportCard'
@@ -8,7 +8,6 @@ import './AdminStudentDetail.css'
 
 function AdminStudentDetail() {
   const { studentId } = useParams()
-  const navigate = useNavigate()
   const [student, setStudent] = useState(null)
   const [grades, setGrades] = useState(null)
   const [notFound, setNotFound] = useState(false)
@@ -50,10 +49,6 @@ function AdminStudentDetail() {
 
   return (
     <div className="admin-student-detail">
-      <button type="button" className="admin-btn-secondary" onClick={() => navigate('/admin/users')}>
-        ← Back to users
-      </button>
-
       <h1 className="admin-page-h1">{student.username}</h1>
       <p className="admin-page-subtitle">Cumulative grades across all enrolled sections</p>
 
