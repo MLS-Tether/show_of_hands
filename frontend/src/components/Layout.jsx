@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import TopBar from './TopBar'
 import Sidebar from './Sidebar'
 import { getParentPath } from '../utils/escNavigation'
+import { isEscapeClaimed } from '../utils/escapeClaim'
 import { isTeacher } from '../utils/auth'
 import './Layout.css'
 
@@ -13,6 +14,7 @@ function Layout() {
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.key !== 'Escape') return
+      if (isEscapeClaimed()) return
       const parent = getParentPath(location.pathname, { isTeacher: isTeacher() })
       if (!parent) return
       if (parent === 'BACK') {

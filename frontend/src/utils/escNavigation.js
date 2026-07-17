@@ -27,3 +27,12 @@ export function getParentPath(pathname, { isTeacher = false } = {}) {
   const match = ROUTE_PARENTS.find((r) => r.pattern.test(pathname))
   return match ? match.parent : null
 }
+
+const ADMIN_ROUTE_PARENTS = [
+  { pattern: /^\/admin\/users\/[^/]+$/, parent: '/admin/users' },
+]
+
+export function getAdminParentPath(pathname) {
+  const match = ADMIN_ROUTE_PARENTS.find((r) => r.pattern.test(pathname))
+  return match ? match.parent : null
+}
