@@ -1,37 +1,6 @@
 .assignments-page {
   text-align: left;
-}
-
-.assignments-tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-  margin: -16px 0 16px;
-}
-
-.assignments-tab {
-  padding: 8px 14px;
-  font-size: 13px;
-  color: var(--text-muted);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-}
-
-.assignments-tab:hover {
-  color: var(--text-h);
-}
-
-.assignments-tab.active {
-  color: var(--text-h);
-  border-bottom-color: var(--text-h);
-  font-weight: 500;
-}
-
-.assignments-placeholder {
-  font-size: 13px;
-  color: var(--text-muted);
+  max-width: 640px;
 }
 
 .assignments-list {
@@ -45,17 +14,17 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 12px 14px;
-  background: none;
   cursor: pointer;
   font: inherit;
   text-align: left;
 }
 
 .assignments-row:hover {
-  background: var(--surface-1);
+  border-color: var(--border-strong);
 }
 
 .assignments-row-title {

@@ -2,33 +2,29 @@
   text-align: left;
 }
 
-.teacher-dashboard-placeholder {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
 .teacher-dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
+  margin-top: 22px;
 }
 
 .teacher-section-card {
   position: relative;
   display: block;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  padding: 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px;
   min-height: 80px;
   text-align: left;
   color: inherit;
-  background: none;
   cursor: pointer;
   font: inherit;
 }
 
 .teacher-section-card:hover {
-  border-color: var(--text-h);
+  border-color: var(--border-strong);
 }
 
 .teacher-section-card-readonly {
@@ -37,27 +33,32 @@
 }
 
 .teacher-section-card-readonly:hover {
-  border-color: var(--border-strong);
+  border-color: var(--border);
 }
 
-.teacher-dashboard h2 {
-  font-size: 16px;
-  margin: 24px 0 12px;
+.teacher-dashboard-subheading {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  margin: 34px 0 12px;
 }
 
 .teacher-section-card-title {
   font-size: 15px;
+  font-weight: 600;
   color: var(--text-h);
   margin-bottom: 6px;
 }
 
 .teacher-section-card-sub {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-muted);
 }
 
 .teacher-section-card-meta {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-muted);
   margin-top: 8px;
 }

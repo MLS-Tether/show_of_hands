@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import api from '../../api'
+import { useDialog } from '../DialogContext'
+import '../../styles/shared-ui.css'
 import '../../pages/Quests.css'
 
 const CATEGORY_LABELS = { academic: 'Academic', social: 'Non-academic' }
@@ -7,6 +9,7 @@ const QUEST_TYPE_LABELS = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly'
 const SOCIAL_MULTIPLIER = 1.5
 
 function QuestsPanel({ sectionId }) {
+  const { alert } = useDialog()
   const [quests, setQuests] = useState(null)
   const [category, setCategory] = useState('all')
   const [showForm, setShowForm] = useState(false)
@@ -68,9 +71,9 @@ function QuestsPanel({ sectionId }) {
       setQuests((prev) => prev.filter((q) => q.quest_id !== quest.quest_id))
     } catch (err) {
       if (err.response?.status === 403) {
-        window.alert("Can't delete a system quest.")
+        await alert("Can't delete a system quest.")
       } else {
-        window.alert(err.response?.data?.detail || 'Could not delete this quest.')
+        await alert(err.response?.data?.detail || 'Could not delete this quest.')
       }
     } finally {
       setDeletingId(null)
@@ -150,14 +153,14 @@ function QuestsPanel({ sectionId }) {
         </form>
       )}
 
-      <div role="tablist" aria-label="Quest category" className="quests-tabs">
+      <div role="tablist" aria-label="Quest category" className="admin-filter-chips">
         {['all', 'academic', 'social'].map((c) => (
           <button
             key={c}
             type="button"
             role="tab"
             aria-selected={category === c}
-            className={`quests-tab${category === c ? ' active' : ''}`}
+            className={`admin-chip${category === c ? ' active' : ''}`}
             onClick={() => setCategory(c)}
           >
             {c === 'all' ? 'All' : CATEGORY_LABELS[c]}
@@ -165,8 +168,8 @@ function QuestsPanel({ sectionId }) {
         ))}
       </div>
 
-      {loading && <p className="quests-placeholder">Loading quests…</p>}
-      {!loading && rows.length === 0 && <p className="quests-placeholder">No quests to show.</p>}
+      {loading && <p className="admin-empty-card">Loading quests…</p>}
+      {!loading && rows.length === 0 && <p className="admin-empty-card">No quests to show.</p>}
       {!loading && rows.length > 0 && (
         <div className="quests-grid">
           {rows.map((q) => (
@@ -184,7 +187,7 @@ function QuestsPanel({ sectionId }) {
               </div>
               <button
                 type="button"
-                className="teacher-panel-button quest-card-complete"
+                className="admin-btn-danger quest-card-complete"
                 disabled={deletingId === q.quest_id}
                 onClick={() => handleDelete(q)}
               >

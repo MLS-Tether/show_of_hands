@@ -3,29 +3,36 @@
   max-width: 640px;
 }
 
-.bulletin-board-placeholder {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
 .bulletin-board-subheading {
-  font-size: 16px;
-  margin: 28px 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  margin: 34px 0 12px;
 }
 
 .widget-label {
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
   color: var(--text-muted);
-  margin-bottom: 6px;
+  margin-bottom: 12px;
 }
 
 .bulletin-request-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  padding: 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px;
+}
+
+.bulletin-request-form > button {
+  align-self: flex-start;
 }
 
 .bulletin-request-form-row {
@@ -41,7 +48,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-muted);
 }
 
@@ -54,28 +61,12 @@
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   padding: 8px 10px;
-  background: var(--bg);
+  background: var(--surface-2);
 }
 
 .bulletin-request-form-error {
   font-size: 13px;
-  color: var(--text-h);
-}
-
-.bulletin-request-form button {
-  align-self: flex-start;
-  font-size: 13px;
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: 1px solid var(--border-strong);
-  background: var(--text-h);
-  color: var(--bg);
-  cursor: pointer;
-}
-
-.bulletin-request-form button:disabled {
-  opacity: 0.6;
-  cursor: default;
+  color: var(--danger);
 }
 
 .bulletin-request-list {
@@ -85,7 +76,8 @@
 }
 
 .bulletin-request-card {
-  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 12px 14px;
 }
@@ -124,44 +116,24 @@
 }
 
 .bulletin-request-status {
-  border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 1px 8px;
 }
 
 .bulletin-request-status-open {
-  color: #1f7a4d;
-  background: rgba(31, 122, 77, 0.12);
-  border-color: rgba(31, 122, 77, 0.35);
+  color: var(--success);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
 }
 
 .bulletin-request-status-active {
-  color: #92660a;
-  background: rgba(217, 155, 15, 0.12);
-  border-color: rgba(217, 155, 15, 0.35);
+  color: var(--warning);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
 }
 
 .bulletin-request-card-actions {
   display: flex;
   gap: 8px;
   margin-top: 10px;
-}
-
-.bulletin-request-card-actions button {
-  font-size: 12px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border-strong);
-  background: none;
-  color: var(--text-h);
-  cursor: pointer;
-}
-
-.bulletin-request-card-actions button:hover {
-  background: var(--surface-1);
-}
-
-.bulletin-request-card-actions button:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
