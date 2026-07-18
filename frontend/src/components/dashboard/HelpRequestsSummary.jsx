@@ -46,6 +46,8 @@ function HelpRequestsSummary() {
 
   const loading = requests === null
   const myHelpRequestIds = getMyHelpRequestIds()
+  const visible = loading ? [] : requests.slice(0, 3)
+  const hasMore = !loading && requests.length > 3
 
   return (
     <section className="help-requests-summary">
@@ -59,7 +61,7 @@ function HelpRequestsSummary() {
           <div className="widget-empty">No open help requests</div>
         )}
         {!loading &&
-          requests.map((h) => {
+          visible.map((h) => {
             const isMine = myHelpRequestIds.includes(h.help_request_id)
             const canJoin = !isMine && h.current_size < h.group_size
             return (
@@ -81,6 +83,11 @@ function HelpRequestsSummary() {
               </div>
             )
           })}
+        {hasMore && (
+          <Link to="/bulletin-board" className="help-request-show-more">
+            Show more
+          </Link>
+        )}
         <Link to="/bulletin-board" className="post-request-card">
           + post request
         </Link>

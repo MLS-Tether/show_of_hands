@@ -10,8 +10,15 @@ import AssignmentsPanel from './AssignmentsPanel'
 import QuestsPanel from './QuestsPanel'
 import HelpRequestsPanel from './HelpRequestsPanel'
 import AnalyticsPanel from './AnalyticsPanel'
+import '../../styles/shared-ui.css'
 import '../../pages/SectionDetail.css'
 import './TeacherSectionDetail.css'
+
+const STATUS_BADGE_CLASS = {
+  active: 'status-active',
+  pending_reassignment: 'status-pending',
+  archived: 'status-archived',
+}
 
 const CARDS = [
   { key: 'roster', label: 'Roster' },
@@ -141,7 +148,7 @@ function TeacherSectionDetail() {
   if (loading) {
     return (
       <section className="section-detail">
-        <p className="section-detail-placeholder">Loading section…</p>
+        <p className="admin-empty-card">Loading section…</p>
       </section>
     )
   }
@@ -149,20 +156,22 @@ function TeacherSectionDetail() {
   if (notFound) {
     return (
       <section className="section-detail">
-        <p className="section-detail-placeholder">Section not found.</p>
+        <p className="admin-empty-card">Section not found.</p>
       </section>
     )
   }
 
   return (
     <section className="section-detail">
-      <h1>{section.class_name}</h1>
+      <h1 className="admin-page-h1">{section.class_name}</h1>
       <div className="section-detail-meta">
         <span>{section.period}</span>
         <span>
           {section.enrolled_count}/{section.capacity} students
         </span>
-        <span className="section-detail-status">{section.status}</span>
+        <span className={`admin-status-badge ${STATUS_BADGE_CLASS[section.status] || ''}`}>
+          {section.status}
+        </span>
         <span>Created {new Date(section.created_at).toLocaleDateString()}</span>
         {!editing && !activeCard && (
           <button type="button" className="teacher-panel-button" onClick={() => setEditing(true)}>

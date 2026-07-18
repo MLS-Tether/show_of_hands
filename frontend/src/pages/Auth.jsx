@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
+import '../styles/shared-ui.css'
+import './Auth.css'
 
 const ROLES = ['student', 'teacher', 'admin']
 
@@ -34,12 +36,12 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>
+    <form className="auth-form" onSubmit={handleSubmit}>
+      <label className="auth-field">
         Username
         <input value={username} onChange={(e) => setUsername(e.target.value)} required />
       </label>
-      <label>
+      <label className="auth-field">
         Password
         <input
           type="password"
@@ -48,8 +50,14 @@ function LoginForm() {
           required
         />
       </label>
-      {error && <p role="alert">{error}</p>}
-      <button type="submit">Log in</button>
+      {error && (
+        <p className="auth-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button type="submit" className="admin-btn-primary auth-submit">
+        Log in
+      </button>
     </form>
   )
 }
@@ -93,25 +101,26 @@ function RegisterForm({ onPendingVerification }) {
 
   return (
     <>
-      <div role="tablist" aria-label="Role">
+      <div role="tablist" aria-label="Role" className="admin-filter-chips">
         {ROLES.map((r) => (
           <button
             key={r}
             type="button"
             role="tab"
             aria-selected={role === r}
+            className={`admin-chip${role === r ? ' active' : ''}`}
             onClick={() => setRole(r)}
           >
             {r[0].toUpperCase() + r.slice(1)}
           </button>
         ))}
       </div>
-      <form onSubmit={handleSubmit}>
-        <label>
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <label className="auth-field">
           Username
           <input value={username} onChange={(e) => setUsername(e.target.value)} required />
         </label>
-        <label>
+        <label className="auth-field">
           Password
           <input
             type="password"
@@ -120,22 +129,28 @@ function RegisterForm({ onPendingVerification }) {
             required
           />
         </label>
-        <label>
+        <label className="auth-field">
           Email (optional)
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         {role !== 'student' && (
-          <label>
+          <label className="auth-field">
             Note for the admin (optional)
             <input value={note} onChange={(e) => setNote(e.target.value)} />
           </label>
         )}
-        <label>
+        <label className="auth-field">
           School code
           <input value={schoolCode} onChange={(e) => setSchoolCode(e.target.value)} required />
         </label>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit">Sign up as {role}</button>
+        {error && (
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+        )}
+        <button type="submit" className="admin-btn-primary auth-submit">
+          Sign up as {role}
+        </button>
       </form>
     </>
   )
@@ -146,40 +161,46 @@ function Auth() {
   const [pendingVerification, setPendingVerification] = useState(false)
 
   return (
-    <section>
-      <h1>{mode === 'login' ? 'Log in' : 'Sign up'}</h1>
-      <div role="tablist" aria-label="Auth mode">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'login'}
-          onClick={() => setMode('login')}
-        >
-          Login
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'register'}
-          onClick={() => setMode('register')}
-        >
-          Register
-        </button>
-      </div>
-      {mode === 'login' && pendingVerification && (
-        <p role="status">Account created. It needs admin verification before you can log in.</p>
-      )}
-      {mode === 'login' ? (
-        <LoginForm />
-      ) : (
-        <RegisterForm
-          onPendingVerification={() => {
-            setPendingVerification(true)
-            setMode('login')
-          }}
-        />
-      )}
-    </section>
+    <div className="auth-page">
+      <section className="auth-card">
+        <h1 className="admin-page-h1 auth-heading">{mode === 'login' ? 'Log in' : 'Sign up'}</h1>
+        <div role="tablist" aria-label="Auth mode" className="admin-filter-chips">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'login'}
+            className={`admin-chip${mode === 'login' ? ' active' : ''}`}
+            onClick={() => setMode('login')}
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'register'}
+            className={`admin-chip${mode === 'register' ? ' active' : ''}`}
+            onClick={() => setMode('register')}
+          >
+            Register
+          </button>
+        </div>
+        {mode === 'login' && pendingVerification && (
+          <p className="auth-status" role="status">
+            Account created. It needs admin verification before you can log in.
+          </p>
+        )}
+        {mode === 'login' ? (
+          <LoginForm />
+        ) : (
+          <RegisterForm
+            onPendingVerification={() => {
+              setPendingVerification(true)
+              setMode('login')
+            }}
+          />
+        )}
+      </section>
+    </div>
   )
 }
 

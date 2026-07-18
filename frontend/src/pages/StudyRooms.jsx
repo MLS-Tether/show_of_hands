@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import api from '../api'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { forgetRoom, getMyRooms } from '../utils/roomTracking'
+import '../styles/shared-ui.css'
 import './StudyRooms.css'
 
 function StudyRooms() {
@@ -35,16 +36,16 @@ function StudyRooms() {
 
   return (
     <section className="study-rooms-page">
-      <h1>Study rooms</h1>
+      <h1 className="admin-page-h1">Study rooms</h1>
       <p className="study-rooms-intro">
         Rooms open automatically when a help request on the{' '}
         <Link to="/bulletin-board">bulletin board</Link> gets accepted. Rooms you've joined show up
         here.
       </p>
 
-      {loading && <p className="study-rooms-placeholder">Loading your rooms…</p>}
+      {loading && <p className="admin-empty-card">Loading your rooms…</p>}
       {!loading && rooms.length === 0 && (
-        <p className="study-rooms-placeholder">You're not in any study rooms right now.</p>
+        <p className="admin-empty-card">You're not in any study rooms right now.</p>
       )}
       {!loading && rooms.length > 0 && (
         <div className="study-rooms-list">

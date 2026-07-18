@@ -98,7 +98,7 @@
 
 .admin-btn-danger {
   background: transparent;
-  color: #dc2626;
+  color: var(--danger);
   border: 1px solid var(--border-strong);
 }
 
@@ -170,4 +170,27 @@
 
 .admin-chevron.rotated {
   transform: rotate(180deg);
+}
+
+.admin-status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.status-active {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+.status-pending {
+  color: var(--warning);
+  background: var(--warning-bg);
+}
+
+.status-archived {
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
 }

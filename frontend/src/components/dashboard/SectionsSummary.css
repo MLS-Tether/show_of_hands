@@ -6,9 +6,10 @@
 
 .section-card {
   display: block;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  padding: 10px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
   min-height: 60px;
   text-align: left;
   color: inherit;
@@ -16,11 +17,12 @@
 }
 
 .section-card:hover {
-  border-color: var(--text-h);
+  border-color: var(--border-strong);
 }
 
 .section-card-title {
   font-size: 14px;
+  font-weight: 500;
   color: var(--text-h);
   margin-bottom: 6px;
 }
@@ -32,8 +34,8 @@
 
 .join-section-card {
   border: 1px dashed var(--border-strong);
-  border-radius: 6px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 12px;
   min-height: 60px;
   display: flex;
   align-items: center;
@@ -45,5 +47,5 @@
 
 .join-section-card:hover {
   color: var(--text-h);
-  border-color: var(--text-h);
+  border-color: var(--border-strong);
 }

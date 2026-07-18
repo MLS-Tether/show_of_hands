@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
+import { useDialog } from '../components/DialogContext'
+import '../styles/shared-ui.css'
 import './Quests.css'
 
 const CATEGORY_LABELS = {
@@ -14,6 +16,7 @@ const QUEST_TYPE_LABELS = {
 }
 
 function Quests() {
+  const { alert } = useDialog()
   const [sections, setSections] = useState(null)
   const [quests, setQuests] = useState(null)
   const [category, setCategory] = useState('all')
@@ -62,7 +65,7 @@ function Quests() {
         prev.map((q) => (q.quest_id === quest.quest_id ? { ...q, completed: true } : q))
       )
     } catch (err) {
-      window.alert(err.response?.data?.message || 'Could not complete this quest.')
+      await alert(err.response?.data?.message || 'Could not complete this quest.')
     } finally {
       setCompletingId(null)
     }
@@ -73,13 +76,13 @@ function Quests() {
 
   return (
     <section className="quests-page">
-      <h1>Quests</h1>
-      <div role="tablist" aria-label="Quest category" className="quests-tabs">
+      <h1 className="admin-page-h1">Quests</h1>
+      <div role="tablist" aria-label="Quest category" className="admin-filter-chips">
         <button
           type="button"
           role="tab"
           aria-selected={category === 'all'}
-          className={`quests-tab${category === 'all' ? ' active' : ''}`}
+          className={`admin-chip${category === 'all' ? ' active' : ''}`}
           onClick={() => setCategory('all')}
         >
           All
@@ -88,7 +91,7 @@ function Quests() {
           type="button"
           role="tab"
           aria-selected={category === 'academic'}
-          className={`quests-tab${category === 'academic' ? ' active' : ''}`}
+          className={`admin-chip${category === 'academic' ? ' active' : ''}`}
           onClick={() => setCategory('academic')}
         >
           Academic
@@ -97,15 +100,15 @@ function Quests() {
           type="button"
           role="tab"
           aria-selected={category === 'social'}
-          className={`quests-tab${category === 'social' ? ' active' : ''}`}
+          className={`admin-chip${category === 'social' ? ' active' : ''}`}
           onClick={() => setCategory('social')}
         >
           Non-academic
         </button>
       </div>
 
-      {loading && <p className="quests-placeholder">Loading quests…</p>}
-      {!loading && rows.length === 0 && <p className="quests-placeholder">No quests to show.</p>}
+      {loading && <p className="admin-empty-card">Loading quests…</p>}
+      {!loading && rows.length === 0 && <p className="admin-empty-card">No quests to show.</p>}
       {!loading && rows.length > 0 && (
         <div className="quests-grid">
           {rows.map((q) => (
@@ -131,7 +134,7 @@ function Quests() {
               {q.completed === false && (
                 <button
                   type="button"
-                  className="quest-card-complete"
+                  className="admin-btn-secondary quest-card-complete"
                   disabled={completingId === q.quest_id}
                   onClick={() => handleComplete(q)}
                 >

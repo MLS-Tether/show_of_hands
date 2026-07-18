@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
+import '../styles/shared-ui.css'
 import './Points.css'
 
 const PAGE_SIZE = 10
@@ -50,10 +51,10 @@ function Points() {
 
   return (
     <section className="points-page">
-      <h1>Points</h1>
+      <h1 className="admin-page-h1">Points</h1>
 
-      {loading && <p className="points-placeholder">Loading points…</p>}
-      {error && <p className="points-placeholder">Couldn't load points.</p>}
+      {loading && <p className="admin-empty-card">Loading points…</p>}
+      {error && <p className="admin-empty-card">Couldn't load points.</p>}
 
       {data && (
         <>
@@ -63,7 +64,7 @@ function Points() {
           </div>
 
           {data.transactions.length === 0 && (
-            <p className="points-placeholder">No point transactions yet.</p>
+            <p className="admin-empty-card">No point transactions yet.</p>
           )}
 
           {data.transactions.length > 0 && (
@@ -87,6 +88,7 @@ function Points() {
             <div className="points-pagination">
               <button
                 type="button"
+                className="admin-btn-secondary"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
@@ -97,6 +99,7 @@ function Points() {
               </span>
               <button
                 type="button"
+                className="admin-btn-secondary"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >

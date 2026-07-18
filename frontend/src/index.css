@@ -11,6 +11,15 @@
   --accent: #aa3bff;
   --accent-bg: rgba(170, 59, 255, 0.1);
   --accent-border: rgba(170, 59, 255, 0.5);
+  --success: #16a34a;
+  --success-bg: rgba(22, 163, 74, 0.13);
+  --success-border: rgba(22, 163, 74, 0.3);
+  --warning: #d97706;
+  --warning-bg: rgba(217, 119, 6, 0.13);
+  --warning-border: rgba(217, 119, 6, 0.3);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.13);
+  --danger-border: rgba(220, 38, 38, 0.3);
   --social-bg: rgba(244, 243, 236, 0.5);
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
@@ -48,6 +57,15 @@
     --accent: #c084fc;
     --accent-bg: rgba(192, 132, 252, 0.15);
     --accent-border: rgba(192, 132, 252, 0.5);
+    --success: #4ade80;
+    --success-bg: rgba(74, 222, 128, 0.15);
+    --success-border: rgba(74, 222, 128, 0.4);
+    --warning: #fbbf24;
+    --warning-bg: rgba(251, 191, 36, 0.15);
+    --warning-border: rgba(251, 191, 36, 0.4);
+    --danger: #f87171;
+    --danger-bg: rgba(248, 113, 113, 0.15);
+    --danger-border: rgba(248, 113, 113, 0.4);
     --social-bg: rgba(47, 48, 58, 0.5);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
@@ -72,6 +90,15 @@
   --accent: #aa3bff;
   --accent-bg: rgba(170, 59, 255, 0.1);
   --accent-border: rgba(170, 59, 255, 0.5);
+  --success: #16a34a;
+  --success-bg: rgba(22, 163, 74, 0.13);
+  --success-border: rgba(22, 163, 74, 0.3);
+  --warning: #d97706;
+  --warning-bg: rgba(217, 119, 6, 0.13);
+  --warning-border: rgba(217, 119, 6, 0.3);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.13);
+  --danger-border: rgba(220, 38, 38, 0.3);
 }
 
 :root[data-theme='dark'] {
@@ -86,15 +113,30 @@
   --accent: #c084fc;
   --accent-bg: rgba(192, 132, 252, 0.13);
   --accent-border: rgba(192, 132, 252, 0.5);
+  --success: #4ade80;
+  --success-bg: rgba(74, 222, 128, 0.15);
+  --success-border: rgba(74, 222, 128, 0.4);
+  --warning: #fbbf24;
+  --warning-bg: rgba(251, 191, 36, 0.15);
+  --warning-border: rgba(251, 191, 36, 0.4);
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.15);
+  --danger-border: rgba(248, 113, 113, 0.4);
+}
+
+html {
+  height: 100%;
 }
 
 body {
   margin: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 #root {
   width: 100%;
-  min-height: 100svh;
+  height: 100svh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;

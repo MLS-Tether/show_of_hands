@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import api from '../../api'
 import { formatDueDate } from '../../utils/formatDueDate'
 import { useAutoRefresh } from '../../utils/autoRefresh'
@@ -19,7 +19,7 @@ function AssignmentsSummary() {
         const merged = data
           .filter((a) => new Date(a.due_date).getTime() >= now)
           .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
-        setAssignments(merged.slice(0, 3))
+        setAssignments(merged)
       })
       .catch(() => {
         if (!cancelled) setAssignments((prev) => prev ?? [])
@@ -33,6 +33,8 @@ function AssignmentsSummary() {
   useAutoRefresh(load)
 
   const loading = assignments === null
+  const visible = loading ? [] : assignments.slice(0, 3)
+  const hasMore = !loading && assignments.length > 3
 
   return (
     <section className="assignments-summary">
@@ -43,7 +45,7 @@ function AssignmentsSummary() {
           <div className="widget-empty">No upcoming assignments</div>
         )}
         {!loading &&
-          assignments.map((a) => (
+          visible.map((a) => (
             <button
               type="button"
               className="assignment-row"
@@ -54,6 +56,11 @@ function AssignmentsSummary() {
               <span className="assignment-due">{formatDueDate(a.due_date)}</span>
             </button>
           ))}
+        {hasMore && (
+          <Link to="/assignments" className="assignment-show-more">
+            Show more
+          </Link>
+        )}
       </div>
     </section>
   )

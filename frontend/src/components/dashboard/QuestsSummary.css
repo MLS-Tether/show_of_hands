@@ -1,6 +1,7 @@
 .quests-list {
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .quest-row {
@@ -28,4 +29,20 @@
   border-radius: 10px;
   padding: 1px 8px;
   white-space: nowrap;
+}
+
+.quest-show-more {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.quest-show-more:hover {
+  color: var(--text-h);
+  background: var(--surface-1);
 }

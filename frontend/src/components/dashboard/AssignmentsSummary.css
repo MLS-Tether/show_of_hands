@@ -1,6 +1,7 @@
 .assignments-list {
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .assignment-row {
@@ -23,7 +24,7 @@
 }
 
 .assignment-row:hover {
-  background: var(--surface-1);
+  background: var(--surface-2);
 }
 
 .assignment-title {
@@ -35,4 +36,20 @@
   font-size: 11px;
   color: var(--text-muted);
   white-space: nowrap;
+}
+
+.assignment-show-more {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.assignment-show-more:hover {
+  color: var(--text-h);
+  background: var(--surface-1);
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import api from '../api'
 import { useAutoRefresh } from '../utils/autoRefresh'
+import '../styles/shared-ui.css'
 import './Profile.css'
 
 function formatDate(dateStr) {
@@ -50,7 +51,7 @@ function Profile() {
   if (failed) {
     return (
       <section className="profile-page">
-        <p className="profile-placeholder">Could not load your profile.</p>
+        <p className="admin-empty-card">Could not load your profile.</p>
       </section>
     )
   }
@@ -58,14 +59,14 @@ function Profile() {
   if (!user) {
     return (
       <section className="profile-page">
-        <p className="profile-placeholder">Loading profile…</p>
+        <p className="admin-empty-card">Loading profile…</p>
       </section>
     )
   }
 
   return (
     <section className="profile-page">
-      <h1>My profile</h1>
+      <h1 className="admin-page-h1">My profile</h1>
       <div className="profile-card">
         <div className="profile-row">
           <span className="profile-row-label">Username</span>

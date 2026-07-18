@@ -1,12 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import api from '../api'
-import { getUserId, isTeacher } from '../utils/auth'
+import { getUserId, isAdmin, isTeacher } from '../utils/auth'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { initials } from '../utils/format'
 import './Sidebar.css'
 
-const NAV_ITEMS = [
+const ADMIN_NAV_GROUPS = [
+  { label: null, items: [{ label: 'Overview', to: '/admin/overview', end: true }] },
+  { label: 'Approvals', items: [{ label: 'Inbox', to: '/admin/inbox', badge: 'inbox' }] },
+  {
+    label: 'Manage',
+    items: [
+      { label: 'Sections', to: '/admin/sections' },
+      { label: 'Users', to: '/admin/users' },
+    ],
+  },
+  { label: 'School', items: [{ label: 'Settings', to: '/admin/settings' }] },
+]
+
+const APP_NAV_ITEMS = [
   { label: 'Dashboard', to: '/dashboard', end: true },
   { label: 'My sections', to: '/sections' },
   { label: 'Assignments', to: '/assignments', studentOnly: true },
@@ -18,27 +31,44 @@ const NAV_ITEMS = [
 
 function Sidebar() {
   const navigate = useNavigate()
+  const admin = isAdmin()
   const teacher = isTeacher()
-  const items = NAV_ITEMS.filter((item) => !item.studentOnly || !teacher)
-
+  const [school, setSchool] = useState(null)
   const [user, setUser] = useState(null)
+  const [inboxCount, setInboxCount] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
 
   const load = useCallback(() => {
     let cancelled = false
-    api
-      .get(`/users/${getUserId()}`)
-      .then(({ data }) => {
-        if (!cancelled) setUser(data)
+    const userId = getUserId()
+
+    const requests = [api.get('/schools/me'), api.get(`/users/${userId}`)]
+    if (admin) requests.push(api.get('/users'), api.get('/class-requests'))
+
+    Promise.all(requests)
+      .then(([schoolRes, userRes, usersRes, classRequestsRes]) => {
+        if (cancelled) return
+        setSchool(schoolRes.data)
+        setUser(userRes.data)
+        if (admin) {
+          const pendingSignups = usersRes.data.filter(
+            (u) => u.role !== 'student' && !u.is_verified
+          ).length
+          const pendingClassRequests = classRequestsRes.data.filter(
+            (r) => r.status === 'pending'
+          ).length
+          setInboxCount(pendingSignups + pendingClassRequests)
+        }
       })
       .catch(() => {
-        if (!cancelled) setUser((prev) => prev)
+        if (!cancelled) setInboxCount((prev) => prev ?? 0)
       })
+
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [admin])
 
   useEffect(() => load(), [load])
   useAutoRefresh(load)
@@ -68,31 +98,53 @@ function Sidebar() {
     navigate('/auth')
   }
 
+  const navGroups = admin
+    ? ADMIN_NAV_GROUPS
+    : [{ label: null, items: APP_NAV_ITEMS.filter((item) => !item.studentOnly || !teacher) }]
+
   return (
-    <nav className="sidebar" aria-label="Main">
-      <div className="sidebar-nav">
-        {items.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-          >
-            {item.label}
-          </NavLink>
+    <nav className="admin-sidebar" aria-label="Main">
+      <div className="admin-sidebar-brand">
+        <div className="admin-sidebar-logo">
+          Show of Hands{' '}
+          <span className="admin-sidebar-pill">
+            {admin ? 'Admin' : teacher ? 'Teacher' : 'Student'}
+          </span>
+        </div>
+        {school && <div className="admin-sidebar-school">{school.name}</div>}
+      </div>
+
+      <div className="admin-sidebar-nav">
+        {navGroups.map((group, i) => (
+          <div className="admin-sidebar-group" key={group.label ?? i}>
+            {group.label && <div className="admin-sidebar-group-label">{group.label}</div>}
+            {group.items.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) => `admin-sidebar-link${isActive ? ' active' : ''}`}
+              >
+                <span>{item.label}</span>
+                {item.badge === 'inbox' && inboxCount > 0 && (
+                  <span className="admin-sidebar-badge">{inboxCount}</span>
+                )}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </div>
 
       {user && (
-        <div className="sidebar-account" ref={menuRef}>
+        <div className="admin-sidebar-account" ref={menuRef}>
           {menuOpen && (
-            <div className="sidebar-menu" role="menu">
+            <div className="admin-sidebar-menu" role="menu">
               <button
                 type="button"
                 role="menuitem"
                 onClick={() => {
                   setMenuOpen(false)
-                  navigate('/profile')
+                  navigate(admin ? '/admin/profile' : '/profile')
                 }}
               >
                 My profile
@@ -104,15 +156,15 @@ function Sidebar() {
           )}
           <button
             type="button"
-            className="sidebar-footer"
+            className="admin-sidebar-footer"
             aria-label="Account menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((open) => !open)}
           >
-            <div className="sidebar-avatar">{initials(user.username)}</div>
-            <div className="sidebar-footer-text">
-              <div className="sidebar-footer-name">{user.username}</div>
-              <div className="sidebar-footer-role">{user.role}</div>
+            <div className="admin-sidebar-avatar">{initials(user.username)}</div>
+            <div className="admin-sidebar-footer-text">
+              <div className="admin-sidebar-footer-name">{user.username}</div>
+              <div className="admin-sidebar-footer-role">{user.role}</div>
             </div>
           </button>
         </div>

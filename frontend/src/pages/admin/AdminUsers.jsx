@@ -5,7 +5,7 @@ import { useDialog } from '../../components/DialogContext'
 import { useToast } from '../../components/ToastContext'
 import { useAutoRefresh } from '../../utils/autoRefresh'
 import { initials } from '../../utils/format'
-import './admin-shared.css'
+import '../../styles/shared-ui.css'
 import './AdminUsers.css'
 
 const FILTERS = [

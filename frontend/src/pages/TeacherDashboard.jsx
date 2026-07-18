@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import api from '../api'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { getUserId } from '../utils/auth'
 import AddSectionForm from '../components/dashboard/AddSectionForm'
+import '../styles/shared-ui.css'
 import './TeacherDashboard.css'
 
 // Caps how many sections' badge data are fetched at once. Each section costs
@@ -82,19 +83,23 @@ function TeacherDashboard() {
   const loading = sections === null
   const ownedSections = loading ? [] : sections.filter((s) => s.teacher_id === userId)
   const otherSections = loading ? [] : sections.filter((s) => s.teacher_id !== userId)
+  const visibleOwnedSections = ownedSections.slice(0, 3)
+  const ownedSectionsHasMore = ownedSections.length > 3
+  const visibleOtherSections = otherSections.slice(0, 3)
+  const otherSectionsHasMore = otherSections.length > 3
 
   return (
     <section className="teacher-dashboard">
-      <h1>My Sections</h1>
+      <h1 className="admin-page-h1">My Sections</h1>
 
-      {loading && <p className="teacher-dashboard-placeholder">Loading sections…</p>}
+      {loading && <p className="admin-empty-card">Loading sections…</p>}
 
       {!loading && ownedSections.length === 0 && (
-        <p className="teacher-dashboard-placeholder">No sections yet.</p>
+        <p className="admin-empty-card">No sections yet.</p>
       )}
       {!loading && (
         <div className="teacher-dashboard-grid">
-          {ownedSections.map((s) => {
+          {visibleOwnedSections.map((s) => {
             const badge = pending[s.section_id]
             const badgeCount = badge ? badge.pendingRequests + badge.ungraded : 0
             return (
@@ -115,15 +120,20 @@ function TeacherDashboard() {
               </button>
             )
           })}
+          {ownedSectionsHasMore && (
+            <Link to="/sections" className="teacher-section-show-more">
+              Show more
+            </Link>
+          )}
           <AddSectionForm onCreated={load} />
         </div>
       )}
 
       {!loading && otherSections.length > 0 && (
         <>
-          <h2>Other Sections in Your School</h2>
+          <h2 className="teacher-dashboard-subheading">Other Sections in Your School</h2>
           <div className="teacher-dashboard-grid">
-            {otherSections.map((s) => (
+            {visibleOtherSections.map((s) => (
               <div className="teacher-section-card teacher-section-card-readonly" key={s.section_id}>
                 <div className="teacher-section-card-title">{s.class_name}</div>
                 <div className="teacher-section-card-sub">
@@ -134,6 +144,11 @@ function TeacherDashboard() {
                 </div>
               </div>
             ))}
+            {otherSectionsHasMore && (
+              <Link to="/sections" className="teacher-section-show-more">
+                Show more
+              </Link>
+            )}
           </div>
         </>
       )}

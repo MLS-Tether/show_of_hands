@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import TopBar from './TopBar'
 import Sidebar from './Sidebar'
-import { getParentPath } from '../utils/escNavigation'
+import { getAdminParentPath, getParentPath } from '../utils/escNavigation'
 import { isEscapeClaimed } from '../utils/escapeClaim'
 import { isTeacher } from '../utils/auth'
 import './Layout.css'
@@ -15,7 +15,9 @@ function Layout() {
     function handleKeyDown(e) {
       if (e.key !== 'Escape') return
       if (isEscapeClaimed()) return
-      const parent = getParentPath(location.pathname, { isTeacher: isTeacher() })
+      const parent = location.pathname.startsWith('/admin')
+        ? getAdminParentPath(location.pathname)
+        : getParentPath(location.pathname, { isTeacher: isTeacher() })
       if (!parent) return
       if (parent === 'BACK') {
         navigate(-1)
@@ -28,12 +30,14 @@ function Layout() {
   }, [location.pathname, navigate])
 
   return (
-    <div className="app-shell">
-      <TopBar />
-      <div className="app-body">
-        <Sidebar />
-        <main className="app-content">
-          <Outlet />
+    <div className="admin-shell">
+      <Sidebar />
+      <div className="admin-main">
+        <TopBar />
+        <main className="admin-content">
+          <div className="admin-content-inner">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

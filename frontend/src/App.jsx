@@ -1,6 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import Layout from './components/Layout'
-import AdminLayout from './components/admin/AdminLayout'
 import Dashboard from './pages/Dashboard'
 import Sections from './pages/Sections'
 import SectionDetail from './pages/SectionDetail'
@@ -21,6 +20,11 @@ import AdminStudentDetail from './pages/admin/AdminStudentDetail'
 import AdminSettings from './pages/admin/AdminSettings'
 import { isAdmin } from './utils/auth'
 import './App.css'
+
+function RequireAdmin() {
+  if (!isAdmin()) return <Navigate to="/dashboard" replace />
+  return <Outlet />
+}
 
 function App() {
   return (
@@ -53,15 +57,15 @@ function App() {
         <Route path="/rooms/:roomId" element={<RoomDetail />} />
         <Route path="/points" element={<Points />} />
         <Route path="/profile" element={<Profile />} />
-      </Route>
-      <Route element={<AdminLayout />}>
-        <Route path="/admin/overview" element={<AdminOverview />} />
-        <Route path="/admin/inbox" element={<AdminInbox />} />
-        <Route path="/admin/sections" element={<AdminSections />} />
-        <Route path="/admin/users" element={<AdminUsers />} />
-        <Route path="/admin/users/:studentId" element={<AdminStudentDetail />} />
-        <Route path="/admin/settings" element={<AdminSettings />} />
-        <Route path="/admin/profile" element={<Profile />} />
+        <Route element={<RequireAdmin />}>
+          <Route path="/admin/overview" element={<AdminOverview />} />
+          <Route path="/admin/inbox" element={<AdminInbox />} />
+          <Route path="/admin/sections" element={<AdminSections />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/users/:studentId" element={<AdminStudentDetail />} />
+          <Route path="/admin/settings" element={<AdminSettings />} />
+          <Route path="/admin/profile" element={<Profile />} />
+        </Route>
       </Route>
     </Routes>
   )

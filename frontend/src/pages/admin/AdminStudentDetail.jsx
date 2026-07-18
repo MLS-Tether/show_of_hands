@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import api from '../../api'
 import { formatPercent } from '../../utils/format'
 import { downloadReportCard, printReportCard } from '../../utils/reportCard'
-import './admin-shared.css'
+import '../../styles/shared-ui.css'
 import './AdminStudentDetail.css'
 
 function AdminStudentDetail() {
