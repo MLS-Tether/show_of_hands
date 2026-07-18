@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../../api'
 import './QuestsSummary.css'
 
@@ -24,6 +25,8 @@ function QuestsSummary({ sections }) {
   }, [sections])
 
   const loading = quests === null
+  const visible = loading ? [] : quests.slice(0, 3)
+  const hasMore = !loading && quests.length > 3
 
   return (
     <section className="quests-summary">
@@ -34,12 +37,17 @@ function QuestsSummary({ sections }) {
           <div className="widget-empty">No active quests</div>
         )}
         {!loading &&
-          quests.map((q) => (
+          visible.map((q) => (
             <div className="quest-row" key={q.quest_id}>
               <span className="quest-title">{q.title}</span>
               <span className="quest-category">{q.category}</span>
             </div>
           ))}
+        {hasMore && (
+          <Link to="/quests" className="quest-show-more">
+            Show more
+          </Link>
+        )}
       </div>
     </section>
   )

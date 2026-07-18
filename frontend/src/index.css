@@ -88,13 +88,19 @@
   --accent-border: rgba(192, 132, 252, 0.5);
 }
 
+html {
+  height: 100%;
+}
+
 body {
   margin: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 #root {
   width: 100%;
-  min-height: 100svh;
+  height: 100svh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;

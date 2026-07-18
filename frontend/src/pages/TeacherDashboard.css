@@ -40,6 +40,24 @@
   border-color: var(--border-strong);
 }
 
+.teacher-section-show-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 14px;
+  min-height: 80px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.teacher-section-show-more:hover {
+  color: var(--text-h);
+  border-color: var(--text-h);
+}
+
 .teacher-dashboard h2 {
   font-size: 16px;
   margin: 24px 0 12px;
