@@ -1,23 +1,49 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import api from '../api'
 import NotificationBell from './NotificationBell'
+import { getUserId, isAdmin } from '../utils/auth'
+import { getTheme, setTheme } from '../utils/theme'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import './TopBar.css'
 
+const BREADCRUMB_RULES = [
+  { pattern: /^\/admin\/overview$/, label: 'Overview' },
+  { pattern: /^\/admin\/inbox$/, label: 'Approvals · Inbox' },
+  { pattern: /^\/admin\/sections$/, label: 'Manage · Sections' },
+  { pattern: /^\/admin\/users$/, label: 'Manage · Users' },
+  { pattern: /^\/admin\/settings$/, label: 'School · Settings' },
+  { pattern: /^\/admin\/profile$/, label: 'My profile' },
+  { pattern: /^\/dashboard$/, label: 'Dashboard' },
+  { pattern: /^\/sections$/, label: 'My sections' },
+  { pattern: /^\/sections\/[^/]+$/, label: 'Section detail' },
+  { pattern: /^\/assignments$/, label: 'Assignments' },
+  { pattern: /^\/assignments\/[^/]+$/, label: 'Assignment detail' },
+  { pattern: /^\/quests$/, label: 'Quests' },
+  { pattern: /^\/bulletin-board$/, label: 'Bulletin board' },
+  { pattern: /^\/study-rooms$/, label: 'Study rooms' },
+  { pattern: /^\/rooms\/[^/]+$/, label: 'Study room' },
+  { pattern: /^\/points$/, label: 'Points' },
+  { pattern: /^\/profile$/, label: 'My profile' },
+]
+
+function getBreadcrumb(pathname) {
+  const match = BREADCRUMB_RULES.find((r) => r.pattern.test(pathname))
+  return match ? match.label : 'Show of Hands'
+}
+
 function TopBar() {
-  const navigate = useNavigate()
+  const location = useLocation()
+  const admin = isAdmin()
   const [points, setPoints] = useState(null)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef(null)
+  const [theme, setThemeState] = useState(getTheme())
+  const breadcrumb = getBreadcrumb(location.pathname)
 
   const loadPoints = useCallback(() => {
-    const userId = localStorage.getItem('user_id')
-    if (!userId) return undefined
     let cancelled = false
+    const request = admin ? api.get('/schools/points') : api.get(`/users/${getUserId()}/points`)
 
-    api
-      .get(`/users/${userId}/points`)
+    request
       .then(({ data }) => {
         if (!cancelled) setPoints(data.total_points)
       })
@@ -28,68 +54,30 @@ function TopBar() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [admin])
 
   useEffect(() => loadPoints(), [loadPoints])
   useAutoRefresh(loadPoints)
 
-  useEffect(() => {
-    if (!menuOpen) return
-    function handleClickOutside(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [menuOpen])
-
-  async function handleLogout() {
-    const refreshToken = localStorage.getItem('refresh_token')
-    try {
-      await api.post('/auth/logout', { refresh_token: refreshToken })
-    } catch {
-      // best-effort: still clear local session and redirect below
-    }
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('user_id')
-    localStorage.removeItem('role')
-    navigate('/auth')
+  function toggleTheme() {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    setThemeState(next)
   }
 
   return (
-    <header className="topbar">
-      <div className="topbar-logo">Show of Hands</div>
-      <div className="topbar-actions">
+    <header className="admin-topbar">
+      <div className="admin-topbar-breadcrumb">{breadcrumb}</div>
+      <div className="admin-topbar-actions">
+        {points !== null && (
+          <span className="admin-topbar-points">
+            {points.toLocaleString()} {admin ? 'school pts' : 'pts'}
+          </span>
+        )}
         <NotificationBell />
-        <span className="topbar-points">{points === null ? '—' : points} pts</span>
-        <div className="topbar-account" ref={menuRef}>
-          <button
-            type="button"
-            className="topbar-avatar"
-            aria-label="Account menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
-          />
-          {menuOpen && (
-            <div className="topbar-menu" role="menu">
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false)
-                  navigate('/profile')
-                }}
-              >
-                My profile
-              </button>
-              <button type="button" role="menuitem" onClick={handleLogout}>
-                Log out
-              </button>
-            </div>
-          )}
-        </div>
+        <button type="button" className="admin-topbar-theme" onClick={toggleTheme}>
+          {theme === 'dark' ? 'Dark' : 'Light'}
+        </button>
       </div>
     </header>
   )

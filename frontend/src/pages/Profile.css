@@ -1,13 +1,9 @@
-.profile-placeholder {
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
 .profile-card {
-  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
   border-radius: 8px;
   max-width: 420px;
-  margin-top: 16px;
+  margin-top: 22px;
   overflow: hidden;
 }
 

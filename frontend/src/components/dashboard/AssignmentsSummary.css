@@ -1,6 +1,7 @@
 .assignments-list {
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .assignment-row {
@@ -23,7 +24,7 @@
 }
 
 .assignment-row:hover {
-  background: var(--surface-1);
+  background: var(--surface-2);
 }
 
 .assignment-title {

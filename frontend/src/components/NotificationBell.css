@@ -98,7 +98,7 @@
 }
 
 .notification-row:hover {
-  background: var(--surface-1);
+  background: var(--surface-2);
 }
 
 .notification-row.unread {

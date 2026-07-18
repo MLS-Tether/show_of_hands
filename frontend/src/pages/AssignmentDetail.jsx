@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import api from '../api'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { isTeacher } from '../utils/auth'
+import { useDialog } from '../components/DialogContext'
+import '../styles/shared-ui.css'
 import './AssignmentDetail.css'
 
 const STATUS_LABELS = {
@@ -90,10 +92,10 @@ function EditAssignmentForm({ assignment, onSaved, onCancel }) {
       </label>
       {error && <p className="submission-form-error">{error}</p>}
       <div className="assignment-detail-actions">
-        <button type="button" onClick={onCancel} disabled={saving}>
+        <button type="button" className="admin-btn-secondary" onClick={onCancel} disabled={saving}>
           Cancel
         </button>
-        <button type="submit" disabled={saving}>
+        <button type="submit" className="admin-btn-primary" disabled={saving}>
           {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
@@ -150,7 +152,7 @@ function SubmissionForm({ assignmentId, onSubmitted }) {
         <input value={fileUrl} onChange={(e) => setFileUrl(e.target.value)} />
       </label>
       {error && <p className="submission-form-error">{error}</p>}
-      <button type="submit" disabled={submitting}>
+      <button type="submit" className="admin-btn-primary" disabled={submitting}>
         {submitting ? 'Submitting…' : 'Submit'}
       </button>
     </form>
@@ -174,16 +176,17 @@ function SubmissionSummary({ submission }) {
         {submission.grade != null && (
           <span className="submission-summary-grade">Grade: {submission.grade}</span>
         )}
+        <span className={`admin-chevron${expanded ? ' rotated' : ''}`}>▾</span>
       </button>
 
       {expanded && (
         <div className="submission-detail">
-          <div className="submission-detail-row">
-            <span className="submission-detail-label">Content</span>
+          <div className="admin-detail-row">
+            <span className="admin-detail-label">Content</span>
             <span>{submission.content || '—'}</span>
           </div>
-          <div className="submission-detail-row">
-            <span className="submission-detail-label">File</span>
+          <div className="admin-detail-row">
+            <span className="admin-detail-label">File</span>
             <span>
               {submission.file_url ? (
                 isUrl(submission.file_url) ? (
@@ -198,20 +201,20 @@ function SubmissionSummary({ submission }) {
               )}
             </span>
           </div>
-          <div className="submission-detail-row">
-            <span className="submission-detail-label">Grade</span>
+          <div className="admin-detail-row">
+            <span className="admin-detail-label">Grade</span>
             <span>{submission.grade != null ? submission.grade : 'Not graded yet'}</span>
           </div>
-          <div className="submission-detail-row">
-            <span className="submission-detail-label">Points awarded</span>
+          <div className="admin-detail-row">
+            <span className="admin-detail-label">Points awarded</span>
             <span>{submission.points_awarded}</span>
           </div>
-          <div className="submission-detail-row">
-            <span className="submission-detail-label">Submitted</span>
+          <div className="admin-detail-row">
+            <span className="admin-detail-label">Submitted</span>
             <span>{formatFullDate(submission.submitted_at)}</span>
           </div>
-          <div className="submission-detail-row">
-            <span className="submission-detail-label">Finalized</span>
+          <div className="admin-detail-row">
+            <span className="admin-detail-label">Finalized</span>
             <span>{submission.finalized_at ? formatFullDate(submission.finalized_at) : '—'}</span>
           </div>
         </div>
@@ -276,18 +279,19 @@ function GradingRow({ submission, onGraded }) {
         {submission.grade != null && (
           <span className="submission-summary-grade">Grade: {submission.grade}</span>
         )}
+        <span className={`admin-chevron${expanded ? ' rotated' : ''}`}>▾</span>
       </button>
 
       {expanded && (
         <div className="submission-detail">
-          <div className="submission-detail-row">
-            <span className="submission-detail-label">Submitted</span>
+          <div className="admin-detail-row">
+            <span className="admin-detail-label">Submitted</span>
             <span>{formatFullDate(submission.submitted_at)}</span>
           </div>
 
           {isGraded ? (
-            <div className="submission-detail-row">
-              <span className="submission-detail-label">Grade</span>
+            <div className="admin-detail-row">
+              <span className="admin-detail-label">Grade</span>
               <span>
                 {submission.grade} — {submission.points_awarded} pts (finalized)
               </span>
@@ -309,11 +313,17 @@ function GradingRow({ submission, onGraded }) {
                 grade ≥ 70, or +0% below 70.
               </p>
               {error && <p className="submission-form-error">{error}</p>}
-              <button type="button" disabled={saving || grade === ''} onClick={handleSaveGrade}>
+              <button
+                type="button"
+                className="admin-btn-secondary"
+                disabled={saving || grade === ''}
+                onClick={handleSaveGrade}
+              >
                 {saving ? 'Saving…' : 'Save grade'}
               </button>
               <button
                 type="button"
+                className="admin-btn-primary"
                 disabled={saving || submission.grade == null}
                 onClick={handleFinalize}
               >
@@ -329,6 +339,7 @@ function GradingRow({ submission, onGraded }) {
 
 function TeacherAssignmentView({ assignmentId, assignment, onAssignmentChanged }) {
   const navigate = useNavigate()
+  const { confirm } = useDialog()
   const [submissions, setSubmissions] = useState(null)
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -359,7 +370,8 @@ function TeacherAssignmentView({ assignmentId, assignment, onAssignmentChanged }
   }
 
   async function handleDelete() {
-    if (!window.confirm('Delete this assignment? This cannot be undone.')) return
+    const ok = await confirm('Delete this assignment? This cannot be undone.')
+    if (!ok) return
     setDeleteError('')
     setDeleting(true)
     try {
@@ -386,7 +398,7 @@ function TeacherAssignmentView({ assignmentId, assignment, onAssignmentChanged }
         />
       ) : (
         <>
-          <h1>{assignment.title}</h1>
+          <h1 className="admin-page-h1">{assignment.title}</h1>
           <p className="assignment-detail-due">
             Due {formatFullDate(assignment.due_date)} · {assignment.point_value} pts
           </p>
@@ -401,10 +413,10 @@ function TeacherAssignmentView({ assignmentId, assignment, onAssignmentChanged }
             </p>
           )}
           <div className="assignment-detail-actions">
-            <button type="button" onClick={() => setEditing(true)}>
+            <button type="button" className="admin-btn-secondary" onClick={() => setEditing(true)}>
               Edit
             </button>
-            <button type="button" disabled={deleting} onClick={handleDelete}>
+            <button type="button" className="admin-btn-danger" disabled={deleting} onClick={handleDelete}>
               {deleting ? 'Deleting…' : 'Delete'}
             </button>
           </div>
@@ -413,9 +425,9 @@ function TeacherAssignmentView({ assignmentId, assignment, onAssignmentChanged }
       )}
 
       <div className="widget-label">submissions</div>
-      {loading && <p className="assignment-detail-placeholder">Loading submissions…</p>}
+      {loading && <p className="admin-empty-card">Loading submissions…</p>}
       {!loading && submissions.length === 0 && (
-        <p className="assignment-detail-placeholder">No submissions yet.</p>
+        <p className="admin-empty-card">No submissions yet.</p>
       )}
       {!loading &&
         submissions.map((s) => (
@@ -466,7 +478,7 @@ function AssignmentDetail() {
   if (assignmentFailed) {
     return (
       <section className="assignment-detail">
-        <p className="assignment-detail-placeholder">Assignment not found.</p>
+        <p className="admin-empty-card">Assignment not found.</p>
       </section>
     )
   }
@@ -474,7 +486,7 @@ function AssignmentDetail() {
   if (!assignment || (!teacher && submission === undefined)) {
     return (
       <section className="assignment-detail">
-        <p className="assignment-detail-placeholder">Loading assignment…</p>
+        <p className="admin-empty-card">Loading assignment…</p>
       </section>
     )
   }
@@ -491,7 +503,7 @@ function AssignmentDetail() {
 
   return (
     <section className="assignment-detail">
-      <h1>{assignment.title}</h1>
+      <h1 className="admin-page-h1">{assignment.title}</h1>
       <p className="assignment-detail-due">
         Due {formatFullDate(assignment.due_date)} · {assignment.point_value} pts
       </p>

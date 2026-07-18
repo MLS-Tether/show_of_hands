@@ -2,38 +2,6 @@
   text-align: left;
 }
 
-.quests-tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-  margin: -16px 0 16px;
-}
-
-.quests-tab {
-  padding: 8px 14px;
-  font-size: 13px;
-  color: var(--text-muted);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-}
-
-.quests-tab:hover {
-  color: var(--text-h);
-}
-
-.quests-tab.active {
-  color: var(--text-h);
-  border-bottom-color: var(--text-h);
-  font-weight: 500;
-}
-
-.quests-placeholder {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
 .quests-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -43,9 +11,10 @@
 .quest-card {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  padding: 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
 }
 
 .quest-card-header {
@@ -75,7 +44,7 @@
 
 .quest-card-category-social {
   color: var(--text-muted);
-  background: var(--surface-1);
+  background: var(--surface-2);
   border: 1px solid var(--border-strong);
 }
 
@@ -112,28 +81,13 @@
 }
 
 .quest-card-status-done {
-  color: #1f7a4d;
-  background: rgba(31, 122, 77, 0.12);
-  border: 1px solid rgba(31, 122, 77, 0.35);
+  color: var(--success);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
 }
 
 .quest-card-complete {
   align-self: flex-start;
   font-size: 12px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border-strong);
-  background: none;
-  color: var(--text-h);
-  cursor: pointer;
   margin-top: 10px;
-}
-
-.quest-card-complete:hover {
-  background: var(--surface-1);
-}
-
-.quest-card-complete:disabled {
-  opacity: 0.6;
-  cursor: default;
 }

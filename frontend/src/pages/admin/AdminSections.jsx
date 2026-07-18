@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import api from '../../api'
 import { useToast } from '../../components/ToastContext'
 import { useAutoRefresh } from '../../utils/autoRefresh'
-import './admin-shared.css'
+import '../../styles/shared-ui.css'
 import './AdminSections.css'
 
 const FILTERS = [

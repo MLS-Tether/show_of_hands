@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
+import '../styles/shared-ui.css'
 import './Auth.css'
 
 const ROLES = ['student', 'teacher', 'admin']
@@ -49,8 +50,14 @@ function LoginForm() {
           required
         />
       </label>
-      {error && <p className="auth-error" role="alert">{error}</p>}
-      <button className="auth-submit" type="submit">Log in</button>
+      {error && (
+        <p className="auth-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button type="submit" className="admin-btn-primary auth-submit">
+        Log in
+      </button>
     </form>
   )
 }
@@ -94,14 +101,14 @@ function RegisterForm({ onPendingVerification }) {
 
   return (
     <>
-      <div className="auth-role-tabs" role="tablist" aria-label="Role">
+      <div role="tablist" aria-label="Role" className="admin-filter-chips">
         {ROLES.map((r) => (
           <button
             key={r}
             type="button"
             role="tab"
-            className="auth-role-tab"
             aria-selected={role === r}
+            className={`admin-chip${role === r ? ' active' : ''}`}
             onClick={() => setRole(r)}
           >
             {r[0].toUpperCase() + r.slice(1)}
@@ -136,8 +143,14 @@ function RegisterForm({ onPendingVerification }) {
           School code
           <input value={schoolCode} onChange={(e) => setSchoolCode(e.target.value)} required />
         </label>
-        {error && <p className="auth-error" role="alert">{error}</p>}
-        <button className="auth-submit" type="submit">Sign up as {role}</button>
+        {error && (
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+        )}
+        <button type="submit" className="admin-btn-primary auth-submit">
+          Sign up as {role}
+        </button>
       </form>
     </>
   )
@@ -148,15 +161,15 @@ function Auth() {
   const [pendingVerification, setPendingVerification] = useState(false)
 
   return (
-    <section className="auth-page">
-      <div className="auth-card">
-        <h1 className="auth-h1">{mode === 'login' ? 'Log in' : 'Sign up'}</h1>
-        <div className="auth-tabs" role="tablist" aria-label="Auth mode">
+    <div className="auth-page">
+      <section className="auth-card">
+        <h1 className="admin-page-h1 auth-heading">{mode === 'login' ? 'Log in' : 'Sign up'}</h1>
+        <div role="tablist" aria-label="Auth mode" className="admin-filter-chips">
           <button
             type="button"
             role="tab"
-            className="auth-tab"
             aria-selected={mode === 'login'}
+            className={`admin-chip${mode === 'login' ? ' active' : ''}`}
             onClick={() => setMode('login')}
           >
             Login
@@ -164,8 +177,8 @@ function Auth() {
           <button
             type="button"
             role="tab"
-            className="auth-tab"
             aria-selected={mode === 'register'}
+            className={`admin-chip${mode === 'register' ? ' active' : ''}`}
             onClick={() => setMode('register')}
           >
             Register
@@ -186,8 +199,8 @@ function Auth() {
             }}
           />
         )}
-      </div>
-    </section>
+      </section>
+    </div>
   )
 }
 

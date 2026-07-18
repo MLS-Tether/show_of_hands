@@ -43,7 +43,7 @@ function AnalyticsPanel({ sectionId }) {
         {points_distribution.median ?? '—'}
       </p>
 
-      <div className="widget-label" style={{ marginTop: 16 }}>
+      <div className="widget-label widget-label-spaced">
         per-assignment completion
       </div>
       {assignments.length === 0 ? (
@@ -62,7 +62,7 @@ function AnalyticsPanel({ sectionId }) {
         </div>
       )}
 
-      <div className="widget-label" style={{ marginTop: 16 }}>
+      <div className="widget-label widget-label-spaced">
         needs attention
       </div>
       {students_needing_attention.length === 0 ? (

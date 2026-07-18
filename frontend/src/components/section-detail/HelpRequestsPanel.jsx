@@ -31,8 +31,8 @@ function HelpRequestsPanel({ sectionId }) {
       {!loading && helpRequests.length > 0 && (
         <div className="teacher-panel-list">
           {helpRequests.map((hr) => (
-            <div className="teacher-panel-row" key={hr.help_request_id} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div className="teacher-panel-row teacher-panel-row-stacked" key={hr.help_request_id}>
+              <div className="teacher-panel-row-header">
                 <span>{hr.topic}</span>
                 <span className="teacher-panel-row-sub">{hr.status}</span>
               </div>
