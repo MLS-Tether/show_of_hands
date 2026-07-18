@@ -28,7 +28,9 @@
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: 18px/145% var(--sans);
+  /* Unitless line-height: a percentage would compute to a fixed px value here
+     and inherit into headings, giving 40px text a ~23px line box. */
+  font: 18px/1.45 var(--sans);
   letter-spacing: 0.18px;
   color-scheme: light dark;
   color: var(--text);
@@ -152,6 +154,7 @@ h2 {
 
 h1 {
   font-size: 56px;
+  line-height: 1.18;
   letter-spacing: -1.68px;
   margin: 32px 0;
   @media (max-width: 1024px) {
