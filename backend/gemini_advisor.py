@@ -89,5 +89,14 @@ def generate_fit_verdict(draft: dict, snapshot: dict) -> FitVerdict:
             continue
         for block in step.get("content", []):
             if block.get("type") == "text" and block.get("text"):
-                return FitVerdict.model_validate_json(block["text"])
+                verdict = FitVerdict.model_validate_json(block["text"])
+                # The UI renders suggested_resources as <a href>, and these
+                # come straight from the model — unlike teacher-posted
+                # resources, they never pass through ResourceCreate's URL
+                # validation. Drop anything that isn't http(s) so a
+                # javascript: URL (or similar) can't reach the DOM.
+                verdict.suggested_resources = [
+                    r for r in verdict.suggested_resources if r.url.startswith(("http://", "https://"))
+                ]
+                return verdict
     raise RuntimeError("Gemini returned no parseable verdict.")

@@ -81,8 +81,10 @@ def test_snapshot_empty_section_reports_zero(db, world):
     }
 
 
+import json
 from unittest.mock import patch
 
+import gemini_advisor
 from gemini_advisor import FitVerdict, SuggestedResource
 
 DRAFT = {
@@ -165,3 +167,48 @@ def test_fit_gemini_error_degrades_to_stats(client, db, world, cleanup, monkeypa
     assert data["unavailable_reason"] == "error"
     assert data["verdict"] is None
     assert data["stats"]["graded_submission_count"] >= 1
+
+
+def test_generate_fit_verdict_filters_unsafe_resource_urls(monkeypatch):
+    """suggested_resources from the model are rendered as <a href> in the UI;
+    generate_fit_verdict must drop any entry whose url isn't http(s) before
+    returning, since these never pass through ResourceCreate's validation.
+    Fully offline: httpx.post is monkeypatched, no network call is made.
+    """
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+    verdict_json = json.dumps(
+        {
+            "readiness": "review_first",
+            "rationale": "Testing URL filtering.",
+            "topics_to_review": ["factoring"],
+            "suggested_resources": [
+                {"title": "Malicious", "url": "javascript:alert(1)", "why": "should be dropped"},
+                {"title": "Khan Academy", "url": "https://www.khanacademy.org/math", "why": "should survive"},
+            ],
+        }
+    )
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {
+                "steps": [
+                    {
+                        "type": "model_output",
+                        "content": [{"type": "text", "text": verdict_json}],
+                    }
+                ]
+            }
+
+    def fake_post(*args, **kwargs):
+        return FakeResponse()
+
+    monkeypatch.setattr(gemini_advisor.httpx, "post", fake_post)
+
+    verdict = gemini_advisor.generate_fit_verdict(DRAFT, {"enrolled_count": 1})
+
+    assert len(verdict.suggested_resources) == 1
+    assert verdict.suggested_resources[0].url == "https://www.khanacademy.org/math"

@@ -10,12 +10,14 @@ const READINESS_LABELS = {
 function AssignmentFitResult({ sectionId, result }) {
   const [postedUrls, setPostedUrls] = useState([])
   const [postError, setPostError] = useState('')
+  const [postingUrl, setPostingUrl] = useState(null)
 
   if (!result) return null
   const { ai_available: aiAvailable, unavailable_reason: reason, verdict, stats } = result
 
   async function postToResources(resource) {
     setPostError('')
+    setPostingUrl(resource.url)
     try {
       await api.post(`/sections/${sectionId}/resources`, {
         title: resource.title,
@@ -25,6 +27,8 @@ function AssignmentFitResult({ sectionId, result }) {
       setPostedUrls((prev) => [...prev, resource.url])
     } catch {
       setPostError('Could not post resource.')
+    } finally {
+      setPostingUrl(null)
     }
   }
 
@@ -44,8 +48,8 @@ function AssignmentFitResult({ sectionId, result }) {
           {verdict.suggested_resources.length > 0 && (
             <div className="fit-resources">
               <div className="widget-label">suggested resources (vet before sharing)</div>
-              {verdict.suggested_resources.map((r) => (
-                <div className="fit-resource-row" key={r.url}>
+              {verdict.suggested_resources.map((r, index) => (
+                <div className="fit-resource-row" key={`${r.url}-${index}`}>
                   <span>
                     <a href={r.url} target="_blank" rel="noopener noreferrer">
                       {r.title}
@@ -58,9 +62,10 @@ function AssignmentFitResult({ sectionId, result }) {
                     <button
                       type="button"
                       className="teacher-panel-button"
+                      disabled={postingUrl !== null}
                       onClick={() => postToResources(r)}
                     >
-                      Post to resources
+                      {postingUrl === r.url ? 'Posting…' : 'Post to resources'}
                     </button>
                   )}
                 </div>

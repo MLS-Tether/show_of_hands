@@ -1,5 +1,6 @@
 from models.resource_model import Resource
-from tests.conftest import auth_header
+from models.user_model import User
+from tests.conftest import auth_header, unique
 
 
 def _create_resource(client, world, cleanup, **overrides):
@@ -122,3 +123,61 @@ def test_teacher_deletes_resource(client, world, cleanup):
 def test_delete_unknown_resource_404(client, world):
     resp = client.delete("/api/resources/999999", headers=auth_header(world.teacher_token))
     assert resp.status_code == 404
+
+
+def test_teacher_delete_sets_archived_and_deleted_at(client, world, cleanup, db):
+    created = _create_resource(client, world, cleanup)
+    rid = created.json()["resource_id"]
+    resp = client.delete(f"/api/resources/{rid}", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 200
+
+    db.expire_all()
+    resource = db.query(Resource).filter(Resource.resource_id == rid).first()
+    assert resource is not None
+    assert resource.is_archived is True
+    assert resource.deleted_at is not None
+
+
+def test_other_teacher_cannot_update_or_delete_resource(client, world, cleanup):
+    """A teacher who doesn't own the section should get 403 on both PATCH
+    and DELETE of another teacher's resource, mirroring how `world` itself
+    registers+verifies+logs in a teacher."""
+    created = _create_resource(client, world, cleanup)
+    rid = created.json()["resource_id"]
+
+    other_username = unique("teacher2")
+    resp = client.post(
+        "/api/auth/register",
+        json={
+            "username": other_username,
+            "password": "password123",
+            "school_code": world.school_code,
+            "role": "teacher",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    other_teacher_id = resp.json()["user_id"]
+    cleanup(User, other_teacher_id)
+
+    resp = client.patch(
+        f"/api/users/{other_teacher_id}/verify",
+        headers=auth_header(world.admin_token),
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = client.post(
+        "/api/auth/login",
+        json={"username": other_username, "password": "password123"},
+    )
+    assert resp.status_code == 200, resp.text
+    other_teacher_token = resp.json()["access_token"]
+
+    resp = client.patch(
+        f"/api/resources/{rid}",
+        json={"title": "Hijacked"},
+        headers=auth_header(other_teacher_token),
+    )
+    assert resp.status_code == 403
+
+    resp = client.delete(f"/api/resources/{rid}", headers=auth_header(other_teacher_token))
+    assert resp.status_code == 403

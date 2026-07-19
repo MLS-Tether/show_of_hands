@@ -41,7 +41,7 @@ function AssignmentsPanel({ sectionId, assignments, onChange }) {
       setFitResult(null)
       onChange?.()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not create assignment.')
+      setError(err.response?.data?.message || 'Could not create assignment.')
     } finally {
       setSubmitting(false)
     }

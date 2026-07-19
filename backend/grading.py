@@ -72,6 +72,7 @@ def compute_section_grade_for_student(db: Session, section_id: int, student_id: 
         .join(Assignment, Submission.assignment_id == Assignment.assignment_id)
         .filter(
             Assignment.section_id == section_id,
+            Assignment.is_archived == False,
             Submission.student_id == student_id,
             Submission.status == SubmissionStatusEnum.graded,
             Submission.grade.isnot(None),
