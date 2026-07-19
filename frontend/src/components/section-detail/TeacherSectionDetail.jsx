@@ -10,6 +10,7 @@ import AssignmentsPanel from './AssignmentsPanel'
 import QuestsPanel from './QuestsPanel'
 import HelpRequestsPanel from './HelpRequestsPanel'
 import AnalyticsPanel from './AnalyticsPanel'
+import ResourcesPanel from './ResourcesPanel'
 import '../../styles/shared-ui.css'
 import '../../pages/SectionDetail.css'
 import './TeacherSectionDetail.css'
@@ -27,6 +28,7 @@ const CARDS = [
   { key: 'quests', label: 'Quests' },
   { key: 'help-requests', label: 'Help Requests' },
   { key: 'analytics', label: 'Analytics' },
+  { key: 'resources', label: 'Resources' },
 ]
 
 function EditSectionForm({ section, onSaved, onCancel }) {
@@ -209,6 +211,7 @@ function TeacherSectionDetail() {
           {activeCard === 'quests' && <QuestsPanel sectionId={sectionId} />}
           {activeCard === 'help-requests' && <HelpRequestsPanel sectionId={sectionId} />}
           {activeCard === 'analytics' && <AnalyticsPanel sectionId={sectionId} />}
+          {activeCard === 'resources' && <ResourcesPanel sectionId={sectionId} />}
         </div>
       ) : (
         <div className="teacher-section-grid">
