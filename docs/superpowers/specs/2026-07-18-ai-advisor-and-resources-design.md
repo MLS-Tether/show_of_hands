@@ -54,15 +54,16 @@ Request body (the draft assignment, not yet saved):
 
 ### Gemini API call
 
-- Official `google-genai` Python SDK (>= 2.3.0, Interactions API), model
+- Gemini Interactions API over REST via `httpx` (the official SDK's
+  Interactions support needs Python >= 3.10; this backend runs 3.9), model
   `gemini-3.5-flash` — chosen because
   Google AI Studio provides a free-tier API key (daily request quotas, no cost),
   which fits this project's budget. The key is set as `GEMINI_API_KEY` in the
   backend environment and never reaches the browser.
-- Structured output: `client.interactions.create` with a top-level
-  `response_format` carrying the Pydantic JSON schema, validated back into the
-  Pydantic model — no manual parsing of prose. `store=False` so class data is
-  not retained by Google.
+- Structured output: the interaction request carries a top-level
+  `response_format` with the Pydantic JSON schema; the JSON text from the
+  `model_output` step is validated back into the Pydantic model — no manual
+  parsing of prose. `store: false` so class data is not retained by Google.
 - System instruction frames the role: teaching assistant analyzing readiness;
   must ground every claim in the provided stats; resource suggestions are ideas
   the teacher should vet, not guaranteed-valid URLs.

@@ -6,13 +6,13 @@
 
 **Architecture:** Two independent backend surfaces on the existing FastAPI app: (1) a `resources` table + section-scoped CRUD following the quests controller pattern, and (2) a stateless `POST /sections/{id}/assignment-fit` endpoint that computes class stats in Python and sends only that compact summary to Gemini for a structured verdict. Frontend adds a teacher ResourcesPanel + student resources card, and a "Check fit" flow inside the existing assignment-creation form.
 
-**Tech Stack:** FastAPI + SQLAlchemy + Alembic + Pydantic (backend), `google-genai` SDK >= 2.3.0, Interactions API (`gemini-3.5-flash`, free AI Studio tier), React 19 + Vite (frontend), pytest.
+**Tech Stack:** FastAPI + SQLAlchemy + Alembic + Pydantic (backend), Gemini Interactions API via httpx REST (`gemini-3.5-flash`, free AI Studio tier), React 19 + Vite (frontend), pytest.
 
 **Spec:** `docs/superpowers/specs/2026-07-18-ai-advisor-and-resources-design.md`
 
 ## Global Constraints
 
-- AI provider is **Google Gemini** via the official `google-genai` Python SDK (**>= 2.3.0**), using the **Interactions API** (`client.interactions.create`) — NOT the legacy `generate_content`. Model string `gemini-3.5-flash` (the `gemini-2.5-*` family is legacy). API key read from env var `GEMINI_API_KEY`, backend-only — never sent to or read by the frontend. Set `store=False` on the interaction so class data is not retained by Google.
+- AI provider is **Google Gemini** via the **Interactions API over REST** (`POST https://generativelanguage.googleapis.com/v1beta2/interactions` with the `x-goog-api-key` header, called through `httpx`, already a backend dependency) — NOT the legacy `generate_content`. Rationale: the official `google-genai` SDK's Interactions support (>= 2.3.0) requires Python >= 3.10, and this backend runs on Python 3.9.4; REST has no interpreter constraint. Model string `gemini-3.5-flash` (the `gemini-2.5-*` family is legacy). API key read from env var `GEMINI_API_KEY`, backend-only — never sent to or read by the frontend. Set `"store": false` on the interaction so class data is not retained by Google.
 - All AI claims must be grounded: the backend computes stats; the model only interprets them. The frontend always renders the computed stats regardless of AI availability.
 - Resource URLs must start with `http://` or `https://` (reject otherwise with 422).
 - Soft-delete convention: `is_archived` boolean + `deleted_at` timestamp, matching every other model in this codebase.
@@ -1127,19 +1127,36 @@ git commit -m "feat: deterministic class snapshot for assignment-fit advisor"
 - Create: `backend/schemas/assignment_fit.py`
 - Create: `backend/controllers/assignment_fit_controller.py`
 - Modify: `backend/main.py` (import + include router)
-- Modify: `backend/requirements.txt` (add `google-genai`)
 - Modify: `backend/tests/test_assignment_fit.py` (append endpoint tests)
 
 **Interfaces:**
 - Consumes: `build_section_snapshot` from Task 6.
 - Produces: `POST /api/sections/{section_id}/assignment-fit` (teacher owning section). Response `AssignmentFitResponse`: `{ai_available: bool, unavailable_reason: "not_configured"|"insufficient_data"|"error"|null, verdict: FitVerdict|null, stats: dict}`. `FitVerdict`: `{readiness: "ready"|"review_first"|"mixed", rationale: str, topics_to_review: [str], suggested_resources: [{title, url, why}]}`. Task 8's UI consumes exactly this shape.
 
-- [ ] **Step 1: Install the SDK**
+- [ ] **Step 1: Verify the REST endpoint once (no SDK install)**
 
-Add `google-genai>=2.3.0` on its own line at the end of `backend/requirements.txt`, then:
+No new dependency: the wrapper calls the Interactions API over REST with `httpx` (already in `requirements.txt`). The `google-genai` SDK is NOT used — its Interactions support requires Python >= 3.10 and this backend runs 3.9.4.
 
-Run: `cd backend && pip install "google-genai>=2.3.0"`
-Expected: successful install (imports as `from google import genai`; >= 2.3.0 is required for the Interactions API).
+One-time smoke check (uses the real key from `backend/.env`, one tiny free-tier request) to confirm the endpoint and response shape before writing code:
+
+```bash
+cd backend && python3 - << 'EOF'
+import json, os
+import httpx
+from dotenv import load_dotenv
+load_dotenv()
+resp = httpx.post(
+    "https://generativelanguage.googleapis.com/v1beta2/interactions",
+    headers={"x-goog-api-key": os.environ["GEMINI_API_KEY"], "Content-Type": "application/json"},
+    json={"model": "gemini-3.5-flash", "input": "Reply with the word ok.", "store": False},
+    timeout=60.0,
+)
+print(resp.status_code)
+print(json.dumps(resp.json(), indent=2)[:800])
+EOF
+```
+
+Expected: `200` and a JSON body containing a `steps` array with a `model_output` step whose `content` holds `{"type": "text", "text": ...}`. If this 404s, retry with `/v1beta/interactions` and use whichever works in the wrapper below (adjust `GEMINI_ENDPOINT`).
 
 - [ ] **Step 2: Write the failing endpoint tests**
 
@@ -1255,9 +1272,12 @@ import json
 import os
 from typing import List, Literal
 
+import httpx
 from pydantic import BaseModel
 
 GEMINI_MODEL = "gemini-3.5-flash"
+GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta2/interactions"
+GEMINI_TIMEOUT_SECONDS = 60.0
 
 SYSTEM_INSTRUCTION = """You are a teaching assistant for a middle/high school
 class management app. A teacher is drafting an assignment and wants to know
@@ -1296,31 +1316,43 @@ def is_configured() -> bool:
 
 
 def generate_fit_verdict(draft: dict, snapshot: dict) -> FitVerdict:
-    # Imported lazily so the backend still boots if the package is missing;
-    # callers gate on is_configured() first.
-    from google import genai
-
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    # Interactions API over REST: the google-genai SDK's Interactions support
+    # needs Python >= 3.10, and this backend runs 3.9 — httpx has no such
+    # constraint. store=False: single-shot call, and class data should not be
+    # retained server-side.
     payload = json.dumps({"draft_assignment": draft, "class_snapshot": snapshot})
-
-    # Interactions API (google-genai >= 2.3.0). store=False: single-shot
-    # call, and class data should not be retained server-side.
-    interaction = client.interactions.create(
-        model=GEMINI_MODEL,
-        input=payload,
-        system_instruction=SYSTEM_INSTRUCTION,
-        store=False,
-        response_format=[
+    body = {
+        "model": GEMINI_MODEL,
+        "input": payload,
+        "system_instruction": SYSTEM_INSTRUCTION,
+        "store": False,
+        "response_format": [
             {
                 "type": "text",
                 "mime_type": "application/json",
                 "schema": FitVerdict.model_json_schema(),
             }
         ],
+    }
+    response = httpx.post(
+        GEMINI_ENDPOINT,
+        headers={
+            "x-goog-api-key": os.environ["GEMINI_API_KEY"],
+            "Content-Type": "application/json",
+        },
+        json=body,
+        timeout=GEMINI_TIMEOUT_SECONDS,
     )
-    if not interaction.output_text:
-        raise RuntimeError("Gemini returned no parseable verdict.")
-    return FitVerdict.model_validate_json(interaction.output_text)
+    response.raise_for_status()
+    data = response.json()
+
+    for step in data.get("steps", []):
+        if step.get("type") != "model_output":
+            continue
+        for block in step.get("content", []):
+            if block.get("type") == "text" and block.get("text"):
+                return FitVerdict.model_validate_json(block["text"])
+    raise RuntimeError("Gemini returned no parseable verdict.")
 ```
 
 - [ ] **Step 5: Implement schemas and controller**
@@ -1441,7 +1473,7 @@ Expected: everything passes (same failures/count as before this feature, if any 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add backend/gemini_advisor.py backend/schemas/assignment_fit.py backend/controllers/assignment_fit_controller.py backend/main.py backend/requirements.txt backend/tests/test_assignment_fit.py
+git add backend/gemini_advisor.py backend/schemas/assignment_fit.py backend/controllers/assignment_fit_controller.py backend/main.py backend/tests/test_assignment_fit.py
 git commit -m "feat: Gemini-backed assignment-fit endpoint"
 ```
 
