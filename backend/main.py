@@ -35,6 +35,7 @@ from controllers.notifications_controller import (
     deliver_notifications,
 )
 from controllers.users_controller import router as users_router
+from controllers.resources_controller import router as resources_router
 
 scheduler = BackgroundScheduler()
 
@@ -187,3 +188,4 @@ app.include_router(help_requests_router, prefix="/api", tags=["help-requests"])
 app.include_router(rooms_router, prefix="/api", tags=["rooms"])
 app.include_router(notifications_router, prefix="/api", tags=["notifications"])
 app.include_router(users_router, prefix="/api", tags=["users"])
+app.include_router(resources_router, prefix="/api", tags=["resources"])
