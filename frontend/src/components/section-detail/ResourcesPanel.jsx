@@ -11,7 +11,7 @@ function domainOf(url) {
 }
 
 function ResourcesPanel({ sectionId }) {
-  const { confirm } = useDialog()
+  const { confirm, alert } = useDialog()
   const [resources, setResources] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -20,6 +20,7 @@ function ResourcesPanel({ sectionId }) {
   const [description, setDescription] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
 
   const load = useCallback(() => {
     let cancelled = false
@@ -52,6 +53,7 @@ function ResourcesPanel({ sectionId }) {
     setTitle(resource.title)
     setUrl(resource.url)
     setDescription(resource.description || '')
+    setError('')
     setShowForm(true)
   }
 
@@ -78,11 +80,14 @@ function ResourcesPanel({ sectionId }) {
   async function handleDelete(resource) {
     const ok = await confirm(`Delete "${resource.title}"?`)
     if (!ok) return
+    setDeletingId(resource.resource_id)
     try {
       await api.delete(`/resources/${resource.resource_id}`)
       load()
-    } catch {
-      setError('Could not delete resource.')
+    } catch (err) {
+      await alert(err.response?.data?.message || 'Could not delete resource.')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -153,8 +158,13 @@ function ResourcesPanel({ sectionId }) {
                 <button type="button" className="teacher-panel-button" onClick={() => startEdit(r)}>
                   Edit
                 </button>{' '}
-                <button type="button" className="teacher-panel-button" onClick={() => handleDelete(r)}>
-                  Delete
+                <button
+                  type="button"
+                  className="teacher-panel-button"
+                  disabled={deletingId === r.resource_id}
+                  onClick={() => handleDelete(r)}
+                >
+                  {deletingId === r.resource_id ? 'Deleting…' : 'Delete'}
                 </button>
               </span>
             </div>
