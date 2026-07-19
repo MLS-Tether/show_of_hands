@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import api from '../api'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { isTeacher } from '../utils/auth'
@@ -93,7 +93,7 @@ function StudentSectionDetail() {
             <p className="admin-empty-card">No assignments</p>
           ) : (
             <div className="section-detail-list">
-              {section.assignments.map((a) => (
+              {section.assignments.slice(0, 3).map((a) => (
                 <div className="section-detail-row" key={a.assignment_id}>
                   <span>{a.title}</span>
                   <span className="section-detail-row-sub">
@@ -101,6 +101,11 @@ function StudentSectionDetail() {
                   </span>
                 </div>
               ))}
+              {section.assignments.length > 3 && (
+                <Link to="/assignments" className="section-detail-load-more">
+                  Load more
+                </Link>
+              )}
             </div>
           )}
         </div>
@@ -111,12 +116,17 @@ function StudentSectionDetail() {
             <p className="admin-empty-card">No quests</p>
           ) : (
             <div className="section-detail-list">
-              {section.quests.map((q) => (
+              {section.quests.slice(0, 3).map((q) => (
                 <div className="section-detail-row" key={q.quest_id}>
                   <span>{q.title}</span>
                   <span className="section-detail-row-sub">{q.category}</span>
                 </div>
               ))}
+              {section.quests.length > 3 && (
+                <Link to="/quests" className="section-detail-load-more">
+                  Load more
+                </Link>
+              )}
             </div>
           )}
         </div>

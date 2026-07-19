@@ -11,10 +11,15 @@
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   text-align: left;
+  text-decoration: none;
 }
 
 .quest-row:last-child {
   border-bottom: none;
+}
+
+.quest-row:hover {
+  background: var(--surface-2);
 }
 
 .quest-title {

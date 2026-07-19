@@ -91,3 +91,8 @@
   font-size: 12px;
   margin-top: 10px;
 }
+
+.quest-card-highlight {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 2px var(--accent-bg);
+}

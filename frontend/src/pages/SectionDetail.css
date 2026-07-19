@@ -70,3 +70,16 @@
   font-size: 11px;
   color: var(--text-muted);
 }
+
+.section-detail-load-more {
+  display: block;
+  text-align: center;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.section-detail-load-more:hover {
+  color: var(--text-h);
+}
