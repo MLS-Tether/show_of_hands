@@ -70,3 +70,55 @@ def test_list_unknown_section_404(client, world):
         headers=auth_header(world.teacher_token),
     )
     assert resp.status_code == 404
+
+
+def test_teacher_updates_resource(client, world, cleanup):
+    created = _create_resource(client, world, cleanup)
+    rid = created.json()["resource_id"]
+    resp = client.patch(
+        f"/api/resources/{rid}",
+        json={"title": "Updated title", "description": None},
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["title"] == "Updated title"
+
+
+def test_update_rejects_bad_url(client, world, cleanup):
+    created = _create_resource(client, world, cleanup)
+    rid = created.json()["resource_id"]
+    resp = client.patch(
+        f"/api/resources/{rid}",
+        json={"url": "ftp://example.com"},
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 422
+
+
+def test_student_cannot_update_resource(client, world, cleanup):
+    created = _create_resource(client, world, cleanup)
+    rid = created.json()["resource_id"]
+    resp = client.patch(
+        f"/api/resources/{rid}",
+        json={"title": "Hacked"},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 403
+
+
+def test_teacher_deletes_resource(client, world, cleanup):
+    created = _create_resource(client, world, cleanup)
+    rid = created.json()["resource_id"]
+    resp = client.delete(f"/api/resources/{rid}", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 200
+    # soft-deleted: no longer listed
+    listing = client.get(
+        f"/api/sections/{world.section_id}/resources",
+        headers=auth_header(world.teacher_token),
+    )
+    assert rid not in [r["resource_id"] for r in listing.json()]
+
+
+def test_delete_unknown_resource_404(client, world):
+    resp = client.delete("/api/resources/999999", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 404

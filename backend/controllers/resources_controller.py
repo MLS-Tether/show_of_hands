@@ -86,3 +86,46 @@ def create_resource(
     db.commit()
     db.refresh(resource)
     return resource
+
+
+def _get_owned_resource(resource_id: int, current_user: User, db: Session) -> Resource:
+    resource = db.query(Resource).filter(
+        Resource.resource_id == resource_id,
+        Resource.is_archived == False,
+    ).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found.")
+    _get_owned_section(resource.section_id, current_user, db)
+    return resource
+
+
+@router.patch("/resources/{resource_id}", response_model=ResourceResponse)
+def update_resource(
+    resource_id: int,
+    body: ResourceUpdate,
+    current_user: User = Depends(require_role(["teacher"])),
+    db: Session = Depends(get_db),
+):
+    resource = _get_owned_resource(resource_id, current_user, db)
+    if body.title is not None:
+        resource.title = body.title
+    if body.url is not None:
+        resource.url = body.url
+    if "description" in body.model_fields_set:
+        resource.description = body.description
+    db.commit()
+    db.refresh(resource)
+    return resource
+
+
+@router.delete("/resources/{resource_id}")
+def delete_resource(
+    resource_id: int,
+    current_user: User = Depends(require_role(["teacher"])),
+    db: Session = Depends(get_db),
+):
+    resource = _get_owned_resource(resource_id, current_user, db)
+    resource.is_archived = True
+    resource.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": "Resource deleted successfully."}
