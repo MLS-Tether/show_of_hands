@@ -6,13 +6,13 @@
 
 **Architecture:** Two independent backend surfaces on the existing FastAPI app: (1) a `resources` table + section-scoped CRUD following the quests controller pattern, and (2) a stateless `POST /sections/{id}/assignment-fit` endpoint that computes class stats in Python and sends only that compact summary to Gemini for a structured verdict. Frontend adds a teacher ResourcesPanel + student resources card, and a "Check fit" flow inside the existing assignment-creation form.
 
-**Tech Stack:** FastAPI + SQLAlchemy + Alembic + Pydantic (backend), `google-genai` SDK (`gemini-2.5-flash`, free AI Studio tier), React 19 + Vite (frontend), pytest.
+**Tech Stack:** FastAPI + SQLAlchemy + Alembic + Pydantic (backend), `google-genai` SDK >= 2.3.0, Interactions API (`gemini-3.5-flash`, free AI Studio tier), React 19 + Vite (frontend), pytest.
 
 **Spec:** `docs/superpowers/specs/2026-07-18-ai-advisor-and-resources-design.md`
 
 ## Global Constraints
 
-- AI provider is **Google Gemini** via the official `google-genai` Python SDK, model string `gemini-2.5-flash`. API key read from env var `GEMINI_API_KEY`, backend-only — never sent to or read by the frontend.
+- AI provider is **Google Gemini** via the official `google-genai` Python SDK (**>= 2.3.0**), using the **Interactions API** (`client.interactions.create`) — NOT the legacy `generate_content`. Model string `gemini-3.5-flash` (the `gemini-2.5-*` family is legacy). API key read from env var `GEMINI_API_KEY`, backend-only — never sent to or read by the frontend. Set `store=False` on the interaction so class data is not retained by Google.
 - All AI claims must be grounded: the backend computes stats; the model only interprets them. The frontend always renders the computed stats regardless of AI availability.
 - Resource URLs must start with `http://` or `https://` (reject otherwise with 422).
 - Soft-delete convention: `is_archived` boolean + `deleted_at` timestamp, matching every other model in this codebase.
@@ -1136,10 +1136,10 @@ git commit -m "feat: deterministic class snapshot for assignment-fit advisor"
 
 - [ ] **Step 1: Install the SDK**
 
-Add `google-genai` on its own line at the end of `backend/requirements.txt`, then:
+Add `google-genai>=2.3.0` on its own line at the end of `backend/requirements.txt`, then:
 
-Run: `cd backend && pip install google-genai`
-Expected: successful install (package imports as `from google import genai`).
+Run: `cd backend && pip install "google-genai>=2.3.0"`
+Expected: successful install (imports as `from google import genai`; >= 2.3.0 is required for the Interactions API).
 
 - [ ] **Step 2: Write the failing endpoint tests**
 
@@ -1257,7 +1257,7 @@ from typing import List, Literal
 
 from pydantic import BaseModel
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.5-flash"
 
 SYSTEM_INSTRUCTION = """You are a teaching assistant for a middle/high school
 class management app. A teacher is drafting an assignment and wants to know
@@ -1299,23 +1299,28 @@ def generate_fit_verdict(draft: dict, snapshot: dict) -> FitVerdict:
     # Imported lazily so the backend still boots if the package is missing;
     # callers gate on is_configured() first.
     from google import genai
-    from google.genai import types
 
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     payload = json.dumps({"draft_assignment": draft, "class_snapshot": snapshot})
 
-    response = client.models.generate_content(
+    # Interactions API (google-genai >= 2.3.0). store=False: single-shot
+    # call, and class data should not be retained server-side.
+    interaction = client.interactions.create(
         model=GEMINI_MODEL,
-        contents=payload,
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_INSTRUCTION,
-            response_mime_type="application/json",
-            response_schema=FitVerdict,
-        ),
+        input=payload,
+        system_instruction=SYSTEM_INSTRUCTION,
+        store=False,
+        response_format=[
+            {
+                "type": "text",
+                "mime_type": "application/json",
+                "schema": FitVerdict.model_json_schema(),
+            }
+        ],
     )
-    if response.parsed is None:
+    if not interaction.output_text:
         raise RuntimeError("Gemini returned no parseable verdict.")
-    return response.parsed
+    return FitVerdict.model_validate_json(interaction.output_text)
 ```
 
 - [ ] **Step 5: Implement schemas and controller**

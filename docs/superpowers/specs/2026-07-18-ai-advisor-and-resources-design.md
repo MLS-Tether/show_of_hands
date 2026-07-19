@@ -16,7 +16,7 @@ Decisions already made with the user:
 
 - AI approach: **hybrid** — backend computes class stats deterministically,
   the model interprets them (no raw-data dumps, no hallucinated numbers).
-- AI provider: **Google Gemini** (`gemini-2.5-flash` via the free AI Studio
+- AI provider: **Google Gemini** (`gemini-3.5-flash` via the free AI Studio
   tier) — chosen for zero cost; the integration is provider-thin so it could
   be swapped later.
 - Resources scope: **per-section**, visible to enrolled students + the teacher.
@@ -54,13 +54,15 @@ Request body (the draft assignment, not yet saved):
 
 ### Gemini API call
 
-- Official `google-genai` Python SDK, model `gemini-2.5-flash` — chosen because
+- Official `google-genai` Python SDK (>= 2.3.0, Interactions API), model
+  `gemini-3.5-flash` — chosen because
   Google AI Studio provides a free-tier API key (daily request quotas, no cost),
   which fits this project's budget. The key is set as `GEMINI_API_KEY` in the
   backend environment and never reaches the browser.
-- Structured output: the request sets `response_mime_type="application/json"`
-  and a `response_schema` (Pydantic model), so the SDK returns validated JSON —
-  no manual parsing of prose.
+- Structured output: `client.interactions.create` with a top-level
+  `response_format` carrying the Pydantic JSON schema, validated back into the
+  Pydantic model — no manual parsing of prose. `store=False` so class data is
+  not retained by Google.
 - System instruction frames the role: teaching assistant analyzing readiness;
   must ground every claim in the provided stats; resource suggestions are ideas
   the teacher should vet, not guaranteed-valid URLs.
