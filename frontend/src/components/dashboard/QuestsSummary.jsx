@@ -38,10 +38,14 @@ function QuestsSummary({ sections }) {
         )}
         {!loading &&
           visible.map((q) => (
-            <div className="quest-row" key={q.quest_id}>
+            <Link
+              className="quest-row"
+              key={q.quest_id}
+              to={`/quests#quest-${q.quest_id}`}
+            >
               <span className="quest-title">{q.title}</span>
               <span className="quest-category">{q.category}</span>
-            </div>
+            </Link>
           ))}
         {hasMore && (
           <Link to="/quests" className="quest-show-more">
