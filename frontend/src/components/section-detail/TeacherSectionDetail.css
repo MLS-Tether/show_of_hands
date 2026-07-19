@@ -203,3 +203,80 @@ button.teacher-panel-row:hover {
   font-size: 11px;
   color: var(--accent);
 }
+
+.fit-result {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--surface-1);
+}
+
+.fit-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 3px 12px;
+  margin-bottom: 8px;
+}
+
+.fit-badge-ready {
+  color: var(--success);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+}
+
+.fit-badge-review_first {
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+}
+
+.fit-badge-mixed {
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+}
+
+.fit-rationale {
+  font-size: 13px;
+  color: var(--text-h);
+  margin: 0 0 8px;
+}
+
+.fit-topics {
+  font-size: 12.5px;
+  color: var(--text);
+  margin: 0 0 10px;
+}
+
+.fit-resources {
+  margin-top: 10px;
+}
+
+.fit-resource-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.fit-resource-row:last-child {
+  border-bottom: none;
+}
+
+.fit-unavailable {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+.fit-stats {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
