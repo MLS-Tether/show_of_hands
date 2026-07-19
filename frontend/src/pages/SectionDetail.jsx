@@ -19,11 +19,35 @@ function SectionDetail() {
   return <StudentSectionDetail />
 }
 
+function domainOf(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
 function StudentSectionDetail() {
   const { sectionId } = useParams()
   const [section, setSection] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [loadedSectionId, setLoadedSectionId] = useState(null)
+  const [resources, setResources] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .get(`/sections/${sectionId}/resources`)
+      .then(({ data }) => {
+        if (!cancelled) setResources(data)
+      })
+      .catch(() => {
+        if (!cancelled) setResources((prev) => prev ?? [])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [sectionId])
 
   const load = useCallback(() => {
     let cancelled = false
@@ -120,6 +144,34 @@ function StudentSectionDetail() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="section-detail-resources">
+        <div className="widget-label">resources</div>
+        {(!resources || resources.length === 0) && (
+          <p className="admin-empty-card">No resources posted yet.</p>
+        )}
+        {resources && resources.length > 0 && (
+          <div className="section-detail-list">
+            {resources.map((r) => (
+              <a
+                className="section-detail-row section-detail-resource-row"
+                key={r.resource_id}
+                href={r.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span>
+                  {r.title}
+                  {r.description && (
+                    <div className="section-detail-row-sub">{r.description}</div>
+                  )}
+                </span>
+                <span className="section-detail-resource-domain">{domainOf(r.url)}</span>
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )
