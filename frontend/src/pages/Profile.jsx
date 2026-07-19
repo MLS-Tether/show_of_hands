@@ -80,10 +80,12 @@ function Profile() {
           <span className="profile-row-label">School</span>
           <span>{school ? school.name : '—'}</span>
         </div>
-        <div className="profile-row">
-          <span className="profile-row-label">Total points</span>
-          <span>{user.total_points}</span>
-        </div>
+        {user.role !== 'teacher' && (
+          <div className="profile-row">
+            <span className="profile-row-label">Total points</span>
+            <span>{user.total_points}</span>
+          </div>
+        )}
         <div className="profile-row">
           <span className="profile-row-label">Member since</span>
           <span>{formatDate(user.created_at)}</span>

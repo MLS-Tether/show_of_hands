@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import api from '../api'
 import { useDialog } from '../components/DialogContext'
 import '../styles/shared-ui.css'
@@ -17,10 +18,21 @@ const QUEST_TYPE_LABELS = {
 
 function Quests() {
   const { alert } = useDialog()
+  const location = useLocation()
   const [sections, setSections] = useState(null)
   const [quests, setQuests] = useState(null)
   const [category, setCategory] = useState('all')
   const [completingId, setCompletingId] = useState(null)
+
+  const highlightId = location.hash.startsWith('#quest-')
+    ? location.hash.slice('#quest-'.length)
+    : null
+
+  useEffect(() => {
+    if (!quests || !highlightId) return
+    const el = document.getElementById(`quest-${highlightId}`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [quests, highlightId])
 
   useEffect(() => {
     let cancelled = false
@@ -112,7 +124,11 @@ function Quests() {
       {!loading && rows.length > 0 && (
         <div className="quests-grid">
           {rows.map((q) => (
-            <div className="quest-card" key={q.quest_id}>
+            <div
+              className={`quest-card${String(q.quest_id) === highlightId ? ' quest-card-highlight' : ''}`}
+              id={`quest-${q.quest_id}`}
+              key={q.quest_id}
+            >
               <div className="quest-card-header">
                 <span className="quest-card-title">{q.title}</span>
                 <span className={`quest-card-category quest-card-category-${q.category}`}>

@@ -34,9 +34,12 @@ function getBreadcrumb(pathname) {
   return match ? match.label : 'Show of Hands'
 }
 
-function TopBar() {
+function noopLoad() {}
+
+function TopBar({ sidebarHidden, onToggleSidebar }) {
   const location = useLocation()
   const admin = isAdmin()
+  const teacher = isTeacher()
   const [points, setPoints] = useState(null)
   const [theme, setThemeState] = useState(getTheme())
   const breadcrumb = getBreadcrumb(location.pathname)
@@ -61,8 +64,10 @@ function TopBar() {
     }
   }, [admin])
 
-  useEffect(() => loadPoints(), [loadPoints])
-  useAutoRefresh(loadPoints)
+  // Teachers don't earn points, so they get no counter and no fetches
+  const load = teacher ? noopLoad : loadPoints
+  useEffect(() => load(), [load])
+  useAutoRefresh(load)
 
   function toggleTheme() {
     const next = theme === 'dark' ? 'light' : 'dark'
@@ -72,12 +77,36 @@ function TopBar() {
 
   return (
     <header className="admin-topbar">
-      <div className="admin-topbar-breadcrumb">
-        {breadcrumb}
-        {parentPath && <span className="admin-topbar-esc-hint">Press ESC to go back</span>}
+      <div className="admin-topbar-left">
+        <button
+          type="button"
+          className="admin-topbar-sidebar-toggle"
+          onClick={onToggleSidebar}
+          aria-pressed={!sidebarHidden}
+          aria-label={sidebarHidden ? 'Show sidebar' : 'Hide sidebar'}
+          title={sidebarHidden ? 'Show sidebar' : 'Hide sidebar'}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect
+              x="1.5"
+              y="2.5"
+              width="13"
+              height="11"
+              rx="1.5"
+              stroke="currentColor"
+              strokeWidth="1.2"
+            />
+            <path d="M6 2.5v11" stroke="currentColor" strokeWidth="1.2" />
+            {!sidebarHidden && <rect x="2.6" y="3.6" width="2.5" height="8.8" fill="currentColor" />}
+          </svg>
+        </button>
+        <div className="admin-topbar-breadcrumb">
+          {breadcrumb}
+          {parentPath && <span className="admin-topbar-esc-hint">Press ESC to go back</span>}
+        </div>
       </div>
       <div className="admin-topbar-actions">
-        {points !== null && (
+        {!teacher && points !== null && (
           <span className="admin-topbar-points">
             {points.toLocaleString()} {admin ? 'school pts' : 'pts'}
           </span>

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import api from '../api'
+import { isTeacher } from '../utils/auth'
 import '../styles/shared-ui.css'
 import './Points.css'
 
@@ -45,6 +47,11 @@ function Points() {
       cancelled = true
     }
   }, [page])
+
+  // Teachers don't earn points; keep them off this student-only page
+  if (isTeacher()) {
+    return <Navigate to="/dashboard" replace />
+  }
 
   const loading = data === null && !error
   const totalPages = data ? Math.max(1, Math.ceil(data.total_count / data.page_size)) : 1

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import TopBar from './TopBar'
 import Sidebar from './Sidebar'
@@ -10,6 +10,16 @@ import './Layout.css'
 function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [sidebarHidden, setSidebarHidden] = useState(
+    () => localStorage.getItem('sidebar_hidden') === '1'
+  )
+
+  function toggleSidebar() {
+    setSidebarHidden((hidden) => {
+      localStorage.setItem('sidebar_hidden', hidden ? '0' : '1')
+      return !hidden
+    })
+  }
 
   useEffect(() => {
     function handleKeyDown(e) {
@@ -31,9 +41,9 @@ function Layout() {
 
   return (
     <div className="admin-shell">
-      <Sidebar />
+      {!sidebarHidden && <Sidebar />}
       <div className="admin-main">
-        <TopBar />
+        <TopBar sidebarHidden={sidebarHidden} onToggleSidebar={toggleSidebar} />
         <main className="admin-content">
           <div className="admin-content-inner">
             <Outlet />

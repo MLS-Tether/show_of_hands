@@ -12,6 +12,31 @@
   padding: 0 24px;
 }
 
+.admin-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-topbar-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.admin-topbar-sidebar-toggle:hover {
+  color: var(--text-h);
+  background: var(--surface-2);
+}
+
 .admin-topbar-breadcrumb {
   display: flex;
   align-items: center;
