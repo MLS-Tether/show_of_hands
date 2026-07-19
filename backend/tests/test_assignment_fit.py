@@ -79,3 +79,89 @@ def test_snapshot_empty_section_reports_zero(db, world):
         "recent_assignments",
         "help_request_topics",
     }
+
+
+from unittest.mock import patch
+
+from gemini_advisor import FitVerdict, SuggestedResource
+
+DRAFT = {
+    "title": "Chapter 8 Test: Polynomials",
+    "description": "Covers factoring and long division.",
+    "category": "tests",
+    "point_value": 100,
+    "due_date": "2026-08-01T23:59:00Z",
+}
+
+FAKE_VERDICT = FitVerdict(
+    readiness="review_first",
+    rationale="The class quiz average is 72 and factoring is a repeated help topic.",
+    topics_to_review=["factoring"],
+    suggested_resources=[
+        SuggestedResource(
+            title="Khan Academy: Factoring",
+            url="https://www.khanacademy.org/math/algebra/factoring",
+            why="Free practice on the weakest topic.",
+        )
+    ],
+)
+
+
+def test_fit_requires_teacher(client, world):
+    resp = client.post(
+        f"/api/sections/{world.section_id}/assignment-fit",
+        json=DRAFT,
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 403
+
+
+def test_fit_returns_verdict_with_mocked_gemini(client, db, world, cleanup, monkeypatch):
+    _seed_graded_data(db, world, cleanup)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    with patch(
+        "controllers.assignment_fit_controller.generate_fit_verdict",
+        return_value=FAKE_VERDICT,
+    ) as mock_generate:
+        resp = client.post(
+            f"/api/sections/{world.section_id}/assignment-fit",
+            json=DRAFT,
+            headers=auth_header(world.teacher_token),
+        )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["ai_available"] is True
+    assert data["verdict"]["readiness"] == "review_first"
+    assert data["stats"]["graded_submission_count"] >= 1
+    mock_generate.assert_called_once()
+
+
+def test_fit_not_configured_returns_503(client, db, world, cleanup, monkeypatch):
+    _seed_graded_data(db, world, cleanup)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    resp = client.post(
+        f"/api/sections/{world.section_id}/assignment-fit",
+        json=DRAFT,
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 503
+
+
+def test_fit_gemini_error_degrades_to_stats(client, db, world, cleanup, monkeypatch):
+    _seed_graded_data(db, world, cleanup)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    with patch(
+        "controllers.assignment_fit_controller.generate_fit_verdict",
+        side_effect=RuntimeError("quota exceeded"),
+    ):
+        resp = client.post(
+            f"/api/sections/{world.section_id}/assignment-fit",
+            json=DRAFT,
+            headers=auth_header(world.teacher_token),
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ai_available"] is False
+    assert data["unavailable_reason"] == "error"
+    assert data["verdict"] is None
+    assert data["stats"]["graded_submission_count"] >= 1
