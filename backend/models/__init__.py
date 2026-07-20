@@ -12,3 +12,4 @@ from models.point_transaction_model import PointTransaction
 from models.help_request_model import HelpRequest, HelpRequestAcceptance
 from models.study_room_model import StudyRoom, RoomMember
 from models.notification_model import Notification
+from models.resource_model import Resource

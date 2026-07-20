@@ -83,3 +83,25 @@
 .section-detail-load-more:hover {
   color: var(--text-h);
 }
+
+.section-detail-resources {
+  margin-top: 22px;
+}
+
+.section-detail-resource-row {
+  text-decoration: none;
+  align-items: center;
+}
+
+.section-detail-resource-row:hover {
+  background: var(--surface-2);
+}
+
+.section-detail-resource-domain {
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}

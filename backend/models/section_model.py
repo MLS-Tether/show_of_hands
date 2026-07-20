@@ -33,3 +33,4 @@ class Section(Base):
     assignments = relationship("Assignment", back_populates="section")
     quests = relationship("Quest", back_populates="section")
     help_requests = relationship("HelpRequest", back_populates="section")
+    resources = relationship("Resource", back_populates="section")

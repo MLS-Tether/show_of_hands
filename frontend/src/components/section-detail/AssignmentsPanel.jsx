@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../api'
+import AssignmentFitResult from './AssignmentFitResult'
 
 function AssignmentsPanel({ sectionId, assignments, onChange }) {
   const navigate = useNavigate()
@@ -13,6 +14,9 @@ function AssignmentsPanel({ sectionId, assignments, onChange }) {
   const [category, setCategory] = useState('homework')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [fitResult, setFitResult] = useState(null)
+  const [fitLoading, setFitLoading] = useState(false)
+  const [fitHidden, setFitHidden] = useState(false)
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -34,11 +38,36 @@ function AssignmentsPanel({ sectionId, assignments, onChange }) {
       setPointValue(100)
       setCategory('homework')
       setShowForm(false)
+      setFitResult(null)
       onChange?.()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not create assignment.')
+      setError(err.response?.data?.message || 'Could not create assignment.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleCheckFit() {
+    setError('')
+    setFitLoading(true)
+    setFitResult(null)
+    try {
+      const { data } = await api.post(`/sections/${sectionId}/assignment-fit`, {
+        title,
+        description: description || null,
+        category,
+        point_value: Number(pointValue),
+        due_date: dueDate ? new Date(dueDate).toISOString() : new Date().toISOString(),
+      })
+      setFitResult(data)
+    } catch (err) {
+      if (err.response?.status === 503) {
+        setFitHidden(true)
+      } else {
+        setError(err.response?.data?.message || 'Could not check fit.')
+      }
+    } finally {
+      setFitLoading(false)
     }
   }
 
@@ -106,6 +135,16 @@ function AssignmentsPanel({ sectionId, assignments, onChange }) {
           </div>
           {error && <p className="teacher-panel-error">{error}</p>}
           <div className="teacher-panel-form-actions">
+            {!fitHidden && (
+              <button
+                type="button"
+                className="teacher-panel-button"
+                disabled={fitLoading || !title}
+                onClick={handleCheckFit}
+              >
+                {fitLoading ? 'Checking…' : 'Check fit'}
+              </button>
+            )}
             <button type="button" className="teacher-panel-button" onClick={() => setShowForm(false)}>
               Cancel
             </button>
@@ -114,6 +153,10 @@ function AssignmentsPanel({ sectionId, assignments, onChange }) {
             </button>
           </div>
         </form>
+      )}
+
+      {showForm && fitResult && (
+        <AssignmentFitResult sectionId={sectionId} result={fitResult} />
       )}
 
       {assignments.length === 0 ? (
