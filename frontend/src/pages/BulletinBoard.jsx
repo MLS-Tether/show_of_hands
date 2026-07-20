@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
 import Modal from '../components/Modal'
 import { useDialog } from '../components/DialogContext'
-import { useAutoRefresh } from '../utils/autoRefresh'
+import { keys, useHelpRequestsBoard, useSections } from '../queries'
 import { forgetRoom, getMyHelpRequestIds, getMyRooms, rememberHelpRequestId, rememberRoom } from '../utils/roomTracking'
 import '../styles/shared-ui.css'
 import './BulletinBoard.css'
@@ -173,60 +174,30 @@ function EditRequestForm({ hr, onSaved, onCancel }) {
 
 function BulletinBoard() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { confirm, alert } = useDialog()
-  const [sections, setSections] = useState(null)
-  const [requests, setRequests] = useState(null)
   const [joiningId, setJoiningId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
   const [droppingId, setDroppingId] = useState(null)
   const [editingRequest, setEditingRequest] = useState(null)
 
-  const loadSections = useCallback(() => {
-    let cancelled = false
-    api
-      .get('/sections')
-      .then(({ data }) => {
-        if (!cancelled) setSections(data)
-      })
-      .catch(() => {
-        if (!cancelled) setSections((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const { data: sections = null } = useSections()
+  const { data: requests = null } = useHelpRequestsBoard()
 
-  useEffect(() => loadSections(), [loadSections])
-  useAutoRefresh(loadSections)
-
-  const loadRequests = useCallback(() => {
-    let cancelled = false
-    api
-      .get('/help-requests')
-      .then(({ data }) => {
-        if (cancelled) return
-        const myHelpRequestIds = getMyHelpRequestIds()
-        data
-          .filter((hr) => myHelpRequestIds.includes(hr.help_request_id) && hr.room_id)
-          .forEach((hr) => rememberRoom({ room_id: hr.room_id, topic: hr.topic }))
-        setRequests(data)
-      })
-      .catch(() => {
-        if (!cancelled) setRequests((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => loadRequests(), [loadRequests])
-  useAutoRefresh(loadRequests)
+  useEffect(() => {
+    if (!requests) return
+    const myHelpRequestIds = getMyHelpRequestIds()
+    requests
+      .filter((hr) => myHelpRequestIds.includes(hr.help_request_id) && hr.room_id)
+      .forEach((hr) => rememberRoom({ room_id: hr.room_id, topic: hr.topic }))
+  }, [requests])
 
   async function handleJoin(hr) {
     setJoiningId(hr.help_request_id)
     try {
       const { data } = await api.post(`/help-requests/${hr.help_request_id}/accept`)
       rememberRoom({ room_id: data.room_id, topic: hr.topic })
+      queryClient.invalidateQueries({ queryKey: keys.helpRequests() })
       navigate(`/rooms/${data.room_id}`)
     } catch (err) {
       await alert(err.response?.data?.message || 'Could not join this request.')
@@ -246,8 +217,10 @@ function BulletinBoard() {
     try {
       await api.delete(`/rooms/${hr.room_id}`)
       forgetRoom(hr.room_id)
-      setRequests((prev) =>
-        prev.map((r) => (r.help_request_id === hr.help_request_id ? { ...r, room_id: null, status: 'closed' } : r))
+      queryClient.setQueryData(keys.helpRequests(), (prev) =>
+        (prev || []).map((r) =>
+          r.help_request_id === hr.help_request_id ? { ...r, room_id: null, status: 'closed' } : r
+        )
       )
     } catch (err) {
       await alert(err.response?.data?.message || 'Could not delete the room.')
@@ -262,7 +235,9 @@ function BulletinBoard() {
     setDroppingId(hr.help_request_id)
     try {
       await api.post(`/help-requests/${hr.help_request_id}/drop`)
-      setRequests((prev) => prev.filter((r) => r.help_request_id !== hr.help_request_id))
+      queryClient.setQueryData(keys.helpRequests(), (prev) =>
+        (prev || []).filter((r) => r.help_request_id !== hr.help_request_id)
+      )
     } catch (err) {
       await alert(err.response?.data?.message || 'Could not delete this help request.')
     } finally {
@@ -289,7 +264,9 @@ function BulletinBoard() {
           <div className="widget-label">post a help request</div>
           <NewRequestForm
             sections={sections}
-            onCreated={(hr) => setRequests((prev) => [hr, ...(prev || [])])}
+            onCreated={(hr) =>
+              queryClient.setQueryData(keys.helpRequests(), (prev) => [hr, ...(prev || [])])
+            }
           />
 
           <h2 className="bulletin-board-subheading">Help requests</h2>
@@ -386,8 +363,8 @@ function BulletinBoard() {
             hr={editingRequest}
             onCancel={() => setEditingRequest(null)}
             onSaved={(updated) => {
-              setRequests((prev) =>
-                prev.map((r) =>
+              queryClient.setQueryData(keys.helpRequests(), (prev) =>
+                (prev || []).map((r) =>
                   r.help_request_id === updated.help_request_id ? { ...r, ...updated } : r
                 )
               )
