@@ -30,7 +30,7 @@ class UserResponse(BaseModel):
 
     user_id: int
     username: str
-    full_name: Optional[str] = None
+    full_name: str
     profile_picture_url: Optional[str] = None
     role: RoleEnum
     school_id: int
@@ -43,7 +43,7 @@ class UserListResponse(BaseModel):
 
     user_id: int
     username: str
-    full_name: Optional[str] = None
+    full_name: str
     profile_picture_url: Optional[str] = None
     email: Optional[str] = None
     role: RoleEnum
@@ -58,7 +58,7 @@ class UserListResponse(BaseModel):
 
 class ProfileUpdateRequest(BaseModel):
     username: Optional[str] = None
-    full_name: Optional[str] = None
+    full_name: str
 
 
 class ProfilePictureResponse(BaseModel):

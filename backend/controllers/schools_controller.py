@@ -51,6 +51,7 @@ def create_school(body: SchoolCreate, db: Session = Depends(get_db)):
     admin = User(
         school_id=school.school_id,
         username=body.admin_username,
+        full_name=body.admin_username,
         password_hash=hash_password(body.admin_password),
         email=body.admin_email,
         role=RoleEnum.admin,

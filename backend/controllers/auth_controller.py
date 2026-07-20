@@ -17,6 +17,7 @@ from dependencies import get_current_user, require_role
 from models.user_model import User, RoleEnum
 from models.school_model import School
 from schemas.user import UserResponse
+from validators import validate_full_name
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -49,6 +50,7 @@ class ResetPasswordRequest(BaseModel):
 
 class RegisterRequest(BaseModel):
     username: str
+    full_name: str
     password: str
     school_code: str
     role: RoleEnum
@@ -58,6 +60,8 @@ class RegisterRequest(BaseModel):
 
 @router.post("/register", response_model=UserResponse, status_code=201)
 def register(body: RegisterRequest, db: Session = Depends(get_db)):
+    full_name = validate_full_name(body.full_name)
+
     school = db.query(School).filter(School.school_code == body.school_code).first()
     if not school:
         raise HTTPException(status_code=404, detail="School not found.")
@@ -77,6 +81,7 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
     user = User(
         school_id=school.school_id,
         username=body.username,
+        full_name=full_name,
         password_hash=hash_password(body.password),
         email=body.email,
         role=body.role,

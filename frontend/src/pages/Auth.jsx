@@ -66,6 +66,7 @@ function RegisterForm({ onPendingVerification }) {
   const navigate = useNavigate()
   const [role, setRole] = useState('student')
   const [username, setUsername] = useState('')
+  const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
   const [email, setEmail] = useState('')
   const [note, setNote] = useState('')
@@ -78,6 +79,7 @@ function RegisterForm({ onPendingVerification }) {
     try {
       await api.post('/auth/register', {
         username,
+        full_name: fullName,
         password,
         email: email || undefined,
         note: note || undefined,
@@ -119,6 +121,16 @@ function RegisterForm({ onPendingVerification }) {
         <label className="auth-field">
           Username
           <input value={username} onChange={(e) => setUsername(e.target.value)} required />
+        </label>
+        <label className="auth-field">
+          Full name
+          <input
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            pattern=".*\S\s+\S.*"
+            title="Enter your first and last name."
+            required
+          />
         </label>
         <label className="auth-field">
           Password
