@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
 import { useDialog } from '../../components/DialogContext'
 import { useToast } from '../../components/ToastContext'
-import { useAutoRefresh } from '../../utils/autoRefresh'
+import { keys, useUsers } from '../../queries'
 import { initials } from '../../utils/format'
 import '../../styles/shared-ui.css'
 import './AdminUsers.css'
@@ -35,27 +36,11 @@ function AdminUsers() {
   const navigate = useNavigate()
   const { confirm } = useDialog()
   const { showToast } = useToast()
-  const [users, setUsers] = useState(null)
+  const queryClient = useQueryClient()
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
 
-  const load = useCallback(() => {
-    let cancelled = false
-    api
-      .get('/users')
-      .then(({ data }) => {
-        if (!cancelled) setUsers(data)
-      })
-      .catch(() => {
-        if (!cancelled) setUsers((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
+  const { data: users = null } = useUsers()
 
   const counts = useMemo(() => {
     const list = users || []
@@ -78,7 +63,9 @@ function AdminUsers() {
   }, [users, filter, search])
 
   function patchLocal(userId, patch) {
-    setUsers((prev) => (prev || []).map((u) => (u.user_id === userId ? { ...u, ...patch } : u)))
+    queryClient.setQueryData(keys.users({}), (prev) =>
+      (prev || []).map((u) => (u.user_id === userId ? { ...u, ...patch } : u))
+    )
   }
 
   async function deactivate(user) {

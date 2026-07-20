@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
 import { useDialog } from '../../components/DialogContext'
 import { useToast } from '../../components/ToastContext'
-import { useAutoRefresh } from '../../utils/autoRefresh'
+import { keys, useClassRequests, useUsers } from '../../queries'
 import '../../styles/shared-ui.css'
 import './AdminInbox.css'
 
@@ -34,58 +35,48 @@ function AdminInbox() {
   const filter = searchParams.get('filter') || 'all'
   const { confirm } = useDialog()
   const { showToast } = useToast()
+  const queryClient = useQueryClient()
 
-  const [items, setItems] = useState(null)
   const [selected, setSelected] = useState([])
   const [expanded, setExpanded] = useState(null)
   const [busy, setBusy] = useState(false)
 
-  const load = useCallback(() => {
-    let cancelled = false
-    Promise.all([api.get('/users'), api.get('/class-requests')])
-      .then(([usersRes, classRequestsRes]) => {
-        if (cancelled) return
-        const usersById = new Map(usersRes.data.map((u) => [u.user_id, u.username]))
+  const { data: rawUsers = null } = useUsers()
+  const { data: rawClassRequests = null } = useClassRequests()
 
-        const signupItems = usersRes.data
-          .filter((u) => u.role !== 'student' && !u.is_verified && !u.rejection_reason)
-          .map((u) => ({
-            id: `signup-${u.user_id}`,
-            entityId: u.user_id,
-            kind: u.role,
-            title: u.username,
-            createdAt: u.created_at,
-            role: u.role,
-            email: u.email,
-            note: u.signup_note,
-          }))
+  const items = useMemo(() => {
+    if (rawUsers === null || rawClassRequests === null) return null
+    const usersById = new Map(rawUsers.map((u) => [u.user_id, u.username]))
 
-        const classItems = classRequestsRes.data
-          .filter((r) => r.status === 'pending')
-          .map((r) => ({
-            id: `class-${r.class_request_id}`,
-            entityId: r.class_request_id,
-            kind: 'class',
-            title: r.class_name,
-            createdAt: r.created_at,
-            requestedBy: usersById.get(r.requested_by) || `User #${r.requested_by}`,
-            subject: r.subject,
-            description: r.description,
-            similarClasses: r.similar_classes || [],
-          }))
+    const signupItems = rawUsers
+      .filter((u) => u.role !== 'student' && !u.is_verified && !u.rejection_reason)
+      .map((u) => ({
+        id: `signup-${u.user_id}`,
+        entityId: u.user_id,
+        kind: u.role,
+        title: u.username,
+        createdAt: u.created_at,
+        role: u.role,
+        email: u.email,
+        note: u.signup_note,
+      }))
 
-        setItems([...signupItems, ...classItems])
-      })
-      .catch(() => {
-        if (!cancelled) setItems((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    const classItems = rawClassRequests
+      .filter((r) => r.status === 'pending')
+      .map((r) => ({
+        id: `class-${r.class_request_id}`,
+        entityId: r.class_request_id,
+        kind: 'class',
+        title: r.class_name,
+        createdAt: r.created_at,
+        requestedBy: usersById.get(r.requested_by) || `User #${r.requested_by}`,
+        subject: r.subject,
+        description: r.description,
+        similarClasses: r.similar_classes || [],
+      }))
 
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
+    return [...signupItems, ...classItems]
+  }, [rawUsers, rawClassRequests])
 
   const counts = useMemo(() => {
     const list = items || []
@@ -103,8 +94,19 @@ function AdminInbox() {
     return list.filter((i) => i.kind === filter)
   }, [items, filter])
 
-  function removeItems(ids) {
-    setItems((prev) => (prev || []).filter((i) => !ids.includes(i.id)))
+  function patchUser(userId, patch) {
+    queryClient.setQueryData(keys.users({}), (prev) =>
+      (prev || []).map((u) => (u.user_id === userId ? { ...u, ...patch } : u))
+    )
+  }
+
+  function patchClassRequest(classRequestId, patch) {
+    queryClient.setQueryData(keys.classRequests(), (prev) =>
+      (prev || []).map((r) => (r.class_request_id === classRequestId ? { ...r, ...patch } : r))
+    )
+  }
+
+  function dismissItems(ids) {
     setSelected((prev) => prev.filter((id) => !ids.includes(id)))
     if (expanded && ids.includes(expanded)) setExpanded(null)
   }
@@ -113,7 +115,8 @@ function AdminInbox() {
     setBusy(true)
     try {
       await api.patch(`/users/${item.entityId}/verify`)
-      removeItems([item.id])
+      patchUser(item.entityId, { is_verified: true })
+      dismissItems([item.id])
       showToast(`Approved ${item.title}`)
     } catch {
       showToast(`Couldn't approve ${item.title}`)
@@ -128,7 +131,8 @@ function AdminInbox() {
     setBusy(true)
     try {
       await api.patch(`/users/${item.entityId}/reject`, {})
-      removeItems([item.id])
+      patchUser(item.entityId, { rejection_reason: 'Rejected by admin' })
+      dismissItems([item.id])
       showToast(`Rejected ${item.title}`)
     } catch {
       showToast(`Couldn't reject ${item.title}`)
@@ -141,7 +145,8 @@ function AdminInbox() {
     setBusy(true)
     try {
       await api.patch(`/class-requests/${item.entityId}`, { status: 'approved' })
-      removeItems([item.id])
+      patchClassRequest(item.entityId, { status: 'approved' })
+      dismissItems([item.id])
       showToast(`Added to catalog: ${item.title}`)
     } catch {
       showToast(`Couldn't approve ${item.title}`)
@@ -156,7 +161,8 @@ function AdminInbox() {
     setBusy(true)
     try {
       await api.patch(`/class-requests/${item.entityId}`, { status: 'rejected' })
-      removeItems([item.id])
+      patchClassRequest(item.entityId, { status: 'rejected' })
+      dismissItems([item.id])
       showToast(`Declined ${item.title}`)
     } catch {
       showToast(`Couldn't decline ${item.title}`)
@@ -177,11 +183,17 @@ function AdminInbox() {
             : api.patch(`/users/${item.entityId}/verify`)
         )
       )
-      removeItems(targets.map((i) => i.id))
+      targets.forEach((item) =>
+        item.kind === 'class'
+          ? patchClassRequest(item.entityId, { status: 'approved' })
+          : patchUser(item.entityId, { is_verified: true })
+      )
+      dismissItems(targets.map((i) => i.id))
       showToast(`${targets.length} item${targets.length === 1 ? '' : 's'} approved`)
     } catch {
       showToast('Some items could not be approved')
-      load()
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      queryClient.invalidateQueries({ queryKey: keys.classRequests() })
     } finally {
       setBusy(false)
     }
@@ -201,11 +213,17 @@ function AdminInbox() {
             : api.patch(`/users/${item.entityId}/reject`, {})
         )
       )
-      removeItems(targets.map((i) => i.id))
+      targets.forEach((item) =>
+        item.kind === 'class'
+          ? patchClassRequest(item.entityId, { status: 'rejected' })
+          : patchUser(item.entityId, { rejection_reason: 'Rejected by admin' })
+      )
+      dismissItems(targets.map((i) => i.id))
       showToast(`${targets.length} item${targets.length === 1 ? '' : 's'} rejected`)
     } catch {
       showToast('Some items could not be rejected')
-      load()
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      queryClient.invalidateQueries({ queryKey: keys.classRequests() })
     } finally {
       setBusy(false)
     }
