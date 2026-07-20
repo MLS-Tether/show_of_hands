@@ -1,15 +1,10 @@
 import { keys } from '../queries'
-import { broadcastRefresh } from '../utils/autoRefresh'
 
 // Maps a backend data_event ({entity, action, school_id, section_id, ids,
 // user_ids}) to the query keys it can affect. Deliberately invalidates
 // (refetch-on-next-use) rather than writing cache directly — the payload
 // doesn't carry the full row, and invalidation is enough to kill staleness
 // within a render.
-//
-// Also calls the legacy broadcastRefresh() bridge so pages not yet migrated
-// to react-query (see migration commits 3-9) still refresh instantly. Once
-// every page is converted, this bridge call and autoRefresh.js are deleted.
 export function invalidateForEvent(queryClient, event) {
   const { entity, section_id: sectionId, ids = {} } = event
 
@@ -77,6 +72,4 @@ export function invalidateForEvent(queryClient, event) {
     default:
       break
   }
-
-  broadcastRefresh()
 }
