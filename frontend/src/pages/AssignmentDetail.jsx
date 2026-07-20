@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
-import { useAutoRefresh } from '../utils/autoRefresh'
+import { keys, useAssignment, useAssignmentMySubmission, useAssignmentSubmissions } from '../queries'
 import { isTeacher } from '../utils/auth'
 import { formatPercent } from '../utils/format'
 import { useDialog } from '../components/DialogContext'
@@ -104,7 +105,8 @@ function EditAssignmentForm({ assignment, onSaved, onCancel }) {
   )
 }
 
-function SubmissionForm({ assignmentId, onSubmitted }) {
+function SubmissionForm({ assignmentId }) {
+  const queryClient = useQueryClient()
   const [content, setContent] = useState('')
   const [fileUrl, setFileUrl] = useState('')
   const [error, setError] = useState('')
@@ -119,18 +121,19 @@ function SubmissionForm({ assignmentId, onSubmitted }) {
         content: content || null,
         file_url: fileUrl || null,
       })
-      onSubmitted({
+      const submission = {
         ...data,
         content: content || null,
         file_url: fileUrl || null,
         grade: null,
         finalized_at: null,
-      })
+      }
+      queryClient.setQueryData(keys.assignmentMySubmission(assignmentId), submission)
     } catch (err) {
       if (err.response?.status === 409) {
         try {
           const { data } = await api.get(`/assignments/${assignmentId}/my-submission`)
-          onSubmitted(data)
+          queryClient.setQueryData(keys.assignmentMySubmission(assignmentId), data)
           return
         } catch {
           // fall through to showing the original error
@@ -338,36 +341,22 @@ function GradingRow({ submission, onGraded }) {
   )
 }
 
-function TeacherAssignmentView({ assignmentId, assignment, onAssignmentChanged }) {
+function TeacherAssignmentView({ assignmentId, assignment }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { confirm } = useDialog()
-  const [submissions, setSubmissions] = useState(null)
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const load = useCallback(() => {
-    let cancelled = false
-    api
-      .get(`/assignments/${assignmentId}/submissions`)
-      .then(({ data }) => {
-        if (!cancelled) setSubmissions(data)
-      })
-      .catch(() => {
-        if (!cancelled) setSubmissions((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [assignmentId])
-
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
+  const { data: submissions = null } = useAssignmentSubmissions(assignmentId)
 
   function handleGraded(updated) {
-    setSubmissions((prev) =>
-      prev.map((s) => (s.submission_id === updated.submission_id ? updated : s))
+    queryClient.setQueryData(keys.assignmentSubmissions(assignmentId), (prev) =>
+      (prev || []).map((s) => (s.submission_id === updated.submission_id ? updated : s))
     )
+    queryClient.invalidateQueries({ queryKey: keys.sectionAnalytics(assignment.section_id) })
+    queryClient.invalidateQueries({ queryKey: ['section', assignment.section_id, 'grades'] })
   }
 
   async function handleDelete() {
@@ -377,6 +366,8 @@ function TeacherAssignmentView({ assignmentId, assignment, onAssignmentChanged }
     setDeleting(true)
     try {
       await api.delete(`/assignments/${assignmentId}`)
+      queryClient.invalidateQueries({ queryKey: ['assignments'] })
+      queryClient.invalidateQueries({ queryKey: keys.section(assignment.section_id) })
       navigate(`/sections/${assignment.section_id}`)
     } catch (err) {
       setDeleteError(err.response?.data?.detail || 'Could not delete this assignment.')
@@ -394,7 +385,9 @@ function TeacherAssignmentView({ assignmentId, assignment, onAssignmentChanged }
           onCancel={() => setEditing(false)}
           onSaved={() => {
             setEditing(false)
-            onAssignmentChanged()
+            queryClient.invalidateQueries({ queryKey: keys.assignment(assignmentId) })
+            queryClient.invalidateQueries({ queryKey: ['assignments'] })
+            queryClient.invalidateQueries({ queryKey: keys.section(assignment.section_id) })
           }}
         />
       ) : (
@@ -440,41 +433,14 @@ function TeacherAssignmentView({ assignmentId, assignment, onAssignmentChanged }
 
 function AssignmentDetail() {
   const { assignmentId } = useParams()
-  const [assignment, setAssignment] = useState(null)
-  const [assignmentFailed, setAssignmentFailed] = useState(false)
-  const [submission, setSubmission] = useState(undefined)
   const teacher = isTeacher()
 
-  const load = useCallback(() => {
-    let cancelled = false
-
-    api
-      .get(`/assignments/${assignmentId}`)
-      .then(({ data }) => {
-        if (!cancelled) setAssignment(data)
-      })
-      .catch(() => {
-        if (!cancelled) setAssignmentFailed(true)
-      })
-
-    if (!teacher) {
-      api
-        .get(`/assignments/${assignmentId}/my-submission`)
-        .then(({ data }) => {
-          if (!cancelled) setSubmission(data)
-        })
-        .catch(() => {
-          if (!cancelled) setSubmission((prev) => (prev === undefined ? null : prev))
-        })
-    }
-
-    return () => {
-      cancelled = true
-    }
-  }, [assignmentId, teacher])
-
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
+  const { data: assignment = null, isError: assignmentFailed } = useAssignment(assignmentId)
+  const {
+    data: submission,
+    isLoading: submissionLoading,
+    isError: noSubmissionYet,
+  } = useAssignmentMySubmission(assignmentId, { enabled: !teacher })
 
   if (assignmentFailed) {
     return (
@@ -484,7 +450,7 @@ function AssignmentDetail() {
     )
   }
 
-  if (!assignment || (!teacher && submission === undefined)) {
+  if (!assignment || (!teacher && submissionLoading)) {
     return (
       <section className="assignment-detail">
         <p className="admin-empty-card">Loading assignment…</p>
@@ -493,13 +459,7 @@ function AssignmentDetail() {
   }
 
   if (teacher) {
-    return (
-      <TeacherAssignmentView
-        assignmentId={assignmentId}
-        assignment={assignment}
-        onAssignmentChanged={load}
-      />
-    )
+    return <TeacherAssignmentView assignmentId={assignmentId} assignment={assignment} />
   }
 
   return (
@@ -520,10 +480,10 @@ function AssignmentDetail() {
       )}
 
       <div className="widget-label">submission</div>
-      {submission ? (
+      {submission && !noSubmissionYet ? (
         <SubmissionSummary submission={submission} />
       ) : (
-        <SubmissionForm assignmentId={assignmentId} onSubmitted={setSubmission} />
+        <SubmissionForm assignmentId={assignmentId} />
       )}
     </section>
   )
