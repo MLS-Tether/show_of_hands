@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { useQueries, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
 import { useDialog } from '../components/DialogContext'
-import { keys, useSections } from '../queries'
+import { keys, useQuestsForSections, useSections } from '../queries'
 import '../styles/shared-ui.css'
 import './Quests.css'
 
@@ -30,23 +30,18 @@ function Quests() {
     ? location.hash.slice('#quest-'.length)
     : null
 
-  const results = useQueries({
-    queries: (sections ?? []).map((s) => ({
-      queryKey: keys.sectionQuests(s.section_id),
-      queryFn: () => api.get(`/sections/${s.section_id}/quests`).then((r) => r.data),
-    })),
-  })
+  const sectionIds = (sections ?? []).map((s) => s.section_id)
+  const { data: rawQuests, isLoading: questsLoading } = useQuestsForSections(sectionIds)
 
-  const stillLoading = sections === null || results.some((r) => r.isLoading)
+  const stillLoading = sections === null || (sectionIds.length > 0 && questsLoading)
   const quests = stillLoading
     ? null
-    : results
-        .flatMap((r, i) => {
-          if (!r.isSuccess) return []
-          const section = sections[i]
-          return r.data.map((q) => ({ ...q, section_id: section.section_id, section_name: section.class_name }))
-        })
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    : (() => {
+        const sectionNameById = new Map(sections.map((s) => [s.section_id, s.class_name]))
+        return [...(rawQuests ?? [])]
+          .map((q) => ({ ...q, section_name: sectionNameById.get(q.section_id) }))
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      })()
 
   useEffect(() => {
     if (!quests || !highlightId) return
@@ -58,7 +53,7 @@ function Quests() {
     setCompletingId(quest.quest_id)
     try {
       await api.post(`/quests/${quest.quest_id}/complete`)
-      queryClient.setQueryData(keys.sectionQuests(quest.section_id), (prev) =>
+      queryClient.setQueryData(keys.quests(sectionIds), (prev) =>
         (prev || []).map((q) => (q.quest_id === quest.quest_id ? { ...q, completed: true } : q))
       )
       queryClient.invalidateQueries({ queryKey: ['points'] })

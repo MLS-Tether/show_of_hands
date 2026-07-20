@@ -18,6 +18,7 @@ export function invalidateForEvent(queryClient, event) {
         queryClient.invalidateQueries({ queryKey: keys.sectionQuests(sectionId) })
         queryClient.invalidateQueries({ queryKey: keys.section(sectionId) })
       }
+      queryClient.invalidateQueries({ queryKey: ['quests'] })
       break
     case 'assignments':
       queryClient.invalidateQueries({ queryKey: keys.assignments() })

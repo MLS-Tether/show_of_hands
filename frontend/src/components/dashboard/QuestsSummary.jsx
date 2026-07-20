@@ -1,21 +1,13 @@
-import { useQueries } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import api from '../../api'
-import { keys } from '../../queries'
+import { useQuestsForSections } from '../../queries'
 import './QuestsSummary.css'
 
 function QuestsSummary({ sections }) {
-  const results = useQueries({
-    queries: (sections ?? []).map((s) => ({
-      queryKey: keys.sectionQuests(s.section_id),
-      queryFn: () => api.get(`/sections/${s.section_id}/quests`).then((r) => r.data),
-    })),
-  })
+  const sectionIds = (sections ?? []).map((s) => s.section_id)
+  const { data: rawQuests, isLoading: questsLoading } = useQuestsForSections(sectionIds)
 
-  const stillLoading = sections === null || results.some((r) => r.isLoading)
-  const quests = stillLoading
-    ? null
-    : results.filter((r) => r.isSuccess).flatMap((r) => r.data).filter((q) => !q.completed)
+  const stillLoading = sections === null || (sectionIds.length > 0 && questsLoading)
+  const quests = stillLoading ? null : (rawQuests ?? []).filter((q) => !q.completed)
 
   const loading = quests === null
   const visible = loading ? [] : quests.slice(0, 3)

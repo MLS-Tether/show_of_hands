@@ -2,8 +2,24 @@ import axios from 'axios'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
 
+// Axios's default array serialization appends `[]` to the key
+// (`section_ids[]=1&section_ids[]=2`), which FastAPI's `List[int] = Query(...)`
+// doesn't parse — it expects the key repeated plain (`section_ids=1&section_ids=2`).
+function serializeParams(params) {
+  const searchParams = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.forEach((v) => searchParams.append(key, v))
+    } else if (value !== undefined && value !== null) {
+      searchParams.append(key, value)
+    }
+  })
+  return searchParams.toString()
+}
+
 const api = axios.create({
   baseURL: BASE_URL,
+  paramsSerializer: serializeParams,
 })
 
 // Uploaded files (e.g. profile pictures) are served from the backend's
