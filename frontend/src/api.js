@@ -22,10 +22,11 @@ const api = axios.create({
   paramsSerializer: serializeParams,
 })
 
-// Uploaded files (e.g. profile pictures) are served from the backend's
-// origin, not under /api — strip the /api suffix to get that origin.
+// Profile pictures are stored in Supabase Storage and already come back as
+// absolute URLs; older/relative paths fall back to the backend's own origin.
 export function mediaUrl(path) {
   if (!path) return null
+  if (/^https?:\/\//.test(path)) return path
   return `${BASE_URL.replace(/\/api\/?$/, '')}${path}`
 }
 

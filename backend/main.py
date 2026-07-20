@@ -7,10 +7,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from fastapi.staticfiles import StaticFiles
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from image_utils import UPLOAD_ROOT
 from db.pool import SessionLocal
 from db.seed import seed_classes, seed_dev_data, seed_second_teacher_data
 from db.ws_broadcast import start_listener, stop_listener, deliver_loop
@@ -149,9 +147,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.mount("/uploads", StaticFiles(directory=UPLOAD_ROOT), name="uploads")
-
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
