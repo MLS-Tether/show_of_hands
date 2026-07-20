@@ -177,6 +177,7 @@ function BulletinBoard() {
   const queryClient = useQueryClient()
   const { confirm, alert } = useDialog()
   const [joiningId, setJoiningId] = useState(null)
+  const [closingId, setClosingId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
   const [droppingId, setDroppingId] = useState(null)
   const [editingRequest, setEditingRequest] = useState(null)
@@ -203,6 +204,25 @@ function BulletinBoard() {
       await alert(err.response?.data?.message || 'Could not join this request.')
     } finally {
       setJoiningId(null)
+    }
+  }
+
+  async function handleCloseRoom(hr) {
+    if (!(await confirm('Close this study room for everyone?'))) return
+
+    setClosingId(hr.help_request_id)
+    try {
+      await api.post(`/rooms/${hr.room_id}/close`)
+      forgetRoom(hr.room_id)
+      queryClient.setQueryData(keys.helpRequests(), (prev) =>
+        (prev || []).map((r) =>
+          r.help_request_id === hr.help_request_id ? { ...r, status: 'closed' } : r
+        )
+      )
+    } catch (err) {
+      await alert(err.response?.data?.message || 'Could not close the room.')
+    } finally {
+      setClosingId(null)
     }
   }
 
@@ -316,6 +336,16 @@ function BulletinBoard() {
                           onClick={() => handleJoin(hr)}
                         >
                           {joiningId === hr.help_request_id ? 'Joining…' : 'Join'}
+                        </button>
+                      )}
+                      {isMine && hr.room_id && hr.status === 'active' && (
+                        <button
+                          type="button"
+                          className="admin-btn-secondary"
+                          disabled={closingId === hr.help_request_id}
+                          onClick={() => handleCloseRoom(hr)}
+                        >
+                          {closingId === hr.help_request_id ? 'Closing…' : 'Close room'}
                         </button>
                       )}
                       {isMine && hr.room_id && (
