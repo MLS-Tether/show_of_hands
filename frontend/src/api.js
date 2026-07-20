@@ -6,6 +6,13 @@ const api = axios.create({
   baseURL: BASE_URL,
 })
 
+// Uploaded files (e.g. profile pictures) are served from the backend's
+// origin, not under /api — strip the /api suffix to get that origin.
+export function mediaUrl(path) {
+  if (!path) return null
+  return `${BASE_URL.replace(/\/api\/?$/, '')}${path}`
+}
+
 function logout() {
   localStorage.removeItem('access_token')
   localStorage.removeItem('refresh_token')

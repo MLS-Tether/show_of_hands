@@ -80,6 +80,7 @@ def seed_dev_data():
             user = User(
                 school_id=school.school_id,
                 username=username,
+                full_name=username,
                 password_hash=password_hash,
                 role=role,
                 is_verified=True,
@@ -344,6 +345,7 @@ def seed_second_teacher_data():
             user = User(
                 school_id=school.school_id,
                 username=username,
+                full_name=username,
                 password_hash=password_hash,
                 role=role,
                 is_verified=True,
