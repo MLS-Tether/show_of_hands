@@ -4,6 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from db.data_events import emit_data_event, resolve_section_audience
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.enrollment_model import Enrollment
@@ -74,7 +75,7 @@ def create_resource(
     current_user: User = Depends(require_role(["teacher"])),
     db: Session = Depends(get_db),
 ):
-    _get_owned_section(section_id, current_user, db)
+    section = _get_owned_section(section_id, current_user, db)
     resource = Resource(
         section_id=section_id,
         teacher_id=current_user.user_id,
@@ -83,6 +84,12 @@ def create_resource(
         description=body.description,
     )
     db.add(resource)
+    db.flush()
+    emit_data_event(
+        db, "resources", "created", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section_id, ids={"resource_id": resource.resource_id},
+    )
     db.commit()
     db.refresh(resource)
     return resource
@@ -113,6 +120,11 @@ def update_resource(
         resource.url = body.url
     if "description" in body.model_fields_set:
         resource.description = body.description
+    emit_data_event(
+        db, "resources", "updated", resource.section.school_id,
+        resolve_section_audience(db, resource.section),
+        section_id=resource.section_id, ids={"resource_id": resource_id},
+    )
     db.commit()
     db.refresh(resource)
     return resource
@@ -127,5 +139,10 @@ def delete_resource(
     resource = _get_owned_resource(resource_id, current_user, db)
     resource.is_archived = True
     resource.deleted_at = datetime.now(timezone.utc)
+    emit_data_event(
+        db, "resources", "deleted", resource.section.school_id,
+        resolve_section_audience(db, resource.section),
+        section_id=resource.section_id, ids={"resource_id": resource_id},
+    )
     db.commit()
     return {"message": "Resource deleted successfully."}

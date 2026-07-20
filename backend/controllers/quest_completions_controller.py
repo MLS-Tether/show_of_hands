@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from db.data_events import emit_data_event, resolve_admin_audience, resolve_section_audience
 from db.pool import get_db
 from dependencies import require_role
 from models.enrollment_model import Enrollment
@@ -69,6 +70,16 @@ def complete_quest(
     ))
     current_user.total_points += quest.point_value
 
+    emit_data_event(
+        db, "quests", "updated", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section.section_id, ids={"quest_id": quest_id},
+    )
+    emit_data_event(
+        db, "points", "updated", section.school_id,
+        resolve_admin_audience(db, section.school_id, [current_user.user_id]),
+        ids={"user_id": current_user.user_id},
+    )
     db.commit()
     db.refresh(completion)
     return completion

@@ -21,6 +21,7 @@ def _new_student(client, world, cleanup):
     username = unique("enrollee")
     resp = client.post("/api/auth/register", json={
         "username": username,
+        "full_name": "New Enrollee",
         "password": "password123",
         "school_code": world.school_code,
         "role": "student",
@@ -174,6 +175,7 @@ def test_patch_enrollment_request_requires_section_owner(client, world, cleanup)
     other_username = unique("otherteacher")
     resp = client.post("/api/auth/register", json={
         "username": other_username,
+        "full_name": "Other Teacher",
         "password": "password123",
         "school_code": world.school_code,
         "role": "teacher",

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from db.data_events import emit_data_event, resolve_admin_audience, resolve_section_audience
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.user_model import User
@@ -67,6 +68,13 @@ def create_enrollment_request(
         status=EnrollmentStatusEnum.pending,
     )
     db.add(new_request)
+    audience = resolve_admin_audience(db, section.school_id, [current_user.user_id])
+    if section.teacher_id is not None:
+        audience.append(section.teacher_id)
+    emit_data_event(
+        db, "enrollment_requests", "created", section.school_id, audience,
+        section_id=section_id,
+    )
     db.commit()
     db.refresh(new_request) 
 
@@ -151,6 +159,17 @@ def update_enrollment_request(
             )
         )
 
+    emit_data_event(
+        db, "enrollment_requests", "updated", section.school_id,
+        resolve_admin_audience(db, section.school_id, [request.student_id, current_user.user_id]),
+        section_id=request.section_id,
+    )
+    if body.status == EnrollmentStatusEnum.accepted:
+        emit_data_event(
+            db, "sections", "updated", section.school_id,
+            resolve_section_audience(db, section),
+            section_id=request.section_id,
+        )
     db.commit()
     db.refresh(request)
 
@@ -183,6 +202,13 @@ def drop_student_from_section(
 
     enrollment.is_archived = True
     enrollment.deleted_at = datetime.now(timezone.utc)
+    section = enrollment.section
+    audience = resolve_section_audience(db, section)
+    audience.append(student_id)
+    emit_data_event(
+        db, "sections", "updated", section.school_id, audience,
+        section_id=section_id,
+    )
     db.commit()
 
     return MessageResponse(message="Student removed from section.")

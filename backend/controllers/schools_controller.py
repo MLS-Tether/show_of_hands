@@ -5,6 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from auth_utils import hash_password, create_access_token, create_refresh_token
+from db.data_events import emit_data_event
 from db.pool import get_db
 from dependencies import require_role
 from models.school_model import School
@@ -109,6 +110,9 @@ def update_my_school(
     if body.grades is not None:
         school.grades = body.grades
 
+    emit_data_event(
+        db, "school", "updated", school.school_id, [], broadcast=True,
+    )
     db.commit()
     db.refresh(school)
     return school

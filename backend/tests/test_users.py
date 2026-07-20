@@ -37,6 +37,7 @@ def test_verify_user(client, world, cleanup):
     username = unique("needsverify")
     resp = client.post("/api/auth/register", json={
         "username": username,
+        "full_name": "Needs Verify",
         "password": "password123",
         "school_code": world.school_code,
         "role": "teacher",
@@ -56,6 +57,7 @@ def test_reject_signup(client, world, cleanup):
     username = unique("rejectme")
     resp = client.post("/api/auth/register", json={
         "username": username,
+        "full_name": "Reject Me",
         "password": "password123",
         "school_code": world.school_code,
         "role": "teacher",
@@ -94,6 +96,7 @@ def test_deactivate_and_reactivate_user(client, world, cleanup):
     username = unique("togglable")
     resp = client.post("/api/auth/register", json={
         "username": username,
+        "full_name": "Toggle Able",
         "password": "password123",
         "school_code": world.school_code,
         "role": "student",
@@ -136,6 +139,7 @@ def test_delete_teacher_cascades_sections_to_pending_reassignment(client, world,
     teacher_username = unique("droppedteacher")
     resp = client.post("/api/auth/register", json={
         "username": teacher_username,
+        "full_name": "Dropped Teacher",
         "password": "password123",
         "school_code": world.school_code,
         "role": "teacher",
@@ -161,6 +165,7 @@ def test_delete_teacher_cascades_sections_to_pending_reassignment(client, world,
     student_username = unique("caughtinmiddle")
     resp = client.post("/api/auth/register", json={
         "username": student_username,
+        "full_name": "Caught Inmiddle",
         "password": "password123",
         "school_code": world.school_code,
         "role": "student",

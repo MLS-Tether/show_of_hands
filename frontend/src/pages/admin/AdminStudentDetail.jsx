@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import api from '../../api'
+import { useUser, useUserGrades } from '../../queries'
 import { formatPercent } from '../../utils/format'
 import { downloadReportCard, printReportCard } from '../../utils/reportCard'
 import '../../styles/shared-ui.css'
@@ -8,28 +7,9 @@ import './AdminStudentDetail.css'
 
 function AdminStudentDetail() {
   const { studentId } = useParams()
-  const [student, setStudent] = useState(null)
-  const [grades, setGrades] = useState(null)
-  const [notFound, setNotFound] = useState(false)
-
-  const load = useCallback(() => {
-    let cancelled = false
-    Promise.all([api.get(`/users/${studentId}`), api.get(`/users/${studentId}/grades`)])
-      .then(([userRes, gradesRes]) => {
-        if (cancelled) return
-        setStudent(userRes.data)
-        setGrades(gradesRes.data)
-      })
-      .catch(() => {
-        if (cancelled) return
-        setNotFound(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [studentId])
-
-  useEffect(() => load(), [load])
+  const { data: student = null, isError: studentFailed } = useUser(studentId)
+  const { data: grades = null, isError: gradesFailed } = useUserGrades(studentId)
+  const notFound = studentFailed || gradesFailed
 
   if (notFound) {
     return (

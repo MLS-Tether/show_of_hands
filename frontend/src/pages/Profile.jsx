@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import api, { mediaUrl } from '../api'
 import { useToast } from '../components/ToastContext'
-import { useAutoRefresh } from '../utils/autoRefresh'
+import { keys, useSchool, useUser } from '../queries'
+import { getUserId } from '../utils/auth'
 import { initials } from '../utils/format'
 import '../styles/shared-ui.css'
 import './Profile.css'
@@ -18,45 +20,16 @@ function formatDate(dateStr) {
 
 function Profile() {
   const { showToast } = useToast()
-  const [user, setUser] = useState(null)
-  const [school, setSchool] = useState(null)
-  const [failed, setFailed] = useState(false)
+  const queryClient = useQueryClient()
+  const userId = getUserId()
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ username: '', full_name: '' })
   const [saving, setSaving] = useState(false)
   const [uploadingPicture, setUploadingPicture] = useState(false)
   const fileInputRef = useRef(null)
 
-  const load = useCallback(() => {
-    const userId = localStorage.getItem('user_id')
-    if (!userId) return undefined
-    let cancelled = false
-
-    api
-      .get(`/users/${userId}`)
-      .then(({ data }) => {
-        if (!cancelled) setUser(data)
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true)
-      })
-
-    api
-      .get('/schools/me')
-      .then(({ data }) => {
-        if (!cancelled) setSchool(data)
-      })
-      .catch(() => {
-        if (!cancelled) setSchool((prev) => prev ?? null)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
+  const { data: user = null, isError: failed } = useUser(userId)
+  const { data: school = null } = useSchool()
 
   function startEditing() {
     setForm({ username: user.username, full_name: user.full_name || '' })
@@ -70,7 +43,7 @@ function Profile() {
         username: form.username.trim(),
         full_name: form.full_name.trim(),
       })
-      setUser(data)
+      queryClient.setQueryData(keys.user(userId), data)
       setEditing(false)
       showToast('Profile updated')
     } catch (err) {
@@ -102,7 +75,9 @@ function Profile() {
     body.append('file', file)
     try {
       const { data } = await api.post('/users/me/profile-picture', body)
-      setUser((prev) => (prev ? { ...prev, profile_picture_url: data.profile_picture_url } : prev))
+      queryClient.setQueryData(keys.user(userId), (prev) =>
+        prev ? { ...prev, profile_picture_url: data.profile_picture_url } : prev
+      )
       showToast('Profile picture updated')
     } catch (err) {
       showToast(err.response?.data?.message || 'Could not upload image.')
@@ -115,7 +90,7 @@ function Profile() {
     setUploadingPicture(true)
     try {
       await api.delete('/users/me/profile-picture')
-      setUser((prev) => (prev ? { ...prev, profile_picture_url: null } : prev))
+      queryClient.setQueryData(keys.user(userId), (prev) => (prev ? { ...prev, profile_picture_url: null } : prev))
       showToast('Profile picture removed')
     } catch (err) {
       showToast(err.response?.data?.message || 'Could not remove image.')

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
-import { useAutoRefresh } from '../../utils/autoRefresh'
+import { keys, useSection, useSectionAnalytics, useSectionEnrollmentRequests } from '../../queries'
 import { useEscapeBack } from '../../utils/useEscapeBack'
 import RosterPanel from './RosterPanel'
 import StudentGradeDetail from './StudentGradeDetail'
@@ -87,65 +88,26 @@ function EditSectionForm({ section, onSaved, onCancel }) {
 
 function TeacherSectionDetail() {
   const { sectionId } = useParams()
-  const [section, setSection] = useState(null)
-  const [notFound, setNotFound] = useState(false)
-  const [loadedSectionId, setLoadedSectionId] = useState(null)
+  const queryClient = useQueryClient()
   const [activeCard, setActiveCard] = useState(null)
   const [viewingStudent, setViewingStudent] = useState(null)
   const [editing, setEditing] = useState(false)
-  const [pendingRequests, setPendingRequests] = useState(0)
-  const [ungraded, setUngraded] = useState(0)
 
-  const load = useCallback(() => {
-    let cancelled = false
-    api
-      .get(`/sections/${sectionId}`)
-      .then(({ data }) => {
-        if (cancelled) return
-        setSection(data)
-        setNotFound(false)
-        setLoadedSectionId(sectionId)
-      })
-      .catch(() => {
-        if (cancelled) return
-        setNotFound(true)
-        setLoadedSectionId(sectionId)
-      })
+  const { data: section = null, isError: notFound } = useSection(sectionId)
+  const { data: enrollmentRequests } = useSectionEnrollmentRequests(sectionId)
+  const { data: analytics } = useSectionAnalytics(sectionId)
 
-    Promise.all([
-      api.get(`/sections/${sectionId}/enrollment-requests`),
-      api.get(`/sections/${sectionId}/analytics`),
-    ])
-      .then(([enrollmentRequestsRes, analyticsRes]) => {
-        if (cancelled) return
-        setPendingRequests(enrollmentRequestsRes.data.length)
-        setUngraded(
-          analyticsRes.data.assignments.reduce(
-            (sum, a) => sum + (a.submitted_count - a.graded_count),
-            0
-          )
-        )
-      })
-      .catch(() => {
-        if (cancelled) return
-        setPendingRequests(0)
-        setUngraded(0)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [sectionId])
-
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
+  const pendingRequests = enrollmentRequests?.length ?? 0
+  const ungraded = analytics
+    ? analytics.assignments.reduce((sum, a) => sum + (a.submitted_count - a.graded_count), 0)
+    : 0
 
   useEscapeBack(() => {
     if (viewingStudent) setViewingStudent(null)
     else setActiveCard(null)
   }, Boolean(activeCard))
 
-  const loading = loadedSectionId !== sectionId
+  const loading = section === null && !notFound
 
   if (loading) {
     return (
@@ -188,7 +150,7 @@ function TeacherSectionDetail() {
           onCancel={() => setEditing(false)}
           onSaved={() => {
             setEditing(false)
-            load()
+            queryClient.invalidateQueries({ queryKey: keys.section(sectionId) })
           }}
         />
       )}
@@ -202,11 +164,9 @@ function TeacherSectionDetail() {
             ) : (
               <RosterPanel section={section} onSelectStudent={setViewingStudent} />
             ))}
-          {activeCard === 'enrollment-requests' && (
-            <EnrollmentRequestsPanel sectionId={sectionId} onChange={load} />
-          )}
+          {activeCard === 'enrollment-requests' && <EnrollmentRequestsPanel sectionId={sectionId} />}
           {activeCard === 'assignments' && (
-            <AssignmentsPanel sectionId={sectionId} assignments={section.assignments} onChange={load} />
+            <AssignmentsPanel sectionId={sectionId} assignments={section.assignments} />
           )}
           {activeCard === 'quests' && <QuestsPanel sectionId={sectionId} />}
           {activeCard === 'help-requests' && <HelpRequestsPanel sectionId={sectionId} />}

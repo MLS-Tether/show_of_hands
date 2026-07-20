@@ -4,6 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from db.data_events import emit_data_event, resolve_section_audience
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.assignment_model import Assignment
@@ -128,6 +129,11 @@ def create_assignment(
             message=f"New assignment posted: {body.title}",
         ))
 
+    emit_data_event(
+        db, "assignments", "created", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section_id, ids={"assignment_id": assignment.assignment_id},
+    )
     db.commit()
     db.refresh(assignment)
     return assignment
@@ -183,6 +189,11 @@ def update_assignment(
     if body.category is not None:
         assignment.category = body.category
 
+    emit_data_event(
+        db, "assignments", "updated", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section.section_id, ids={"assignment_id": assignment_id},
+    )
     db.commit()
     db.refresh(assignment)
     return assignment
@@ -205,5 +216,10 @@ def delete_assignment(
 
     assignment.is_archived = True
     assignment.deleted_at = datetime.now(timezone.utc)
+    emit_data_event(
+        db, "assignments", "deleted", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section.section_id, ids={"assignment_id": assignment_id},
+    )
     db.commit()
     return {"message": "Assignment deleted successfully."}

@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import api from '../api'
-import { useAutoRefresh } from '../utils/autoRefresh'
+import { useSection, useSectionResources } from '../queries'
 import { isTeacher } from '../utils/auth'
 import TeacherSectionDetail from '../components/section-detail/TeacherSectionDetail'
 import GradeSummary from '../components/section-detail/GradeSummary'
@@ -29,50 +27,10 @@ function domainOf(url) {
 
 function StudentSectionDetail() {
   const { sectionId } = useParams()
-  const [section, setSection] = useState(null)
-  const [notFound, setNotFound] = useState(false)
-  const [loadedSectionId, setLoadedSectionId] = useState(null)
-  const [resources, setResources] = useState(null)
+  const { data: resources = null } = useSectionResources(sectionId)
+  const { data: section = null, isError: notFound } = useSection(sectionId)
 
-  useEffect(() => {
-    let cancelled = false
-    api
-      .get(`/sections/${sectionId}/resources`)
-      .then(({ data }) => {
-        if (!cancelled) setResources(data)
-      })
-      .catch(() => {
-        if (!cancelled) setResources((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [sectionId])
-
-  const load = useCallback(() => {
-    let cancelled = false
-    api
-      .get(`/sections/${sectionId}`)
-      .then(({ data }) => {
-        if (cancelled) return
-        setSection(data)
-        setNotFound(false)
-        setLoadedSectionId(sectionId)
-      })
-      .catch(() => {
-        if (cancelled) return
-        setNotFound(true)
-        setLoadedSectionId(sectionId)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [sectionId])
-
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
-
-  const loading = loadedSectionId !== sectionId
+  const loading = section === null && !notFound
 
   if (loading) {
     return (

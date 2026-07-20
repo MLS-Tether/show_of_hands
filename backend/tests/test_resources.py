@@ -150,6 +150,7 @@ def test_other_teacher_cannot_update_or_delete_resource(client, world, cleanup):
         "/api/auth/register",
         json={
             "username": other_username,
+            "full_name": "Other Teacher",
             "password": "password123",
             "school_code": world.school_code,
             "role": "teacher",

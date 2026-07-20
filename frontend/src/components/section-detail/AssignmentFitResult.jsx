@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
+import { keys } from '../../queries'
 
 const READINESS_LABELS = {
   ready: 'Ready',
@@ -8,6 +10,7 @@ const READINESS_LABELS = {
 }
 
 function AssignmentFitResult({ sectionId, result }) {
+  const queryClient = useQueryClient()
   const [postedUrls, setPostedUrls] = useState([])
   const [postError, setPostError] = useState('')
   const [postingUrl, setPostingUrl] = useState(null)
@@ -24,6 +27,7 @@ function AssignmentFitResult({ sectionId, result }) {
         url: resource.url,
         description: resource.why,
       })
+      queryClient.invalidateQueries({ queryKey: keys.sectionResources(sectionId) })
       setPostedUrls((prev) => [...prev, resource.url])
     } catch {
       setPostError('Could not post resource.')

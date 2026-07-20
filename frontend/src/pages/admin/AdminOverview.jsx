@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api from '../../api'
+import { useClassRequests, useSchool, useSections, useUser, useUsers } from '../../queries'
 import { getUserId } from '../../utils/auth'
-import { useAutoRefresh } from '../../utils/autoRefresh'
 import './AdminOverview.css'
 
 function greeting() {
@@ -22,55 +20,22 @@ function formattedDate() {
 
 function AdminOverview() {
   const navigate = useNavigate()
-  const [user, setUser] = useState(null)
-  const [school, setSchool] = useState(null)
-  const [stats, setStats] = useState(null)
+  const { data: user = null } = useUser(getUserId())
+  const { data: school = null } = useSchool()
+  const { data: users = null } = useUsers()
+  const { data: classRequests = null } = useClassRequests()
+  const { data: allSections = null } = useSections('all')
 
-  const load = useCallback(() => {
-    let cancelled = false
-    Promise.all([
-      api.get(`/users/${getUserId()}`),
-      api.get('/schools/me'),
-      api.get('/users'),
-      api.get('/class-requests'),
-      api.get('/sections', { params: { scope: 'all' } }),
-    ])
-      .then(([userRes, schoolRes, usersRes, classRequestsRes, sectionsRes]) => {
-        if (cancelled) return
-        setUser(userRes.data)
-        setSchool(schoolRes.data)
-
-        const pendingSignups = usersRes.data.filter(
-          (u) => u.role !== 'student' && !u.is_verified
-        ).length
-        const pendingClassRequests = classRequestsRes.data.filter(
-          (r) => r.status === 'pending'
-        ).length
-        const activeSections = sectionsRes.data.filter((s) => s.status === 'active').length
-        const needTeacher = sectionsRes.data.filter(
-          (s) => s.status === 'pending_reassignment'
-        ).length
-
-        setStats({
-          pendingSignups,
-          pendingClassRequests,
-          activeSections,
-          needTeacher,
-          activeUsers: usersRes.data.length,
-        })
-      })
-      .catch(() => {
-        if (!cancelled) setStats((prev) => prev ?? null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
-
-  const loading = stats === null
+  const loading = users === null || classRequests === null || allSections === null
+  const stats = loading
+    ? null
+    : {
+        pendingSignups: users.filter((u) => u.role !== 'student' && !u.is_verified).length,
+        pendingClassRequests: classRequests.filter((r) => r.status === 'pending').length,
+        activeSections: allSections.filter((s) => s.status === 'active').length,
+        needTeacher: allSections.filter((s) => s.status === 'pending_reassignment').length,
+        activeUsers: users.length,
+      }
 
   return (
     <div className="admin-overview">

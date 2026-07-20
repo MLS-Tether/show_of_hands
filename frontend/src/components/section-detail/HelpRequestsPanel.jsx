@@ -1,23 +1,7 @@
-import { useEffect, useState } from 'react'
-import api from '../../api'
+import { useSectionHelpRequests } from '../../queries'
 
 function HelpRequestsPanel({ sectionId }) {
-  const [helpRequests, setHelpRequests] = useState(null)
-
-  useEffect(() => {
-    let cancelled = false
-    api
-      .get(`/sections/${sectionId}/help-requests`)
-      .then(({ data }) => {
-        if (!cancelled) setHelpRequests(data)
-      })
-      .catch(() => {
-        if (!cancelled) setHelpRequests((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [sectionId])
+  const { data: helpRequests = null } = useSectionHelpRequests(sectionId)
 
   const loading = helpRequests === null
 
