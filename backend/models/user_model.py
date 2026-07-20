@@ -17,6 +17,8 @@ class User(Base):
     user_id = Column(Integer, primary_key=True)
     school_id = Column(Integer, ForeignKey("schools.school_id"), nullable=False)
     username = Column(String, nullable=False)
+    full_name = Column(String, nullable=True)
+    profile_picture_url = Column(String, nullable=True)
     password_hash = Column(String, nullable=False)
     email = Column(String, nullable=True)
     role = Column(Enum(RoleEnum), nullable=False)

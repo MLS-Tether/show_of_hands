@@ -160,6 +160,13 @@
   font-size: 11.5px;
   font-weight: 600;
   color: var(--text-h);
+  overflow: hidden;
+}
+
+.admin-sidebar-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .admin-sidebar-footer-text {

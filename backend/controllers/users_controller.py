@@ -2,23 +2,110 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from grading import compute_section_grade_for_student
+from image_utils import delete_avatar_image, save_avatar_image
 from models.enrollment_model import Enrollment
 from models.notification_model import Notification, NotificationTypeEnum
 from models.section_model import Section, SectionStatusEnum
 from models.user_model import User, RoleEnum
-from schemas.user import UserResponse, UserListResponse, StudentSectionGradeResponse
+from schemas.user import (
+    UserResponse,
+    UserListResponse,
+    StudentSectionGradeResponse,
+    ProfileUpdateRequest,
+    ProfilePictureResponse,
+)
 
 
 class RejectSignupRequest(BaseModel):
     reason: Optional[str] = None
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+# NOTE: the "/me" routes must be registered before "/{user_id}" — otherwise
+# FastAPI tries to parse "me" as the int user_id and fails with a 422 before
+# ever reaching these handlers.
+@router.patch("/me", response_model=UserResponse)
+def update_my_profile(
+    body: ProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if body.username is not None:
+        username = body.username.strip()
+        if not username:
+            raise HTTPException(status_code=400, detail="Username cannot be empty.")
+        if len(username) > 30:
+            raise HTTPException(status_code=400, detail="Username must be 30 characters or fewer.")
+
+        existing = db.query(User).filter(
+            User.username == username,
+            User.school_id == current_user.school_id,
+            User.user_id != current_user.user_id,
+            User.is_archived == False,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="Username already taken.")
+        current_user.username = username
+
+    if body.full_name is not None:
+        full_name = body.full_name.strip()
+        if not full_name:
+            raise HTTPException(status_code=400, detail="Full name cannot be empty.")
+        if len(full_name) > 100:
+            raise HTTPException(status_code=400, detail="Full name must be 100 characters or fewer.")
+        current_user.full_name = full_name
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.post("/me/profile-picture", response_model=ProfilePictureResponse)
+async def upload_profile_picture(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Content-type is client-supplied and easily spoofed — it's just a fast
+    # rejection. save_avatar_image() does the real, authoritative check by
+    # actually decoding the bytes as an image.
+    if file.content_type not in ("image/jpeg", "image/png"):
+        raise HTTPException(status_code=400, detail="Only JPEG and PNG images are allowed.")
+
+    raw_bytes = await file.read()
+    new_url = save_avatar_image(raw_bytes)
+
+    old_url = current_user.profile_picture_url
+    current_user.profile_picture_url = new_url
+    db.commit()
+
+    if old_url:
+        delete_avatar_image(old_url)
+
+    return ProfilePictureResponse(profile_picture_url=new_url)
+
+
+@router.delete("/me/profile-picture", response_model=ProfilePictureResponse)
+def delete_profile_picture(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    old_url = current_user.profile_picture_url
+    if not old_url:
+        raise HTTPException(status_code=404, detail="No profile picture to remove.")
+
+    current_user.profile_picture_url = None
+    db.commit()
+    delete_avatar_image(old_url)
+
+    return ProfilePictureResponse(profile_picture_url=None)
 
 
 @router.get("", response_model=List[UserListResponse])

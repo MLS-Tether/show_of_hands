@@ -5,6 +5,7 @@ __pycache__/
 venv/
 .pytest_cache/
 .DS_Store
+uploads/
 
 # Alembic auto-generated migration files (keep versions/ tracked if desired)
 # alembic/versions/

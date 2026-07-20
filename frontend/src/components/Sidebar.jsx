@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import api from '../api'
+import api, { mediaUrl } from '../api'
 import { getUserId, isAdmin, isTeacher } from '../utils/auth'
 import { useAutoRefresh } from '../utils/autoRefresh'
 import { initials } from '../utils/format'
@@ -161,9 +161,15 @@ function Sidebar() {
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((open) => !open)}
           >
-            <div className="admin-sidebar-avatar">{initials(user.username)}</div>
+            <div className="admin-sidebar-avatar">
+              {user.profile_picture_url ? (
+                <img src={mediaUrl(user.profile_picture_url)} alt="" className="admin-sidebar-avatar-img" />
+              ) : (
+                initials(user.username)
+              )}
+            </div>
             <div className="admin-sidebar-footer-text">
-              <div className="admin-sidebar-footer-name">{user.username}</div>
+              <div className="admin-sidebar-footer-name">{user.full_name || user.username}</div>
               <div className="admin-sidebar-footer-role">{user.role}</div>
             </div>
           </button>

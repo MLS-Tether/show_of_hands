@@ -30,6 +30,8 @@ class UserResponse(BaseModel):
 
     user_id: int
     username: str
+    full_name: Optional[str] = None
+    profile_picture_url: Optional[str] = None
     role: RoleEnum
     school_id: int
     total_points: int
@@ -41,6 +43,8 @@ class UserListResponse(BaseModel):
 
     user_id: int
     username: str
+    full_name: Optional[str] = None
+    profile_picture_url: Optional[str] = None
     email: Optional[str] = None
     role: RoleEnum
     is_verified: bool
@@ -50,6 +54,15 @@ class UserListResponse(BaseModel):
     total_points: int
     last_active_at: Optional[datetime] = None
     created_at: datetime
+
+
+class ProfileUpdateRequest(BaseModel):
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+
+
+class ProfilePictureResponse(BaseModel):
+    profile_picture_url: Optional[str] = None
 
 
 class StudentSectionGradeResponse(BaseModel):

@@ -1,9 +1,26 @@
+.profile-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin-top: 22px;
+  max-width: 420px;
+}
+
+.profile-section-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.profile-section-label-row .widget-label {
+  margin-bottom: 0;
+}
+
 .profile-card {
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: 8px;
-  max-width: 420px;
-  margin-top: 22px;
   overflow: hidden;
 }
 
@@ -27,4 +44,49 @@
 
 .profile-role {
   text-transform: capitalize;
+}
+
+.profile-picture-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 22px;
+}
+
+.profile-picture-avatar {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-h);
+  overflow: hidden;
+}
+
+.profile-picture-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-picture-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.profile-picture-input {
+  display: none;
+}
+
+.profile-picture-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
 }
