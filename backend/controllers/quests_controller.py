@@ -4,6 +4,7 @@ from typing import List, Optional, Union, Literal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from db.data_events import emit_data_event, resolve_section_audience
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.enrollment_model import Enrollment
@@ -136,6 +137,11 @@ def create_quest(
             message=f"New quest '{quest.title}' is available.",
         ))
 
+    emit_data_event(
+        db, "quests", "created", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section_id, ids={"quest_id": quest.quest_id},
+    )
     db.commit()
     db.refresh(quest)
     return quest
@@ -166,5 +172,10 @@ def delete_quest(
 
     quest.is_archived = True
     quest.deleted_at = datetime.now(timezone.utc)
+    emit_data_event(
+        db, "quests", "deleted", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section.section_id, ids={"quest_id": quest_id},
+    )
     db.commit()
     return {"message": "Quest deleted successfully."}

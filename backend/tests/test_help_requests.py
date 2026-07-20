@@ -12,6 +12,7 @@ def _enroll_new_student(client, world, cleanup):
     username = unique("classmate")
     resp = client.post("/api/auth/register", json={
         "username": username,
+        "full_name": "Class Mate",
         "password": "password123",
         "school_code": world.school_code,
         "role": "student",

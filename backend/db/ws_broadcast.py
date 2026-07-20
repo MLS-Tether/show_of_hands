@@ -11,13 +11,16 @@ from db.pool import DATABASE_URL
 
 CHANNEL_NAME = "room_chat_channel"
 NOTIFICATION_CHANNEL_NAME = "user_notifications_channel"
+DATA_EVENTS_CHANNEL = "data_events"
 
 broadcast_queue: asyncio.Queue = asyncio.Queue()
 notification_queue: asyncio.Queue = asyncio.Queue()
+data_events_queue: asyncio.Queue = asyncio.Queue()
 
 _QUEUE_BY_CHANNEL = {
     CHANNEL_NAME: broadcast_queue,
     NOTIFICATION_CHANNEL_NAME: notification_queue,
+    DATA_EVENTS_CHANNEL: data_events_queue,
 }
 
 _stop_event = threading.Event()

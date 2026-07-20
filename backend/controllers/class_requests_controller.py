@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 
+from db.data_events import emit_data_event, resolve_admin_audience
 from db.pool import get_db
 from dependencies import require_role
 from models.user_model import User
@@ -33,6 +34,10 @@ def create_class_request(
         school_id=current_user.school_id,
     )
     db.add(req)
+    emit_data_event(
+        db, "class_requests", "created", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id, [current_user.user_id]),
+    )
     db.commit()
     db.refresh(req)
     return req
@@ -112,6 +117,10 @@ def update_class_request_status(
         type=notification_type,
         message=notification_msg,
     ))
+    emit_data_event(
+        db, "class_requests", "updated", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id, [req.requested_by]),
+    )
     db.commit()
     db.refresh(req)
     return req
