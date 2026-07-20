@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import TopBar from './TopBar'
 import Sidebar from './Sidebar'
+import { RealtimeProvider } from '../realtime/RealtimeProvider'
 import { getAdminParentPath, getParentPath } from '../utils/escNavigation'
 import { isEscapeClaimed } from '../utils/escapeClaim'
 import { isTeacher } from '../utils/auth'
@@ -40,17 +41,19 @@ function Layout() {
   }, [location.pathname, navigate])
 
   return (
-    <div className="admin-shell">
-      {!sidebarHidden && <Sidebar />}
-      <div className="admin-main">
-        <TopBar sidebarHidden={sidebarHidden} onToggleSidebar={toggleSidebar} />
-        <main className="admin-content">
-          <div className="admin-content-inner">
-            <Outlet />
-          </div>
-        </main>
+    <RealtimeProvider>
+      <div className="admin-shell">
+        {!sidebarHidden && <Sidebar />}
+        <div className="admin-main">
+          <TopBar sidebarHidden={sidebarHidden} onToggleSidebar={toggleSidebar} />
+          <main className="admin-content">
+            <div className="admin-content-inner">
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </RealtimeProvider>
   )
 }
 

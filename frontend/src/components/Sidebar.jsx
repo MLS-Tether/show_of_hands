@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import api, { mediaUrl } from '../api'
+import { useClassRequests, useSchool, useUser, useUsers } from '../queries'
 import { getUserId, isAdmin, isTeacher } from '../utils/auth'
-import { useAutoRefresh } from '../utils/autoRefresh'
 import { initials } from '../utils/format'
 import './Sidebar.css'
 
@@ -33,45 +33,18 @@ function Sidebar() {
   const navigate = useNavigate()
   const admin = isAdmin()
   const teacher = isTeacher()
-  const [school, setSchool] = useState(null)
-  const [user, setUser] = useState(null)
-  const [inboxCount, setInboxCount] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
 
-  const load = useCallback(() => {
-    let cancelled = false
-    const userId = getUserId()
+  const { data: school = null } = useSchool()
+  const { data: user = null } = useUser(getUserId())
+  const { data: users = null } = useUsers({}, { enabled: admin })
+  const { data: classRequests = null } = useClassRequests({ enabled: admin })
 
-    const requests = [api.get('/schools/me'), api.get(`/users/${userId}`)]
-    if (admin) requests.push(api.get('/users'), api.get('/class-requests'))
-
-    Promise.all(requests)
-      .then(([schoolRes, userRes, usersRes, classRequestsRes]) => {
-        if (cancelled) return
-        setSchool(schoolRes.data)
-        setUser(userRes.data)
-        if (admin) {
-          const pendingSignups = usersRes.data.filter(
-            (u) => u.role !== 'student' && !u.is_verified
-          ).length
-          const pendingClassRequests = classRequestsRes.data.filter(
-            (r) => r.status === 'pending'
-          ).length
-          setInboxCount(pendingSignups + pendingClassRequests)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setInboxCount((prev) => prev ?? 0)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [admin])
-
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
+  const inboxCount = admin
+    ? (users?.filter((u) => u.role !== 'student' && !u.is_verified).length || 0) +
+      (classRequests?.filter((r) => r.status === 'pending').length || 0)
+    : null
 
   useEffect(() => {
     if (!menuOpen) return
