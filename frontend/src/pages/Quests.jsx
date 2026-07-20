@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import { useQueries, useQueryClient } from '@tanstack/react-query'
 import api from '../api'
 import { useDialog } from '../components/DialogContext'
+import { keys, useSections } from '../queries'
 import '../styles/shared-ui.css'
 import './Quests.css'
 
@@ -18,9 +20,9 @@ const QUEST_TYPE_LABELS = {
 
 function Quests() {
   const { alert } = useDialog()
+  const queryClient = useQueryClient()
   const location = useLocation()
-  const [sections, setSections] = useState(null)
-  const [quests, setQuests] = useState(null)
+  const { data: sections = null } = useSections()
   const [category, setCategory] = useState('all')
   const [completingId, setCompletingId] = useState(null)
 
@@ -28,54 +30,38 @@ function Quests() {
     ? location.hash.slice('#quest-'.length)
     : null
 
+  const results = useQueries({
+    queries: (sections ?? []).map((s) => ({
+      queryKey: keys.sectionQuests(s.section_id),
+      queryFn: () => api.get(`/sections/${s.section_id}/quests`).then((r) => r.data),
+    })),
+  })
+
+  const stillLoading = sections === null || results.some((r) => r.isLoading)
+  const quests = stillLoading
+    ? null
+    : results
+        .flatMap((r, i) => {
+          if (!r.isSuccess) return []
+          const section = sections[i]
+          return r.data.map((q) => ({ ...q, section_id: section.section_id, section_name: section.class_name }))
+        })
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
   useEffect(() => {
     if (!quests || !highlightId) return
     const el = document.getElementById(`quest-${highlightId}`)
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [quests, highlightId])
 
-  useEffect(() => {
-    let cancelled = false
-    api
-      .get('/sections')
-      .then(({ data }) => {
-        if (!cancelled) setSections(data)
-      })
-      .catch(() => {
-        if (!cancelled) setSections([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!sections) return
-    let cancelled = false
-    Promise.allSettled(
-      sections.map((s) => api.get(`/sections/${s.section_id}/quests`))
-    ).then((results) => {
-      if (cancelled) return
-      const merged = results.flatMap((r, i) => {
-        if (r.status !== 'fulfilled') return []
-        const section = sections[i]
-        return r.value.data.map((q) => ({ ...q, section_name: section.class_name }))
-      })
-      merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      setQuests(merged)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [sections])
-
   async function handleComplete(quest) {
     setCompletingId(quest.quest_id)
     try {
       await api.post(`/quests/${quest.quest_id}/complete`)
-      setQuests((prev) =>
-        prev.map((q) => (q.quest_id === quest.quest_id ? { ...q, completed: true } : q))
+      queryClient.setQueryData(keys.sectionQuests(quest.section_id), (prev) =>
+        (prev || []).map((q) => (q.quest_id === quest.quest_id ? { ...q, completed: true } : q))
       )
+      queryClient.invalidateQueries({ queryKey: ['points'] })
     } catch (err) {
       await alert(err.response?.data?.message || 'Could not complete this quest.')
     } finally {
@@ -83,7 +69,7 @@ function Quests() {
     }
   }
 
-  const loading = sections === null || quests === null
+  const loading = quests === null
   const rows = loading ? [] : quests.filter((q) => category === 'all' || q.category === category)
 
   return (

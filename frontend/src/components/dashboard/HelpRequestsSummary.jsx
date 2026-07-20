@@ -1,41 +1,27 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
+import { keys, useHelpRequestsBoard } from '../../queries'
 import { useDialog } from '../DialogContext'
-import { useAutoRefresh } from '../../utils/autoRefresh'
 import { getMyHelpRequestIds, rememberRoom } from '../../utils/roomTracking'
 import './HelpRequestsSummary.css'
 
 function HelpRequestsSummary() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { alert } = useDialog()
-  const [requests, setRequests] = useState(null)
   const [joiningId, setJoiningId] = useState(null)
 
-  const load = useCallback(() => {
-    let cancelled = false
-    api
-      .get('/help-requests')
-      .then(({ data }) => {
-        if (cancelled) return
-        setRequests(data.filter((h) => h.status === 'open'))
-      })
-      .catch(() => {
-        if (!cancelled) setRequests((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
+  const { data: rawRequests = null } = useHelpRequestsBoard()
+  const requests = rawRequests === null ? null : rawRequests.filter((h) => h.status === 'open')
 
   async function handleJoin(hr) {
     setJoiningId(hr.help_request_id)
     try {
       const { data } = await api.post(`/help-requests/${hr.help_request_id}/accept`)
       rememberRoom({ room_id: data.room_id, topic: hr.topic })
+      queryClient.invalidateQueries({ queryKey: keys.helpRequests() })
       navigate(`/rooms/${data.room_id}`)
     } catch (err) {
       await alert(err.response?.data?.message || 'Could not join this request.')

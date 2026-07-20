@@ -1,28 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useQueries } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '../../api'
+import { keys } from '../../queries'
 import './QuestsSummary.css'
 
 function QuestsSummary({ sections }) {
-  const [quests, setQuests] = useState(null)
+  const results = useQueries({
+    queries: (sections ?? []).map((s) => ({
+      queryKey: keys.sectionQuests(s.section_id),
+      queryFn: () => api.get(`/sections/${s.section_id}/quests`).then((r) => r.data),
+    })),
+  })
 
-  useEffect(() => {
-    if (!sections) return
-    let cancelled = false
-    Promise.allSettled(
-      sections.map((s) => api.get(`/sections/${s.section_id}/quests`))
-    ).then((results) => {
-      if (cancelled) return
-      const merged = results
-        .filter((r) => r.status === 'fulfilled')
-        .flatMap((r) => r.value.data)
-        .filter((q) => !q.completed)
-      setQuests(merged)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [sections])
+  const stillLoading = sections === null || results.some((r) => r.isLoading)
+  const quests = stillLoading
+    ? null
+    : results.filter((r) => r.isSuccess).flatMap((r) => r.data).filter((q) => !q.completed)
 
   const loading = quests === null
   const visible = loading ? [] : quests.slice(0, 3)
