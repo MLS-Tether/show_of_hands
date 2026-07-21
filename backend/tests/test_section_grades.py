@@ -97,6 +97,7 @@ def test_non_owning_teacher_forbidden(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": other_teacher_username,
         "password": "password123",
+        "full_name": "Test Teacher",
         "school_code": world.school_code,
         "role": "teacher",
     })
@@ -133,6 +134,7 @@ def test_teacher_grade_lookup_for_unenrolled_student_404s(client, world, cleanup
     resp = client.post("/api/auth/register", json={
         "username": other_student_username,
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": world.school_code,
         "role": "student",
     })

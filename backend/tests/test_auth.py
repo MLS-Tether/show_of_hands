@@ -14,6 +14,7 @@ def test_register_and_login_student(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": username,
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": world.school_code,
         "role": "student",
     })
@@ -35,6 +36,7 @@ def test_register_unknown_school_code(client):
     resp = client.post("/api/auth/register", json={
         "username": unique("nope"),
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": "NOT_A_REAL_CODE",
         "role": "student",
     })
@@ -46,6 +48,7 @@ def test_register_duplicate_username_in_school(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": username,
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": world.school_code,
         "role": "student",
     })
@@ -55,6 +58,7 @@ def test_register_duplicate_username_in_school(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": username,
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": world.school_code,
         "role": "student",
     })
@@ -66,6 +70,7 @@ def test_teacher_login_blocked_until_verified(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": username,
         "password": "password123",
+        "full_name": "Test Teacher",
         "school_code": world.school_code,
         "role": "teacher",
     })
@@ -102,6 +107,7 @@ def test_refresh_and_logout(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": username,
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": world.school_code,
         "role": "student",
     })
@@ -138,6 +144,7 @@ def test_reset_password_student(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": username,
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": world.school_code,
         "role": "student",
     })
