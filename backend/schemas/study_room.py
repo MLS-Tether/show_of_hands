@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
 
@@ -25,6 +25,7 @@ class StudyRoomResponse(BaseModel):
     members: List[RoomMemberBrief]
     timer_ends_at: datetime
     status: StudyRoomStatusEnum
+    daily_room_url: Optional[str] = None
 
 
 class StudyRoomExtendResponse(BaseModel):
@@ -32,3 +33,8 @@ class StudyRoomExtendResponse(BaseModel):
 
     room_id: int
     timer_ends_at: datetime
+
+
+class VideoTokenResponse(BaseModel):
+    token: str
+    room_url: str
