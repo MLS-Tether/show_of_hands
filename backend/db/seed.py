@@ -312,6 +312,124 @@ def seed_dev_data():
         db.close()
 
 
+# Target weighted-average per student, spanning A/B/C/D/F evenly (3 each) so
+# the section's grade distribution and category averages look like a real
+# class roster rather than a handful of demo accounts.
+CS_EXTRA_STUDENT_TARGETS = [96, 93, 90, 87, 84, 81, 78, 75, 72, 69, 64, 60, 55, 50, 44]
+
+
+def seed_more_cs_students(count: int = 15):
+    """Adds `count` more students to teacher_demo's existing Computer Science
+    section (section_a from seed_dev_data()) with varying grades on its 3
+    existing assignments, so the assignment-fit advisor has a realistic
+    class size and grade spread to reason over instead of just 3 students.
+
+    Guarded on the first new student's username already existing, so reruns
+    (e.g. app restarts) don't duplicate the roster.
+    """
+    if os.getenv("ENV") != "development":
+        return
+
+    db = SessionLocal()
+    try:
+        school = db.query(School).filter(School.school_code == DEV_SCHOOL_CODE).first()
+        if not school:
+            return  # seed_dev_data() hasn't run yet -- nothing to attach to
+
+        if db.query(User).filter(
+            User.school_id == school.school_id,
+            User.username == "cs_student_01",
+        ).first():
+            return
+
+        cs_class = db.query(Class_).filter(Class_.name == "Computer Science").first()
+        section = db.query(Section).filter(
+            Section.school_id == school.school_id,
+            Section.class_id == cs_class.class_id,
+        ).first()
+        if not cs_class or not section:
+            raise RuntimeError("seed_more_cs_students requires seed_dev_data() to have run first")
+
+        assignments = {
+            a.title: a
+            for a in db.query(Assignment).filter(Assignment.section_id == section.section_id).all()
+        }
+        loops_quiz = assignments["Intro to Loops Quiz"]
+        binary_search_lab = assignments["Binary Search Lab"]
+        recursion_set = assignments["Recursion Practice Set"]
+
+        now = datetime.now(timezone.utc)
+        password_hash = hash_password(DEV_PASSWORD)
+
+        def seed_graded_submission(assignment, student, grade, submitted_days_ago, finalized_days_ago):
+            """Same 25%-on-submit + grade-tier bonus formula as seed_dev_data()."""
+            submitted_at = now - timedelta(days=submitted_days_ago)
+            finalized_at = now - timedelta(days=finalized_days_ago)
+            initial_points = int(assignment.point_value * 0.25)
+            bonus_points = (
+                int(assignment.point_value * 0.75) if grade >= 85
+                else int(assignment.point_value * 0.50) if grade >= 70
+                else 0
+            )
+            db.add(Submission(
+                assignment_id=assignment.assignment_id,
+                student_id=student.user_id,
+                content="Submitted via demo seed data.",
+                status=SubmissionStatusEnum.graded,
+                grade=grade,
+                points_awarded=initial_points + bonus_points,
+                finalized_at=finalized_at,
+                created_at=submitted_at,
+                updated_at=finalized_at,
+            ))
+            db.add(PointTransaction(
+                user_id=student.user_id,
+                amount=initial_points,
+                source=TransactionSourceEnum.assignment,
+                source_id=assignment.assignment_id,
+                awarded_at=submitted_at,
+            ))
+            db.add(PointTransaction(
+                user_id=student.user_id,
+                amount=bonus_points,
+                source=TransactionSourceEnum.assignment,
+                source_id=assignment.assignment_id,
+                awarded_at=finalized_at,
+            ))
+            student.total_points += initial_points + bonus_points
+
+        for i in range(1, count + 1):
+            target = CS_EXTRA_STUDENT_TARGETS[(i - 1) % len(CS_EXTRA_STUDENT_TARGETS)]
+            username = f"cs_student_{i:02d}"
+            student = User(
+                school_id=school.school_id,
+                username=username,
+                full_name=f"CS Student {i:02d}",
+                password_hash=password_hash,
+                role=RoleEnum.student,
+                is_verified=True,
+            )
+            db.add(student)
+            db.flush()
+
+            db.add(Enrollment(section_id=section.section_id, student_id=student.user_id))
+
+            def jittered(base, spread):
+                return max(0, min(100, round(base + random.uniform(-spread, spread), 1)))
+
+            quiz_grade = jittered(target, 4)
+            hw_grade = jittered(target, 4)
+            test_grade = jittered(target, 3)
+
+            seed_graded_submission(loops_quiz, student, quiz_grade, 6, 4)
+            seed_graded_submission(binary_search_lab, student, hw_grade, 5, 3)
+            seed_graded_submission(recursion_set, student, test_grade, 2, 1)
+
+        db.commit()
+    finally:
+        db.close()
+
+
 def seed_second_teacher_data():
     """Adds a second teacher (teacher_demo2) with 3 sections of her own, each
     with 3 assignments, 3 quests, and a random subset of the existing seeded
