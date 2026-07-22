@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import DailyIframe from '@daily-co/daily-js'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
@@ -37,10 +38,15 @@ function RoomDetail() {
   const [confirmResult, setConfirmResult] = useState(null)
   const [actionError, setActionError] = useState('')
   const [connectionStatus, setConnectionStatus] = useState('connecting')
+  const [videoJoined, setVideoJoined] = useState(false)
+  const [videoLoading, setVideoLoading] = useState(false)
+  const [videoError, setVideoError] = useState('')
   const wsRef = useRef(null)
   const reconnectTimeoutRef = useRef(null)
   const reconnectAttemptRef = useRef(0)
   const closingIntentionallyRef = useRef(false)
+  const videoContainerRef = useRef(null)
+  const callFrameRef = useRef(null)
 
   // Kicks/leaves/status changes from other members aren't pushed in real
   // time (only chat is) — the query's own 20s refetchInterval keeps this one
@@ -122,6 +128,43 @@ function RoomDetail() {
       wsRef.current = null
     }
   }, [activeRoomId, roomId, navigate, alert, queryClient])
+
+  const leaveVideoCall = useCallback(() => {
+    callFrameRef.current?.destroy().catch(() => {})
+    callFrameRef.current = null
+    setVideoJoined(false)
+  }, [])
+
+  // Room going inactive (closed/deleted/navigated away) should always take
+  // the call down with it — nothing else tears down the iframe otherwise.
+  // The cleanup fires both on unmount and whenever activeRoomId changes
+  // (e.g. active -> null when the room closes), so no need to also call
+  // this from the effect body itself.
+  useEffect(() => {
+    return () => leaveVideoCall()
+  }, [activeRoomId, leaveVideoCall])
+
+  async function handleJoinVideo() {
+    setVideoError('')
+    setVideoLoading(true)
+    try {
+      const { data } = await api.post(`/rooms/${roomId}/video-token`)
+      const callFrame = DailyIframe.createFrame(videoContainerRef.current, {
+        showLeaveButton: true,
+        iframeStyle: { width: '100%', height: '100%', border: '0' },
+      })
+      callFrame.on('left-meeting', leaveVideoCall)
+      callFrameRef.current = callFrame
+      await callFrame.join({ url: data.room_url, token: data.token })
+      setVideoJoined(true)
+    } catch (err) {
+      setVideoError(err.response?.data?.message || 'Could not join the video call.')
+      callFrameRef.current?.destroy().catch(() => {})
+      callFrameRef.current = null
+    } finally {
+      setVideoLoading(false)
+    }
+  }
 
   function handleSend(e) {
     e.preventDefault()
@@ -305,6 +348,28 @@ function RoomDetail() {
           </div>
         ))}
       </div>
+
+      {room.status === 'active' && room.daily_room_url && (
+        <>
+          <div className="widget-label">video call</div>
+          {videoError && <p className="room-detail-error">{videoError}</p>}
+          {!videoJoined && (
+            <button
+              type="button"
+              className="admin-btn-secondary room-detail-video-join-btn"
+              disabled={videoLoading}
+              onClick={handleJoinVideo}
+            >
+              {videoLoading ? 'Joining…' : 'Join video call'}
+            </button>
+          )}
+          <div
+            ref={videoContainerRef}
+            className="room-detail-video"
+            style={{ display: videoJoined ? 'block' : 'none' }}
+          />
+        </>
+      )}
 
       <div className="widget-label">chat</div>
       {room.status !== 'active' && (
