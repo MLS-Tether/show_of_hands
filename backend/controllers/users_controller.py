@@ -10,7 +10,6 @@ from db.pool import get_db
 from dependencies import get_current_user, require_role
 from grading import compute_section_grade_for_student
 from image_utils import delete_avatar_image, save_avatar_image
-from validators import validate_full_name
 from models.enrollment_model import Enrollment
 from models.notification_model import Notification, NotificationTypeEnum
 from models.section_model import Section, SectionStatusEnum
@@ -61,8 +60,6 @@ def update_my_profile(
         if existing:
             raise HTTPException(status_code=409, detail="Username already taken.")
         current_user.username = username
-
-    current_user.full_name = validate_full_name(body.full_name)
 
     db.commit()
     db.refresh(current_user)

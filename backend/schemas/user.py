@@ -58,7 +58,6 @@ class UserListResponse(BaseModel):
 
 class ProfileUpdateRequest(BaseModel):
     username: Optional[str] = None
-    full_name: str
 
 
 class ProfilePictureResponse(BaseModel):

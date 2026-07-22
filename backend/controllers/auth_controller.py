@@ -17,7 +17,7 @@ from dependencies import get_current_user, require_role
 from models.user_model import User, RoleEnum
 from models.school_model import School
 from schemas.user import UserResponse
-from validators import validate_full_name
+from validators import validate_full_name, validate_new_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -199,6 +199,27 @@ def reset_password(
     if target.school_id != current_user.school_id:
         raise HTTPException(status_code=403, detail="Cannot reset passwords for users outside your school.")
 
-    target.password_hash = hash_password(body.new_password)
+    new_password = validate_new_password(body.new_password)
+    target.password_hash = hash_password(new_password)
     db.commit()
     return {"message": "Password reset successfully."}
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+
+@router.post("/change-password")
+def change_password(
+    body: ChangePasswordRequest,
+    current_user: User = Depends(require_role(["teacher", "admin"])),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(body.old_password, current_user.password_hash):
+        raise HTTPException(status_code=401, detail="Current password is incorrect.")
+
+    new_password = validate_new_password(body.new_password)
+    current_user.password_hash = hash_password(new_password)
+    db.commit()
+    return {"message": "Password changed successfully."}

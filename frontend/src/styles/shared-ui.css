@@ -210,6 +210,12 @@
   margin-top: 4px;
 }
 
+.modal-form-error {
+  font-size: 13px;
+  color: var(--danger);
+  margin: 0;
+}
+
 .admin-chevron {
   display: inline-block;
   color: var(--text-muted);

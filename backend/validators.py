@@ -1,6 +1,20 @@
 from fastapi import HTTPException
 
 FULL_NAME_MAX_LENGTH = 100
+PASSWORD_MIN_LENGTH = 8
+
+
+def validate_new_password(raw: str) -> str:
+    """Shared minimum-strength check for anywhere a new password is set
+    (self-service change, admin reset). Not stripped — leading/trailing
+    whitespace in a password is the user's choice, not a typo to clean up.
+    """
+    if len(raw) < PASSWORD_MIN_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Password must be at least {PASSWORD_MIN_LENGTH} characters.",
+        )
+    return raw
 
 
 def validate_full_name(raw: str) -> str:

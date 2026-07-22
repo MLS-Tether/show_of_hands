@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -5,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+import daily_client
 from auth_utils import decode_token
 from ws_auth import ws_token_from_subprotocol
 from db.data_events import emit_data_event, resolve_section_audience
@@ -14,9 +16,10 @@ from dependencies import get_current_user
 from models.help_request_model import HelpRequestStatusEnum
 from models.study_room_model import StudyRoom, RoomMember, StudyRoomStatusEnum
 from models.user_model import User, RoleEnum
-from schemas.study_room import StudyRoomResponse, StudyRoomExtendResponse
+from schemas.study_room import StudyRoomResponse, StudyRoomExtendResponse, VideoTokenResponse
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
+logger = logging.getLogger(__name__)
 
 # In-memory registry — never persisted to DB
 # Structure: { room_id: { user_id: WebSocket } }
@@ -71,7 +74,21 @@ def _build_room_response(room: StudyRoom) -> dict:
         ],
         "timer_ends_at": room.timer_ends_at,
         "status": room.status,
+        "daily_room_url": room.daily_room_url,
     }
+
+
+def _teardown_daily_room(room: StudyRoom):
+    """Best-effort Daily room deletion — called everywhere a study room
+    closes or is deleted. Never raises: the room's own close/delete has
+    already committed by the time this runs, so a Daily-side failure here
+    just means that room lingers until its own exp cleans it up."""
+    if not room.daily_room_name:
+        return
+    try:
+        daily_client.delete_room(room.daily_room_name)
+    except Exception:
+        logger.exception("Failed to delete Daily room for study room %s", room.room_id)
 
 
 async def _close_room_connections(
@@ -132,6 +149,40 @@ def get_room(
     return _build_room_response(room)
 
 
+@router.post("/{room_id}/video-token", response_model=VideoTokenResponse)
+def get_video_token(
+    room_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    room = _get_room_or_404(room_id, db)
+
+    member = db.query(RoomMember).filter(
+        RoomMember.room_id == room_id,
+        RoomMember.user_id == current_user.user_id,
+    ).first()
+    if not member:
+        raise HTTPException(status_code=403, detail="Not a room member.")
+    if room.status != StudyRoomStatusEnum.active:
+        raise HTTPException(status_code=409, detail="Room is not active.")
+    if not room.daily_room_name:
+        raise HTTPException(status_code=503, detail="Video chat is not available for this room.")
+
+    is_owner = current_user.user_id == room.help_request.requester_id
+    try:
+        token = daily_client.create_meeting_token(
+            room.daily_room_name,
+            current_user.username,
+            is_owner,
+            int(room.timer_ends_at.timestamp()),
+        )
+    except Exception:
+        logger.exception("Failed to create Daily meeting token for study room %s", room.room_id)
+        raise HTTPException(status_code=503, detail="Video chat is temporarily unavailable.")
+
+    return VideoTokenResponse(token=token, room_url=room.daily_room_url)
+
+
 @router.post("/{room_id}/kick")
 async def kick_member(
     room_id: int,
@@ -168,6 +219,7 @@ async def kick_member(
     if remaining <= 1:
         room.status = StudyRoomStatusEnum.closed
         db.commit()
+        _teardown_daily_room(room)
         await _close_room_connections(room_id, requester_id=current_user.user_id)
 
     _emit_room_events(db, room, "updated", hr_action="updated")
@@ -208,6 +260,7 @@ async def leave_room(
     if remaining == 0 and room.status == StudyRoomStatusEnum.active:
         room.status = StudyRoomStatusEnum.closed
         db.commit()
+        _teardown_daily_room(room)
         await _close_room_connections(room_id, requester_id=room.help_request.requester_id)
 
     # Keep the help request's participant count in sync with who's actually left in the room,
@@ -276,6 +329,7 @@ async def close_room(
     _emit_room_events(db, room, "updated", hr_action="deleted")
     db.commit()
 
+    _teardown_daily_room(room)
     await _close_room_connections(room_id, requester_id=current_user.user_id)
     return {"message": "Room closed."}
 
@@ -292,6 +346,7 @@ async def delete_room(
     # The requester has full autonomy to delete the room at any time, active or
     # closed — this is a hard teardown, not the graceful /close flow, so there's
     # no session-confirmation prompt: just notify everyone and disconnect them.
+    _teardown_daily_room(room)
     await _close_room_connections(room_id, notify_type="room_deleted")
 
     # Deletion is terminal — archive the help request too so it stops

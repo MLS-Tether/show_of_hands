@@ -1,9 +1,11 @@
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import List, Union
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
+import daily_client
 from db.data_events import emit_data_event, resolve_admin_audience, resolve_section_audience
 from db.pool import get_db
 from dependencies import get_current_user, require_role
@@ -27,6 +29,7 @@ from schemas.help_request import (
 )
 
 router = APIRouter(tags=["help-requests"])
+logger = logging.getLogger(__name__)
 
 HELP_SESSION_POINTS = 25
 
@@ -296,6 +299,20 @@ def accept_help_request(
         db.add(room)
         db.flush()
         db.add(RoomMember(room_id=room.room_id, user_id=help_request.requester_id))
+
+        # Best-effort: a Daily outage shouldn't block room creation, since
+        # chat works fine without video. Room just won't offer a call.
+        if daily_client.is_configured():
+            try:
+                daily_room_name = f"study-room-{room.room_id}"
+                daily_room = daily_client.create_room(
+                    daily_room_name,
+                    int(room.timer_ends_at.timestamp()),
+                )
+                room.daily_room_name = daily_room_name
+                room.daily_room_url = daily_room["url"]
+            except Exception:
+                logger.exception("Failed to create Daily room for study room %s", room.room_id)
     else:
         room = help_request.study_room
 

@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, Integer, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import relationship
 from db.pool import Base
 
@@ -17,6 +17,8 @@ class StudyRoom(Base):
     help_request_id = Column(Integer, ForeignKey("help_requests.help_request_id"), nullable=False, unique=True)
     timer_ends_at = Column(DateTime(timezone=True), nullable=False)
     status = Column(Enum(StudyRoomStatusEnum), nullable=False, default=StudyRoomStatusEnum.active)
+    daily_room_name = Column(String, nullable=True)
+    daily_room_url = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     help_request = relationship("HelpRequest", back_populates="study_room")
