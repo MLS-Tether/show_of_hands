@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from db.data_events import emit_data_event, resolve_admin_audience, resolve_section_audience
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from grading import compute_section_grade_for_student
@@ -135,6 +136,10 @@ def create_section(
         capacity=body.capacity,
     )
     db.add(section)
+    emit_data_event(
+        db, "sections", "created", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id, [current_user.user_id]),
+    )
     db.commit()
     db.refresh(section)
     return {
@@ -365,6 +370,11 @@ def update_section(
         if body.teacher_id is not None:
             section.teacher_id = body.teacher_id
 
+    emit_data_event(
+        db, "sections", "updated", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section_id,
+    )
     db.commit()
     db.refresh(section)
     return section
@@ -386,5 +396,10 @@ def delete_section(
 
     section.is_archived = True
     section.deleted_at = datetime.now(timezone.utc)
+    emit_data_event(
+        db, "sections", "deleted", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section_id,
+    )
     db.commit()
     return {"message": "Section deleted successfully."}

@@ -41,6 +41,7 @@ class QuestResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     quest_id: int
+    section_id: int
     title: str
     description: str
     category: QuestCategoryEnum

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from auth_utils import decode_token
 from db.pool import get_db, SessionLocal
-from db.ws_broadcast import notification_queue
+from db.ws_broadcast import notification_queue, data_events_queue
 from dependencies import get_current_user, require_role
 from models.enrollment_model import Enrollment
 from models.notification_model import Notification, NotificationTypeEnum
@@ -182,3 +182,40 @@ async def deliver_notifications():
                 dead_connections.append(ws)
         for ws in dead_connections:
             connections.remove(ws)
+
+
+async def route_data_event(data: dict, registry: dict):
+    """Push one data-change event to its audience's connected sockets.
+    Separated from the queue loop so tests can call it directly."""
+    message = {"type": "data_event", "event": data}
+    if data.get("broadcast_school"):
+        target_ids = list(registry.keys())
+    else:
+        target_ids = data.get("user_ids") or []
+
+    for user_id in target_ids:
+        connections = registry.get(user_id)
+        if not connections:
+            continue
+        dead_connections = []
+        for ws in list(connections):
+            try:
+                await ws.send_json(message)
+            except Exception:
+                dead_connections.append(ws)
+        for ws in dead_connections:
+            connections.remove(ws)
+
+
+async def deliver_data_events():
+    """Runs as an asyncio task. Reads relayed data-change payloads off the
+    queue (fired by emit_data_event in mutating controllers) and pushes them
+    to each affected user's connected notification sockets, where the
+    frontend maps them to cache invalidations."""
+    while True:
+        raw_payload = await data_events_queue.get()
+        try:
+            data = json.loads(raw_payload)
+        except json.JSONDecodeError:
+            continue
+        await route_data_event(data, notification_registry)

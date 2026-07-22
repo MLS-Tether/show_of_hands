@@ -1,38 +1,22 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import api from '../../api'
+import { useAssignments } from '../../queries'
 import { formatDueDate } from '../../utils/formatDueDate'
-import { useAutoRefresh } from '../../utils/autoRefresh'
 import './AssignmentsSummary.css'
 
 function AssignmentsSummary() {
   const navigate = useNavigate()
-  const [assignments, setAssignments] = useState(null)
+  const { data: rawAssignments = null } = useAssignments()
+  // Lazy-initialized once at mount rather than recomputed on every render,
+  // which would call the impure Date.now() during render.
+  const [now] = useState(() => Date.now())
 
-  const load = useCallback(() => {
-    let cancelled = false
-    api
-      .get('/assignments')
-      .then(({ data }) => {
-        if (cancelled) return
-        const now = Date.now()
-        const merged = data
-          .filter((a) => new Date(a.due_date).getTime() >= now)
-          .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
-        setAssignments(merged)
-      })
-      .catch(() => {
-        if (!cancelled) setAssignments((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
-
-  const loading = assignments === null
+  const loading = rawAssignments === null
+  const assignments = loading
+    ? []
+    : rawAssignments
+        .filter((a) => new Date(a.due_date).getTime() >= now)
+        .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
   const visible = loading ? [] : assignments.slice(0, 3)
   const hasMore = !loading && assignments.length > 3
 

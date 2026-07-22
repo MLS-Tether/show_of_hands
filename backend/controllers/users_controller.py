@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from db.data_events import emit_data_event, resolve_admin_audience, resolve_section_audience
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from grading import compute_section_grade_for_student
@@ -193,6 +194,11 @@ def verify_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
     user.is_verified = True
+    emit_data_event(
+        db, "users", "updated", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id, [user_id]),
+        ids={"user_id": user_id},
+    )
     db.commit()
     return {"message": "User verified successfully."}
 
@@ -215,6 +221,11 @@ def reject_signup(
         raise HTTPException(status_code=409, detail="User is already verified.")
 
     user.rejection_reason = body.reason or "Rejected by admin"
+    emit_data_event(
+        db, "users", "updated", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id, [user_id]),
+        ids={"user_id": user_id},
+    )
     db.commit()
     return {"message": "Signup rejected."}
 
@@ -237,6 +248,11 @@ def deactivate_user(
         raise HTTPException(status_code=404, detail="User not found.")
 
     user.is_active = False
+    emit_data_event(
+        db, "users", "updated", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id, [user_id]),
+        ids={"user_id": user_id},
+    )
     db.commit()
     return {"message": "User deactivated successfully."}
 
@@ -255,6 +271,11 @@ def reactivate_user(
         raise HTTPException(status_code=404, detail="User not found.")
 
     user.is_active = True
+    emit_data_event(
+        db, "users", "updated", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id, [user_id]),
+        ids={"user_id": user_id},
+    )
     db.commit()
     return {"message": "User reactivated successfully."}
 
@@ -296,6 +317,16 @@ def delete_user(
                     type=NotificationTypeEnum.section_status,
                     message=f"Section #{section.section_id} is pending teacher reassignment.",
                 ))
+            emit_data_event(
+                db, "sections", "updated", section.school_id,
+                resolve_section_audience(db, section),
+                section_id=section.section_id,
+            )
 
+    emit_data_event(
+        db, "users", "deleted", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id),
+        ids={"user_id": user_id},
+    )
     db.commit()
     return {"message": "User deleted successfully."}

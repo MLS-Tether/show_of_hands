@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 import daily_client
 from auth_utils import decode_token
+from db.data_events import emit_data_event, resolve_section_audience
 from db.pool import get_db, SessionLocal
 from db.ws_broadcast import notify_room_message
 from dependencies import get_current_user
@@ -42,6 +43,23 @@ def _get_room_or_404(room_id: int, db: Session) -> StudyRoom:
 def _require_requester(room: StudyRoom, user_id: int):
     if room.help_request.requester_id != user_id:
         raise HTTPException(status_code=403, detail="Only the room requester can perform this action.")
+
+
+def _emit_room_events(db: Session, room: StudyRoom, room_action: str, hr_action: Optional[str] = None):
+    """Queue rooms (and optionally help_requests) data events for everyone in
+    the room's section. Delivered on the caller's next db.commit()."""
+    section = room.help_request.section
+    audience = resolve_section_audience(db, section)
+    emit_data_event(
+        db, "rooms", room_action, section.school_id, audience,
+        section_id=section.section_id, ids={"room_id": room.room_id},
+    )
+    if hr_action is not None:
+        emit_data_event(
+            db, "help_requests", hr_action, section.school_id, audience,
+            section_id=section.section_id,
+            ids={"help_request_id": room.help_request_id, "room_id": room.room_id},
+        )
 
 
 def _build_room_response(room: StudyRoom) -> dict:
@@ -203,6 +221,8 @@ async def kick_member(
         _teardown_daily_room(room)
         await _close_room_connections(room_id, requester_id=current_user.user_id)
 
+    _emit_room_events(db, room, "updated", hr_action="updated")
+    db.commit()
     return {"message": "Member removed from room."}
 
 
@@ -251,6 +271,7 @@ async def leave_room(
         help_request.is_archived = True
     elif remaining < help_request.group_size and help_request.status == HelpRequestStatusEnum.active:
         help_request.status = HelpRequestStatusEnum.open
+    _emit_room_events(db, room, "updated", hr_action="updated")
     db.commit()
 
     return {"message": "Left the room."}
@@ -269,6 +290,7 @@ def extend_room(
         raise HTTPException(status_code=409, detail="Room is not active.")
 
     room.timer_ends_at = room.timer_ends_at + timedelta(minutes=10)
+    _emit_room_events(db, room, "updated")
     db.commit()
     db.refresh(room)
 
@@ -303,6 +325,7 @@ async def close_room(
     help_request.status = HelpRequestStatusEnum.closed
     help_request.is_archived = True
 
+    _emit_room_events(db, room, "updated", hr_action="deleted")
     db.commit()
 
     _teardown_daily_room(room)
@@ -331,6 +354,7 @@ async def delete_room(
     help_request.status = HelpRequestStatusEnum.closed
     help_request.is_archived = True
 
+    _emit_room_events(db, room, "deleted", hr_action="deleted")
     db.query(RoomMember).filter(RoomMember.room_id == room_id).delete()
     db.delete(room)
     db.commit()

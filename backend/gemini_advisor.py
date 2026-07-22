@@ -12,7 +12,7 @@ from typing import List, Literal
 import httpx
 from pydantic import BaseModel
 
-GEMINI_MODEL = "gemini-3.5-flash"
+GEMINI_MODEL = "gemini-3.1-flash-lite"
 # v1beta verified working (v1beta2 returns 404 as of 2026-07).
 GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions"
 GEMINI_TIMEOUT_SECONDS = 60.0

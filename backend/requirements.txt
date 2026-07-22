@@ -11,6 +11,7 @@ bcrypt<4.1
 python-dotenv
 python-multipart
 Pillow
+supabase
 apscheduler
 httpx
 pytest

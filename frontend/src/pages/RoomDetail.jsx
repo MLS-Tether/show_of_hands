@@ -1,9 +1,10 @@
 import DailyIframe from '@daily-co/daily-js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
 import { useDialog } from '../components/DialogContext'
-import { useAutoRefresh } from '../utils/autoRefresh'
+import { keys, useRoom } from '../queries'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
 import { wsUrlWithFreshToken } from '../utils/ws'
 import '../styles/shared-ui.css'
@@ -26,12 +27,10 @@ function formatCountdown(ms) {
 function RoomDetail() {
   const { roomId } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { confirm, alert } = useDialog()
   const currentUserId = Number(localStorage.getItem('user_id'))
 
-  const [room, setRoom] = useState(null)
-  const [loadFailed, setLoadFailed] = useState(false)
-  const [loadedRoomId, setLoadedRoomId] = useState(null)
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [now, setNow] = useState(() => Date.now())
@@ -49,32 +48,15 @@ function RoomDetail() {
   const videoContainerRef = useRef(null)
   const callFrameRef = useRef(null)
 
-  const loadRoom = useCallback(() => {
-    let cancelled = false
-    api
-      .get(`/rooms/${roomId}`)
-      .then(({ data }) => {
-        if (cancelled) return
-        setRoom(data)
-        setLoadFailed(false)
-        setLoadedRoomId(roomId)
-        rememberRoom({ room_id: data.room_id })
-      })
-      .catch(() => {
-        if (cancelled) return
-        setLoadFailed(true)
-        setLoadedRoomId(roomId)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [roomId])
-
-  useEffect(() => loadRoom(), [loadRoom])
   // Kicks/leaves/status changes from other members aren't pushed in real
-  // time (only chat is) — keep this one on a shorter interval than the app
-  // default so room state doesn't feel stale for minutes at a time.
-  useAutoRefresh(loadRoom, 20000)
+  // time (only chat is) — the query's own 20s refetchInterval keeps this one
+  // shorter than the app default so room state doesn't feel stale for
+  // minutes at a time.
+  const { data: room = null, isError: loadFailed, isLoading: loadingRoom } = useRoom(roomId)
+
+  useEffect(() => {
+    if (room) rememberRoom({ room_id: room.room_id })
+  }, [room])
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
@@ -113,7 +95,9 @@ function RoomDetail() {
             return
           }
           if (data.type === 'timer_extended') {
-            setRoom((prev) => (prev ? { ...prev, timer_ends_at: data.timer_ends_at } : prev))
+            queryClient.setQueryData(keys.room(roomId), (prev) =>
+              prev ? { ...prev, timer_ends_at: data.timer_ends_at } : prev
+            )
             return
           }
           setMessages((prev) => [...prev, data])
@@ -143,7 +127,7 @@ function RoomDetail() {
       wsRef.current?.close()
       wsRef.current = null
     }
-  }, [activeRoomId, roomId, navigate, alert])
+  }, [activeRoomId, roomId, navigate, alert, queryClient])
 
   const leaveVideoCall = useCallback(() => {
     callFrameRef.current?.destroy().catch(() => {})
@@ -202,7 +186,7 @@ function RoomDetail() {
     setActionError('')
     try {
       const { data } = await api.post(`/rooms/${roomId}/extend`)
-      setRoom((prev) => ({ ...prev, timer_ends_at: data.timer_ends_at }))
+      queryClient.setQueryData(keys.room(roomId), (prev) => ({ ...prev, timer_ends_at: data.timer_ends_at }))
     } catch (err) {
       setActionError(err.response?.data?.message || 'Could not extend the room.')
     }
@@ -213,7 +197,7 @@ function RoomDetail() {
     setActionError('')
     try {
       await api.post(`/rooms/${roomId}/close`)
-      setRoom((prev) => ({ ...prev, status: 'closed' }))
+      queryClient.setQueryData(keys.room(roomId), (prev) => ({ ...prev, status: 'closed' }))
       forgetRoom(Number(roomId))
     } catch (err) {
       setActionError(err.response?.data?.message || 'Could not close the room.')
@@ -225,7 +209,10 @@ function RoomDetail() {
     setActionError('')
     try {
       await api.post(`/rooms/${roomId}/kick`, { user_id: userId })
-      setRoom((prev) => ({ ...prev, members: prev.members.filter((m) => m.user_id !== userId) }))
+      queryClient.setQueryData(keys.room(roomId), (prev) => ({
+        ...prev,
+        members: prev.members.filter((m) => m.user_id !== userId),
+      }))
     } catch (err) {
       setActionError(err.response?.data?.message || 'Could not remove that member.')
     }
@@ -272,9 +259,7 @@ function RoomDetail() {
     }
   }
 
-  const loading = loadedRoomId !== roomId
-
-  if (loading) {
+  if (loadingRoom) {
     return (
       <section className="room-detail">
         <p className="admin-empty-card">Loading study room…</p>

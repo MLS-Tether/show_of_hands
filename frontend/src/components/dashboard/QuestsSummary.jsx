@@ -1,28 +1,13 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import api from '../../api'
+import { useQuestsForSections } from '../../queries'
 import './QuestsSummary.css'
 
 function QuestsSummary({ sections }) {
-  const [quests, setQuests] = useState(null)
+  const sectionIds = (sections ?? []).map((s) => s.section_id)
+  const { data: rawQuests, isLoading: questsLoading } = useQuestsForSections(sectionIds)
 
-  useEffect(() => {
-    if (!sections) return
-    let cancelled = false
-    Promise.allSettled(
-      sections.map((s) => api.get(`/sections/${s.section_id}/quests`))
-    ).then((results) => {
-      if (cancelled) return
-      const merged = results
-        .filter((r) => r.status === 'fulfilled')
-        .flatMap((r) => r.value.data)
-        .filter((q) => !q.completed)
-      setQuests(merged)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [sections])
+  const stillLoading = sections === null || (sectionIds.length > 0 && questsLoading)
+  const quests = stillLoading ? null : (rawQuests ?? []).filter((q) => !q.completed)
 
   const loading = quests === null
   const visible = loading ? [] : quests.slice(0, 3)

@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
+import { keys, useClasses } from '../../queries'
 import './AddSectionForm.css'
 
 function AddSectionForm({ onCreated }) {
+  const queryClient = useQueryClient()
   const [expanded, setExpanded] = useState(false)
-  const [classes, setClasses] = useState(null)
   const [classId, setClassId] = useState('')
   const [period, setPeriod] = useState('')
   const [capacity, setCapacity] = useState(30)
@@ -17,23 +19,11 @@ function AddSectionForm({ onCreated }) {
   const [classRequestMessage, setClassRequestMessage] = useState('')
   const [requestingClass, setRequestingClass] = useState(false)
 
-  useEffect(() => {
-    if (!expanded || classes !== null) return
-    let cancelled = false
-    api
-      .get('/classes')
-      .then(({ data }) => {
-        if (cancelled) return
-        setClasses(data)
-        if (data.length > 0) setClassId(String(data[0].class_id))
-      })
-      .catch(() => {
-        if (!cancelled) setClasses((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [expanded, classes])
+  const { data: classes = null } = useClasses({ enabled: expanded })
+  // classId only tracks an explicit user selection; until they touch the
+  // select, default to the first loaded class instead of syncing state from
+  // a fetch (which would mean calling setState during an effect).
+  const selectedClassId = classId || (classes?.[0] ? String(classes[0].class_id) : '')
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -41,10 +31,11 @@ function AddSectionForm({ onCreated }) {
     setSubmitting(true)
     try {
       await api.post('/sections', {
-        class_id: Number(classId),
+        class_id: Number(selectedClassId),
         period,
         capacity: Number(capacity),
       })
+      queryClient.invalidateQueries({ queryKey: ['sections'] })
       setPeriod('')
       setCapacity(30)
       setExpanded(false)
@@ -63,6 +54,7 @@ function AddSectionForm({ onCreated }) {
     setRequestingClass(true)
     try {
       await api.post('/class-requests', { class_name: newClassName })
+      queryClient.invalidateQueries({ queryKey: keys.classRequests() })
       setClassRequestMessage('Request submitted — an admin will review it.')
       setNewClassName('')
     } catch (err) {
@@ -96,7 +88,7 @@ function AddSectionForm({ onCreated }) {
           ) : classes.length === 0 ? (
             <span className="add-section-hint">No classes available yet — request one below.</span>
           ) : (
-            <select value={classId} onChange={(e) => setClassId(e.target.value)} required>
+            <select value={selectedClassId} onChange={(e) => setClassId(e.target.value)} required>
               {classes.map((c) => (
                 <option key={c.class_id} value={c.class_id}>
                   {c.name}

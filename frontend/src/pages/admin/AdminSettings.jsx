@@ -1,34 +1,22 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
 import { useToast } from '../../components/ToastContext'
+import { keys, useSchool, useUsers } from '../../queries'
 import '../../styles/shared-ui.css'
 import './AdminSettings.css'
 
 function AdminSettings() {
   const { showToast } = useToast()
-  const [school, setSchool] = useState(null)
-  const [activeUsers, setActiveUsers] = useState(null)
+  const queryClient = useQueryClient()
+  const { data: school = null } = useSchool()
+  const { data: users = null } = useUsers()
+  const activeUsers = users?.length ?? null
   const [code, setCode] = useState(null)
   const [revealed, setRevealed] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ name: '', district: '', grades: '' })
   const [saving, setSaving] = useState(false)
-
-  const load = useCallback(() => {
-    let cancelled = false
-    Promise.all([api.get('/schools/me'), api.get('/users')])
-      .then(([schoolRes, usersRes]) => {
-        if (cancelled) return
-        setSchool(schoolRes.data)
-        setActiveUsers(usersRes.data.length)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => load(), [load])
 
   async function toggleReveal() {
     if (!revealed && !code) {
@@ -76,7 +64,7 @@ function AdminSettings() {
     setSaving(true)
     try {
       const { data } = await api.patch('/schools/me', form)
-      setSchool(data)
+      queryClient.setQueryData(keys.school(), data)
       setEditing(false)
       showToast('School details saved')
     } catch {

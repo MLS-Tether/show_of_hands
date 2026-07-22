@@ -7,12 +7,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from fastapi.staticfiles import StaticFiles
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from image_utils import UPLOAD_ROOT
 from db.pool import SessionLocal
-from db.seed import seed_classes, seed_dev_data, seed_second_teacher_data
+from db.seed import seed_classes, seed_dev_data, seed_second_teacher_data, seed_more_cs_students
 from db.ws_broadcast import start_listener, stop_listener, deliver_loop
 from models.assignment_model import Assignment
 from models.enrollment_model import Enrollment
@@ -35,6 +33,7 @@ from controllers.rooms_controller import router as rooms_router, room_registry, 
 from controllers.notifications_controller import (
     router as notifications_router,
     deliver_notifications,
+    deliver_data_events,
 )
 from controllers.users_controller import router as users_router
 from controllers.resources_controller import router as resources_router
@@ -121,6 +120,7 @@ async def lifespan(app: FastAPI):
     seed_classes()
     seed_dev_data()
     seed_second_teacher_data()
+    seed_more_cs_students()
     scheduler.add_job(check_pending_grades, "interval", days=1)
     scheduler.add_job(check_overdue_assignments, "interval", days=1)
     scheduler.start()
@@ -129,11 +129,13 @@ async def lifespan(app: FastAPI):
     start_listener(loop)
     delivery_task = asyncio.create_task(deliver_loop(room_registry, room_messages))
     notifications_task = asyncio.create_task(deliver_notifications())
+    data_events_task = asyncio.create_task(deliver_data_events())
 
     yield
 
     delivery_task.cancel()
     notifications_task.cancel()
+    data_events_task.cancel()
     stop_listener()
     scheduler.shutdown()
 
@@ -146,9 +148,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.mount("/uploads", StaticFiles(directory=UPLOAD_ROOT), name="uploads")
-
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):

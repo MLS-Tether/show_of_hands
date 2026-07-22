@@ -1,35 +1,25 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
+import { keys, useSectionEnrollmentRequests } from '../../queries'
 
-function EnrollmentRequestsPanel({ sectionId, onChange }) {
-  const [requests, setRequests] = useState(null)
+function EnrollmentRequestsPanel({ sectionId }) {
+  const queryClient = useQueryClient()
   const [actingId, setActingId] = useState(null)
   const [error, setError] = useState('')
 
-  const load = useCallback(() => {
-    let cancelled = false
-    api
-      .get(`/sections/${sectionId}/enrollment-requests`)
-      .then(({ data }) => {
-        if (!cancelled) setRequests(data)
-      })
-      .catch(() => {
-        if (!cancelled) setRequests((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [sectionId])
-
-  useEffect(() => load(), [load])
+  const { data: requests = null } = useSectionEnrollmentRequests(sectionId)
 
   async function handleDecision(requestId, status) {
     setActingId(requestId)
     setError('')
     try {
       await api.patch(`/enrollment-requests/${requestId}`, { status })
-      setRequests((prev) => prev.filter((r) => r.enrollment_request_id !== requestId))
-      onChange?.()
+      queryClient.setQueryData(keys.sectionEnrollmentRequests(sectionId), (prev) =>
+        (prev || []).filter((r) => r.enrollment_request_id !== requestId)
+      )
+      queryClient.invalidateQueries({ queryKey: ['sections'] })
+      queryClient.invalidateQueries({ queryKey: keys.section(sectionId) })
     } catch (err) {
       setError(err.response?.data?.detail || 'Could not update this request.')
     } finally {
