@@ -5,7 +5,7 @@ import api from '../api'
 import { useDialog } from '../components/DialogContext'
 import { keys, useRoom } from '../queries'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
-import { wsUrlWithFreshToken } from '../utils/ws'
+import { wsConnectParams } from '../utils/ws'
 import '../styles/shared-ui.css'
 import './RoomDetail.css'
 
@@ -67,9 +67,9 @@ function RoomDetail() {
 
     function connect() {
       setConnectionStatus('connecting')
-      wsUrlWithFreshToken(`/rooms/${activeRoomId}/chat`).then((url) => {
+      wsConnectParams(`/rooms/${activeRoomId}/chat`).then(({ url, protocols }) => {
         if (cancelled) return
-        const ws = new WebSocket(url)
+        const ws = new WebSocket(url, protocols)
         wsRef.current = ws
 
         ws.onopen = () => {

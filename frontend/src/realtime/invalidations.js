@@ -38,6 +38,10 @@ export function invalidateForEvent(queryClient, event) {
         queryClient.invalidateQueries({ queryKey: keys.sectionAnalytics(sectionId) })
         queryClient.invalidateQueries({ queryKey: ['section', sectionId, 'grades'] })
       }
+      // Grading/finalizing a submission changes the student's overall
+      // grades view (AdminStudentDetail) — without this it went stale for
+      // up to the 7-min poll fallback, since none of the keys above cover it.
+      if (ids.user_id) queryClient.invalidateQueries({ queryKey: keys.userGrades(ids.user_id) })
       break
     case 'resources':
       if (sectionId) queryClient.invalidateQueries({ queryKey: keys.sectionResources(sectionId) })

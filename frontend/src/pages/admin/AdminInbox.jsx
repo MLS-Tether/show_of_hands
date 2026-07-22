@@ -112,9 +112,18 @@ function AdminInbox() {
   }
 
   async function approveSignup(item) {
+    // Admin signups grant full admin rights — require an explicit
+    // confirmation click (not just the ordinary approve button) before
+    // sending confirm_role, which the backend independently checks.
+    if (item.kind === 'admin') {
+      const ok = await confirm(`Grant ${item.title} full admin access?`)
+      if (!ok) return
+    }
     setBusy(true)
     try {
-      await api.patch(`/users/${item.entityId}/verify`)
+      await api.patch(`/users/${item.entityId}/verify`, {
+        confirm_role: item.kind === 'admin' ? 'admin' : undefined,
+      })
       patchUser(item.entityId, { is_verified: true })
       dismissItems([item.id])
       showToast(`Approved ${item.title}`)
@@ -174,13 +183,24 @@ function AdminInbox() {
   async function bulkApprove() {
     const targets = (items || []).filter((i) => selected.includes(i.id))
     if (targets.length === 0) return
+
+    const adminTargets = targets.filter((i) => i.kind === 'admin')
+    if (adminTargets.length > 0) {
+      const ok = await confirm(
+        `This includes ${adminTargets.length} admin signup(s), which will be granted full admin access. Continue?`
+      )
+      if (!ok) return
+    }
+
     setBusy(true)
     try {
       await Promise.all(
         targets.map((item) =>
           item.kind === 'class'
             ? api.patch(`/class-requests/${item.entityId}`, { status: 'approved' })
-            : api.patch(`/users/${item.entityId}/verify`)
+            : api.patch(`/users/${item.entityId}/verify`, {
+                confirm_role: item.kind === 'admin' ? 'admin' : undefined,
+              })
         )
       )
       targets.forEach((item) =>

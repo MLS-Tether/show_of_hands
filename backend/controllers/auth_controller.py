@@ -132,6 +132,14 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
         RefreshToken.token_hash == token_hash,
     ).first()
     if not record:
+        # decode_token already verified this token's signature, so it was
+        # genuinely issued by us — a valid signature with no matching row
+        # means it was already rotated or logged out. That combination only
+        # happens on replay of a stale token, so treat it as compromise:
+        # revoke every other refresh token for this user rather than trust
+        # the presenter, forcing re-login on every device.
+        db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete()
+        db.commit()
         raise HTTPException(status_code=401, detail="Refresh token not found or already used.")
 
     user = db.query(User).filter(
@@ -141,8 +149,19 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="User not found.")
 
+    # Rotate: the presented refresh token is single-use. Deleting it here
+    # means a later replay of this same token hits the reuse-detection
+    # branch above instead of silently succeeding again.
+    db.delete(record)
+    db.commit()
+
     access_token = create_access_token(user.user_id, user.role.value, user.school_id)
-    return {"access_token": access_token, "token_type": "bearer"}
+    new_refresh_token = create_refresh_token(user.user_id, db)
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+    }
 
 
 @router.post("/logout")

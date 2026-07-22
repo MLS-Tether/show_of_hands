@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from auth_utils import decode_token
+from ws_auth import ws_token_from_subprotocol
 from db.data_events import emit_data_event, resolve_section_audience
 from db.pool import get_db, SessionLocal
 from db.ws_broadcast import notify_room_message
@@ -308,9 +309,10 @@ async def delete_room(
 
 
 @router.websocket("/{room_id}/chat")
-async def chat(websocket: WebSocket, room_id: int, token: str):
+async def chat(websocket: WebSocket, room_id: int):
     # Validate JWT
     try:
+        token = ws_token_from_subprotocol(websocket)
         payload = decode_token(token)
         user_id: int = payload["user_id"]
     except Exception:

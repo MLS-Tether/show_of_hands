@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from auth_utils import decode_token
+from ws_auth import ws_token_from_subprotocol
 from db.pool import get_db, SessionLocal
 from db.ws_broadcast import notification_queue, data_events_queue
 from dependencies import get_current_user, require_role
@@ -106,8 +107,9 @@ def notify_section(
 
 
 @router.websocket("/notifications/stream")
-async def notifications_stream(websocket: WebSocket, token: str):
+async def notifications_stream(websocket: WebSocket):
     try:
+        token = ws_token_from_subprotocol(websocket)
         payload = decode_token(token)
         user_id: int = payload["user_id"]
     except Exception:

@@ -53,6 +53,10 @@ function refreshAccessToken() {
       .post(`${BASE_URL}/auth/refresh`, { refresh_token: refreshToken })
       .then(({ data }) => {
         localStorage.setItem('access_token', data.access_token)
+        // The refresh token rotates on every use — the server invalidates
+        // the one we just presented, so we must persist the new one or the
+        // next refresh attempt fails as a reuse.
+        localStorage.setItem('refresh_token', data.refresh_token)
         return data.access_token
       })
       .finally(() => {

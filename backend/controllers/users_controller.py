@@ -27,6 +27,12 @@ from schemas.user import (
 class RejectSignupRequest(BaseModel):
     reason: Optional[str] = None
 
+
+class VerifyUserRequest(BaseModel):
+    # Required to match the target's own requested role when that role is
+    # "admin" — see verify_user for why.
+    confirm_role: Optional[RoleEnum] = None
+
 router = APIRouter(prefix="/users", tags=["users"])
 
 
@@ -186,6 +192,7 @@ def get_student_grades(
 @router.patch("/{user_id}/verify")
 def verify_user(
     user_id: int,
+    body: Optional[VerifyUserRequest] = None,
     current_user: User = Depends(require_role(["admin"])),
     db: Session = Depends(get_db),
 ):
@@ -196,6 +203,17 @@ def verify_user(
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
+
+    # A self-registered admin account is otherwise approved by the same
+    # one-click flow as a student/teacher — this forces the approving admin
+    # to explicitly echo back "admin" first, so a careless click can't grant
+    # full admin rights to whoever requested them.
+    if user.role == RoleEnum.admin and (not body or body.confirm_role != RoleEnum.admin):
+        raise HTTPException(
+            status_code=400,
+            detail="Approving an admin signup requires confirming the requested role.",
+        )
+
     user.is_verified = True
     emit_data_event(
         db, "users", "updated", current_user.school_id,

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 
@@ -142,9 +143,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Wildcard origins widen the blast radius of a stolen bearer token — any
+# origin could call the API with it. CORS_ORIGINS is a comma-separated list;
+# defaults cover the Vite dev server so local dev keeps working unconfigured.
+_cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -159,7 +169,13 @@ async def http_exception_handler(request, exc):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
-    return JSONResponse(status_code=422, content={"message": str(exc)})
+    # str(exc) renders Pydantic's full error list — field paths, expected
+    # types, and the actual invalid input values — straight to the client.
+    # Log that detail server-side instead and return a generic message.
+    logging.getLogger(__name__).info(
+        "Validation error on %s %s: %s", request.method, request.url.path, exc
+    )
+    return JSONResponse(status_code=422, content={"message": "Invalid request."})
 
 
 @app.exception_handler(Exception)

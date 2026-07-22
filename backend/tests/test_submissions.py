@@ -1,4 +1,7 @@
 # tests/test_submissions.py
+import pytest
+from sqlalchemy.exc import IntegrityError
+
 from models.assignment_model import Assignment
 from models.point_transaction_model import PointTransaction, TransactionSourceEnum
 from models.submission_model import Submission
@@ -49,6 +52,48 @@ def test_create_submission_duplicate_conflict(client, world, cleanup):
         headers=auth_header(world.student_token),
     )
     assert resp.status_code == 409
+
+
+def test_grade_out_of_bounds_rejected(client, world, cleanup):
+    assignment_id = _new_assignment(client, world, cleanup)
+    resp = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        json={},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 201, resp.text
+    submission_id = resp.json()["submission_id"]
+    cleanup(Submission, submission_id)
+
+    resp = client.patch(
+        f"/api/submissions/{submission_id}/grade",
+        json={"grade": 925},
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 422
+
+
+def test_duplicate_submission_blocked_at_db_level(client, world, cleanup, db):
+    assignment_id = _new_assignment(client, world, cleanup)
+    resp = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        json={},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 201, resp.text
+    submission_id = resp.json()["submission_id"]
+    cleanup(Submission, submission_id)
+
+    # The application-level check-then-insert in create_submission can race;
+    # this confirms the DB-level unique constraint backstops it regardless.
+    # try/finally (not just rollback after) so a failed assertion here still
+    # leaves the shared `db` session clean for this test's own cleanup.
+    db.add(Submission(assignment_id=assignment_id, student_id=world.student_id))
+    try:
+        with pytest.raises(IntegrityError):
+            db.flush()
+    finally:
+        db.rollback()
 
 
 def test_list_submissions_teacher_admin_only(client, world, cleanup):

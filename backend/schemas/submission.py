@@ -17,7 +17,7 @@ class SubmissionCreate(BaseModel):
 
 
 class SubmissionGradeUpdate(BaseModel):
-    grade: float
+    grade: float = Field(ge=0, le=100)
 
 
 class SubmissionCreateResponse(BaseModel):

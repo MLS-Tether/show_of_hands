@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from db.data_events import emit_data_event, resolve_admin_audience, resolve_section_audience
@@ -95,7 +96,16 @@ def create_submission(
         points_awarded=initial_points,
     )
     db.add(submission)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # Two concurrent submit requests can both pass the `existing` check
+        # above before either commits — the DB-level unique constraint on
+        # (assignment_id, student_id) is what actually prevents the
+        # duplicate row; this just turns that into a clean 409 instead of a
+        # 500.
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Already submitted for this assignment.")
 
     _award_points(current_user, initial_points, TransactionSourceEnum.assignment, assignment_id, db)
 
@@ -180,7 +190,11 @@ def grade_submission(
         db, "submissions", "updated", section.school_id,
         resolve_section_audience(db, section),
         section_id=section.section_id,
-        ids={"assignment_id": submission.assignment_id, "submission_id": submission_id},
+        ids={
+            "assignment_id": submission.assignment_id,
+            "submission_id": submission_id,
+            "user_id": submission.student_id,
+        },
     )
     db.commit()
     db.refresh(submission)
@@ -248,7 +262,11 @@ def finalize_submission(
         db, "submissions", "updated", section.school_id,
         resolve_section_audience(db, section),
         section_id=section.section_id,
-        ids={"assignment_id": submission.assignment_id, "submission_id": submission_id},
+        ids={
+            "assignment_id": submission.assignment_id,
+            "submission_id": submission_id,
+            "user_id": student.user_id,
+        },
     )
     emit_data_event(
         db, "points", "updated", section.school_id,

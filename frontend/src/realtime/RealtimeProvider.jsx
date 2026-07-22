@@ -2,12 +2,17 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { keys } from '../queries'
 import { playNotificationChime } from '../utils/notificationSound'
-import { wsUrlWithFreshToken } from '../utils/ws'
+import { wsConnectParams } from '../utils/ws'
 import { invalidateForEvent } from './invalidations'
 import { RealtimeContext } from './realtimeContext'
 
 const RECONNECT_DELAY_MS = 3000
 const TOAST_DURATION_MS = 6000
+// seenIdsRef exists only to dedupe a notification that arrives twice across
+// a reconnect — it doesn't need to remember more than a recent window, but
+// with no cap it grows for the life of the session (one entry per
+// notification ever received).
+const MAX_SEEN_IDS = 500
 
 // Owns the single /notifications/stream WebSocket for the whole app (moved
 // out of NotificationBell, which previously opened its own). Two message
@@ -32,9 +37,9 @@ export function RealtimeProvider({ children }) {
     let unmounted = false
 
     async function connect() {
-      const url = await wsUrlWithFreshToken('/notifications/stream')
+      const { url, protocols } = await wsConnectParams('/notifications/stream')
       if (unmounted) return
-      const ws = new WebSocket(url)
+      const ws = new WebSocket(url, protocols)
       wsRef.current = ws
 
       ws.onopen = () => {
@@ -53,6 +58,9 @@ export function RealtimeProvider({ children }) {
           const notification = data.notification
           if (seenIdsRef.current.has(notification.notification_id)) return
           seenIdsRef.current.add(notification.notification_id)
+          if (seenIdsRef.current.size > MAX_SEEN_IDS) {
+            seenIdsRef.current.delete(seenIdsRef.current.values().next().value)
+          }
 
           queryClient.setQueryData(keys.notifications(), (prev) =>
             prev ? [notification, ...prev] : prev
