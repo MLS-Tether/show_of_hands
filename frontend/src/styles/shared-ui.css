@@ -51,6 +51,11 @@
   opacity: 0.75;
 }
 
+/* Same low-contrast-compounding issue as the topbar ESC hint. */
+:root[data-theme='light'] .admin-chip-count {
+  opacity: 1;
+}
+
 .admin-bulk-bar {
   display: flex;
   align-items: center;
@@ -208,6 +213,12 @@
   display: flex;
   gap: 8px;
   margin-top: 4px;
+}
+
+.modal-form-error {
+  font-size: 13px;
+  color: var(--danger);
+  margin: 0;
 }
 
 .admin-chevron {

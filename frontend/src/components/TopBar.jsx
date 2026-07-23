@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
-import api from '../api'
+import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import NotificationBell from './NotificationBell'
+import { useTutorial } from './tutorial/TutorialContext'
+import { usePoints, useSchoolPoints } from '../queries'
 import { getUserId, isAdmin, isTeacher } from '../utils/auth'
 import { getAdminParentPath, getParentPath } from '../utils/escNavigation'
 import { getTheme, setTheme } from '../utils/theme'
-import { useAutoRefresh } from '../utils/autoRefresh'
 import './TopBar.css'
 
 const BREADCRUMB_RULES = [
@@ -34,45 +34,35 @@ function getBreadcrumb(pathname) {
   return match ? match.label : 'Show of Hands'
 }
 
-function noopLoad() {}
-
 function TopBar({ sidebarHidden, onToggleSidebar }) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { replay } = useTutorial()
   const admin = isAdmin()
   const teacher = isTeacher()
-  const [points, setPoints] = useState(null)
   const [theme, setThemeState] = useState(getTheme())
   const breadcrumb = getBreadcrumb(location.pathname)
   const parentPath = admin
     ? getAdminParentPath(location.pathname)
     : getParentPath(location.pathname, { isTeacher: isTeacher() })
 
-  const loadPoints = useCallback(() => {
-    let cancelled = false
-    const request = admin ? api.get('/schools/points') : api.get(`/users/${getUserId()}/points`)
-
-    request
-      .then(({ data }) => {
-        if (!cancelled) setPoints(data.total_points)
-      })
-      .catch(() => {
-        if (!cancelled) setPoints((prev) => prev ?? null)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [admin])
-
   // Teachers don't earn points, so they get no counter and no fetches
-  const load = teacher ? noopLoad : loadPoints
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
+  const { data: schoolPoints } = useSchoolPoints({ enabled: admin && !teacher })
+  const { data: userPoints } = usePoints(getUserId(), 1, 20, { enabled: !admin && !teacher })
+  const points = teacher ? null : admin ? schoolPoints?.total_points ?? null : userPoints?.total_points ?? null
 
   function toggleTheme() {
     const next = theme === 'dark' ? 'light' : 'dark'
     setTheme(next)
     setThemeState(next)
+  }
+
+  // The tour's steps target elements on the user's own landing page (the
+  // dashboard, or the overview for admins) — replaying it from some other
+  // page would show the overlay with nothing behind it to point at.
+  function handleReplayTutorial() {
+    navigate(admin ? '/admin/overview' : '/dashboard')
+    replay()
   }
 
   return (
@@ -107,11 +97,19 @@ function TopBar({ sidebarHidden, onToggleSidebar }) {
       </div>
       <div className="admin-topbar-actions">
         {!teacher && points !== null && (
-          <span className="admin-topbar-points">
+          <span className="admin-topbar-points" data-tour="topbar-points">
             {points.toLocaleString()} {admin ? 'school pts' : 'pts'}
           </span>
         )}
         <NotificationBell />
+        <button
+          type="button"
+          className="admin-topbar-theme"
+          onClick={handleReplayTutorial}
+          title="Replay tutorial"
+        >
+          ↻ Tutorial
+        </button>
         <button type="button" className="admin-topbar-theme" onClick={toggleTheme}>
           {theme === 'dark' ? 'Dark' : 'Light'}
         </button>

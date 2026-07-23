@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -5,16 +6,20 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+import daily_client
 from auth_utils import decode_token
+from ws_auth import ws_token_from_subprotocol
+from db.data_events import emit_data_event, resolve_section_audience
 from db.pool import get_db, SessionLocal
 from db.ws_broadcast import notify_room_message
 from dependencies import get_current_user
 from models.help_request_model import HelpRequestStatusEnum
 from models.study_room_model import StudyRoom, RoomMember, StudyRoomStatusEnum
 from models.user_model import User, RoleEnum
-from schemas.study_room import StudyRoomResponse, StudyRoomExtendResponse
+from schemas.study_room import StudyRoomResponse, StudyRoomExtendResponse, VideoTokenResponse
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
+logger = logging.getLogger(__name__)
 
 # In-memory registry — never persisted to DB
 # Structure: { room_id: { user_id: WebSocket } }
@@ -41,6 +46,23 @@ def _require_requester(room: StudyRoom, user_id: int):
         raise HTTPException(status_code=403, detail="Only the room requester can perform this action.")
 
 
+def _emit_room_events(db: Session, room: StudyRoom, room_action: str, hr_action: Optional[str] = None):
+    """Queue rooms (and optionally help_requests) data events for everyone in
+    the room's section. Delivered on the caller's next db.commit()."""
+    section = room.help_request.section
+    audience = resolve_section_audience(db, section)
+    emit_data_event(
+        db, "rooms", room_action, section.school_id, audience,
+        section_id=section.section_id, ids={"room_id": room.room_id},
+    )
+    if hr_action is not None:
+        emit_data_event(
+            db, "help_requests", hr_action, section.school_id, audience,
+            section_id=section.section_id,
+            ids={"help_request_id": room.help_request_id, "room_id": room.room_id},
+        )
+
+
 def _build_room_response(room: StudyRoom) -> dict:
     return {
         "room_id": room.room_id,
@@ -52,7 +74,21 @@ def _build_room_response(room: StudyRoom) -> dict:
         ],
         "timer_ends_at": room.timer_ends_at,
         "status": room.status,
+        "daily_room_url": room.daily_room_url,
     }
+
+
+def _teardown_daily_room(room: StudyRoom):
+    """Best-effort Daily room deletion — called everywhere a study room
+    closes or is deleted. Never raises: the room's own close/delete has
+    already committed by the time this runs, so a Daily-side failure here
+    just means that room lingers until its own exp cleans it up."""
+    if not room.daily_room_name:
+        return
+    try:
+        daily_client.delete_room(room.daily_room_name)
+    except Exception:
+        logger.exception("Failed to delete Daily room for study room %s", room.room_id)
 
 
 async def _close_room_connections(
@@ -61,24 +97,21 @@ async def _close_room_connections(
     notify_type: Optional[str] = None,
 ):
     """Disconnect all WS connections for a room. If requester_id is given, that
-    connection first gets a session-confirmation prompt. If notify_type is given,
-    every connection first gets a {"type": notify_type} message (e.g. room deletion)."""
+    connection first gets a session-confirmation prompt instead of notify_type —
+    a "room deleted" notice would otherwise navigate the requester away before
+    they can answer it. Every other connection first gets a {"type": notify_type}
+    message, if given (e.g. room deletion)."""
     room_messages.pop(room_id, None)
 
     if room_id not in room_registry:
         return
 
-    if notify_type:
-        for ws in list(room_registry[room_id].values()):
-            try:
-                await ws.send_json({"type": notify_type})
-            except Exception:
-                pass
-    elif requester_id and requester_id in room_registry[room_id]:
+    for user_id, ws in list(room_registry[room_id].items()):
         try:
-            await room_registry[room_id][requester_id].send_json({
-                "type": "session_confirmation_required",
-            })
+            if requester_id is not None and user_id == requester_id:
+                await ws.send_json({"type": "session_confirmation_required"})
+            elif notify_type:
+                await ws.send_json({"type": notify_type})
         except Exception:
             pass
 
@@ -111,6 +144,40 @@ def get_room(
             raise HTTPException(status_code=403, detail="Access denied.")
 
     return _build_room_response(room)
+
+
+@router.post("/{room_id}/video-token", response_model=VideoTokenResponse)
+def get_video_token(
+    room_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    room = _get_room_or_404(room_id, db)
+
+    member = db.query(RoomMember).filter(
+        RoomMember.room_id == room_id,
+        RoomMember.user_id == current_user.user_id,
+    ).first()
+    if not member:
+        raise HTTPException(status_code=403, detail="Not a room member.")
+    if room.status != StudyRoomStatusEnum.active:
+        raise HTTPException(status_code=409, detail="Room is not active.")
+    if not room.daily_room_name:
+        raise HTTPException(status_code=503, detail="Video chat is not available for this room.")
+
+    is_owner = current_user.user_id == room.help_request.requester_id
+    try:
+        token = daily_client.create_meeting_token(
+            room.daily_room_name,
+            current_user.username,
+            is_owner,
+            int(room.timer_ends_at.timestamp()),
+        )
+    except Exception:
+        logger.exception("Failed to create Daily meeting token for study room %s", room.room_id)
+        raise HTTPException(status_code=503, detail="Video chat is temporarily unavailable.")
+
+    return VideoTokenResponse(token=token, room_url=room.daily_room_url)
 
 
 @router.post("/{room_id}/kick")
@@ -149,8 +216,11 @@ async def kick_member(
     if remaining <= 1:
         room.status = StudyRoomStatusEnum.closed
         db.commit()
+        _teardown_daily_room(room)
         await _close_room_connections(room_id, requester_id=current_user.user_id)
 
+    _emit_room_events(db, room, "updated", hr_action="updated")
+    db.commit()
     return {"message": "Member removed from room."}
 
 
@@ -187,6 +257,7 @@ async def leave_room(
     if remaining == 0 and room.status == StudyRoomStatusEnum.active:
         room.status = StudyRoomStatusEnum.closed
         db.commit()
+        _teardown_daily_room(room)
         await _close_room_connections(room_id, requester_id=room.help_request.requester_id)
 
     # Keep the help request's participant count in sync with who's actually left in the room,
@@ -198,6 +269,7 @@ async def leave_room(
         help_request.is_archived = True
     elif remaining < help_request.group_size and help_request.status == HelpRequestStatusEnum.active:
         help_request.status = HelpRequestStatusEnum.open
+    _emit_room_events(db, room, "updated", hr_action="updated")
     db.commit()
 
     return {"message": "Left the room."}
@@ -216,6 +288,7 @@ def extend_room(
         raise HTTPException(status_code=409, detail="Room is not active.")
 
     room.timer_ends_at = room.timer_ends_at + timedelta(minutes=10)
+    _emit_room_events(db, room, "updated")
     db.commit()
     db.refresh(room)
 
@@ -241,6 +314,12 @@ async def close_room(
     if room.status == StudyRoomStatusEnum.closed:
         raise HTTPException(status_code=409, detail="Room is already closed.")
 
+    # Prompt the requester over their still-live chat socket now — the
+    # "updated" event below reaches their own client almost immediately and
+    # causes it to tear that socket down on its own, racing (and often
+    # beating) a prompt sent any later.
+    await _close_room_connections(room_id, requester_id=current_user.user_id)
+
     room.status = StudyRoomStatusEnum.closed
 
     # Closing the room is terminal for its help request too — without this,
@@ -250,9 +329,10 @@ async def close_room(
     help_request.status = HelpRequestStatusEnum.closed
     help_request.is_archived = True
 
+    _emit_room_events(db, room, "updated", hr_action="deleted")
     db.commit()
 
-    await _close_room_connections(room_id, requester_id=current_user.user_id)
+    _teardown_daily_room(room)
     return {"message": "Room closed."}
 
 
@@ -266,9 +346,11 @@ async def delete_room(
     _require_requester(room, current_user.user_id)
 
     # The requester has full autonomy to delete the room at any time, active or
-    # closed — this is a hard teardown, not the graceful /close flow, so there's
-    # no session-confirmation prompt: just notify everyone and disconnect them.
-    await _close_room_connections(room_id, notify_type="room_deleted")
+    # closed — but they still need the same session-confirmation prompt as a
+    # graceful close, otherwise nobody gets points for a session that happened
+    # before the room was torn down. Everyone else just gets the deletion notice.
+    _teardown_daily_room(room)
+    await _close_room_connections(room_id, requester_id=current_user.user_id, notify_type="room_deleted")
 
     # Deletion is terminal — archive the help request too so it stops
     # cluttering the bulletin board now that its room is gone for good.
@@ -276,6 +358,7 @@ async def delete_room(
     help_request.status = HelpRequestStatusEnum.closed
     help_request.is_archived = True
 
+    _emit_room_events(db, room, "deleted", hr_action="deleted")
     db.query(RoomMember).filter(RoomMember.room_id == room_id).delete()
     db.delete(room)
     db.commit()
@@ -284,9 +367,10 @@ async def delete_room(
 
 
 @router.websocket("/{room_id}/chat")
-async def chat(websocket: WebSocket, room_id: int, token: str):
+async def chat(websocket: WebSocket, room_id: int):
     # Validate JWT
     try:
+        token = ws_token_from_subprotocol(websocket)
         payload = decode_token(token)
         user_id: int = payload["user_id"]
     except Exception:
@@ -319,7 +403,11 @@ async def chat(websocket: WebSocket, room_id: int, token: str):
     finally:
         db.close()
 
-    await websocket.accept()
+    # The client sent the auth token as a Sec-WebSocket-Protocol subprotocol
+    # (see utils/ws.js) — per RFC 6455, the server must echo one back or the
+    # browser treats the handshake itself as failed, even though the raw
+    # upgrade otherwise succeeds.
+    await websocket.accept(subprotocol=token)
 
     # Register connection
     if room_id not in room_registry:

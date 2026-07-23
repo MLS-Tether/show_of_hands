@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, Enum, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from db.pool import Base
 
@@ -13,6 +13,9 @@ class SubmissionStatusEnum(str, enum.Enum):
 
 class Submission(Base):
     __tablename__ = "submissions"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "student_id", name="uq_submission_assignment_student"),
+    )
 
     submission_id = Column(Integer, primary_key=True)
     assignment_id = Column(Integer, ForeignKey("assignments.assignment_id"), nullable=False)

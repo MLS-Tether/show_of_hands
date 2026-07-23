@@ -17,7 +17,7 @@ from dependencies import get_current_user, require_role
 from models.user_model import User, RoleEnum
 from models.school_model import School
 from schemas.user import UserResponse
-from validators import validate_full_name
+from validators import validate_full_name, validate_new_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -132,6 +132,14 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
         RefreshToken.token_hash == token_hash,
     ).first()
     if not record:
+        # decode_token already verified this token's signature, so it was
+        # genuinely issued by us — a valid signature with no matching row
+        # means it was already rotated or logged out. That combination only
+        # happens on replay of a stale token, so treat it as compromise:
+        # revoke every other refresh token for this user rather than trust
+        # the presenter, forcing re-login on every device.
+        db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete()
+        db.commit()
         raise HTTPException(status_code=401, detail="Refresh token not found or already used.")
 
     user = db.query(User).filter(
@@ -141,8 +149,19 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="User not found.")
 
+    # Rotate: the presented refresh token is single-use. Deleting it here
+    # means a later replay of this same token hits the reuse-detection
+    # branch above instead of silently succeeding again.
+    db.delete(record)
+    db.commit()
+
     access_token = create_access_token(user.user_id, user.role.value, user.school_id)
-    return {"access_token": access_token, "token_type": "bearer"}
+    new_refresh_token = create_refresh_token(user.user_id, db)
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+    }
 
 
 @router.post("/logout")
@@ -180,6 +199,27 @@ def reset_password(
     if target.school_id != current_user.school_id:
         raise HTTPException(status_code=403, detail="Cannot reset passwords for users outside your school.")
 
-    target.password_hash = hash_password(body.new_password)
+    new_password = validate_new_password(body.new_password)
+    target.password_hash = hash_password(new_password)
     db.commit()
     return {"message": "Password reset successfully."}
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+
+@router.post("/change-password")
+def change_password(
+    body: ChangePasswordRequest,
+    current_user: User = Depends(require_role(["teacher", "admin"])),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(body.old_password, current_user.password_hash):
+        raise HTTPException(status_code=401, detail="Current password is incorrect.")
+
+    new_password = validate_new_password(body.new_password)
+    current_user.password_hash = hash_password(new_password)
+    db.commit()
+    return {"message": "Password changed successfully."}

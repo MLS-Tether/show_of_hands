@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
+import { keys } from '../../queries'
 import AssignmentFitResult from './AssignmentFitResult'
 
-function AssignmentsPanel({ sectionId, assignments, onChange }) {
+function AssignmentsPanel({ sectionId, assignments }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -39,7 +42,9 @@ function AssignmentsPanel({ sectionId, assignments, onChange }) {
       setCategory('homework')
       setShowForm(false)
       setFitResult(null)
-      onChange?.()
+      queryClient.invalidateQueries({ queryKey: ['assignments'] })
+      queryClient.invalidateQueries({ queryKey: keys.section(sectionId) })
+      queryClient.invalidateQueries({ queryKey: keys.sectionAnalytics(sectionId) })
     } catch (err) {
       setError(err.response?.data?.message || 'Could not create assignment.')
     } finally {

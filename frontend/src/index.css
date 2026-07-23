@@ -81,9 +81,10 @@
 /* Explicit theme override (admin console theme toggle) — takes precedence
    over the prefers-color-scheme default above once a user picks a theme. */
 :root[data-theme='light'] {
+  color-scheme: light;
   --text: #34343b;
   --text-h: #1a1a1f;
-  --text-muted: #8b8b93;
+  --text-muted: #5c5c66;
   --bg: #fbfbfc;
   --surface-1: #ffffff;
   --surface-2: #f6f6f8;
@@ -104,6 +105,7 @@
 }
 
 :root[data-theme='dark'] {
+  color-scheme: dark;
   --text: #cbcbd3;
   --text-h: #f4f4f7;
   --text-muted: #7f7f88;
@@ -124,6 +126,15 @@
   --danger: #f87171;
   --danger-bg: rgba(248, 113, 113, 0.15);
   --danger-border: rgba(248, 113, 113, 0.4);
+}
+
+/* Without this, any element combining `width: 100%` with padding/border
+   (and there's no shortage of those) overflows its container by exactly
+   that padding/border amount — e.g. .teacher-panel-row did, silently. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 html {

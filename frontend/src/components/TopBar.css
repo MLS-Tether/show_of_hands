@@ -51,6 +51,12 @@
   opacity: 0.7;
 }
 
+/* The opacity above washes out the already-low-contrast --text-muted in
+   light mode; drop it there while leaving dark mode's look untouched. */
+:root[data-theme='light'] .admin-topbar-esc-hint {
+  opacity: 1;
+}
+
 .admin-topbar-actions {
   display: flex;
   align-items: center;

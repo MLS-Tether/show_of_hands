@@ -1,56 +1,23 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
 import { useDialog } from '../components/DialogContext'
-import { useAutoRefresh } from '../utils/autoRefresh'
+import { keys, useSections } from '../queries'
 import { getUserId, isTeacher } from '../utils/auth'
 import '../styles/shared-ui.css'
 import './Sections.css'
 
 function Sections() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { confirm, alert } = useDialog()
   const teacher = isTeacher()
   const userId = getUserId()
-  const [sections, setSections] = useState(null)
-  const [allSections, setAllSections] = useState(null)
   const [requestedIds, setRequestedIds] = useState(() => new Set())
 
-  const loadSections = useCallback(() => {
-    let cancelled = false
-    api
-      .get('/sections')
-      .then(({ data }) => {
-        if (!cancelled) setSections(data)
-      })
-      .catch(() => {
-        if (!cancelled) setSections((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const loadAllSections = useCallback(() => {
-    if (teacher) return () => {}
-    let cancelled = false
-    api
-      .get('/sections', { params: { scope: 'all' } })
-      .then(({ data }) => {
-        if (!cancelled) setAllSections(data)
-      })
-      .catch(() => {
-        if (!cancelled) setAllSections((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [teacher])
-
-  useEffect(() => loadSections(), [loadSections])
-  useEffect(() => loadAllSections(), [loadAllSections])
-  useAutoRefresh(loadSections)
-  useAutoRefresh(loadAllSections)
+  const { data: sections = null } = useSections()
+  const { data: allSections = null } = useSections('all', { enabled: !teacher })
 
   async function handleEnroll(s) {
     const confirmed = await confirm(`Request to join ${s.class_name} (${s.period})?`)
@@ -58,6 +25,7 @@ function Sections() {
 
     try {
       await api.post(`/sections/${s.section_id}/enrollment-requests`)
+      queryClient.invalidateQueries({ queryKey: keys.sectionEnrollmentRequests(s.section_id) })
       setRequestedIds((prev) => new Set(prev).add(s.section_id))
       await alert('Request sent. A teacher or admin needs to approve it.')
     } catch (err) {

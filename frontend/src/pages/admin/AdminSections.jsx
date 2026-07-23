@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
 import { useToast } from '../../components/ToastContext'
-import { useAutoRefresh } from '../../utils/autoRefresh'
+import { keys, useSections, useUsers } from '../../queries'
 import '../../styles/shared-ui.css'
 import './AdminSections.css'
 
@@ -26,35 +27,15 @@ const STATUS_OPTIONS = [
 
 function AdminSections() {
   const { showToast } = useToast()
+  const queryClient = useQueryClient()
   const [filter, setFilter] = useState('all')
-  const [sections, setSections] = useState(null)
-  const [teachers, setTeachers] = useState([])
   const [expanded, setExpanded] = useState(null)
   const [broadcastFor, setBroadcastFor] = useState(null)
   const [broadcastText, setBroadcastText] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const load = useCallback(() => {
-    let cancelled = false
-    Promise.all([
-      api.get('/sections', { params: { scope: 'all' } }),
-      api.get('/users', { params: { role: 'teacher' } }),
-    ])
-      .then(([sectionsRes, teachersRes]) => {
-        if (cancelled) return
-        setSections(sectionsRes.data)
-        setTeachers(teachersRes.data)
-      })
-      .catch(() => {
-        if (!cancelled) setSections((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
+  const { data: sections = null } = useSections('all')
+  const { data: teachers = [] } = useUsers({ role: 'teacher' })
 
   const counts = useMemo(() => {
     const list = sections || []
@@ -73,9 +54,11 @@ function AdminSections() {
   }, [sections, filter])
 
   function patchLocal(sectionId, patch) {
-    setSections((prev) =>
+    queryClient.setQueryData(keys.sections('all'), (prev) =>
       (prev || []).map((s) => (s.section_id === sectionId ? { ...s, ...patch } : s))
     )
+    queryClient.invalidateQueries({ queryKey: ['sections', 'mine'] })
+    queryClient.invalidateQueries({ queryKey: keys.section(sectionId) })
   }
 
   async function reassignTeacher(section, teacherId) {

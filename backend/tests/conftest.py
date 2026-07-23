@@ -156,6 +156,7 @@ def world(mod_client, mod_db):
     teacher_username = unique("teacher")
     resp = mod_client.post("/api/auth/register", json={
         "username": teacher_username,
+        "full_name": "Test Teacher",
         "password": "password123",
         "school_code": school_code,
         "role": "teacher",
@@ -177,6 +178,7 @@ def world(mod_client, mod_db):
     student_username = unique("student")
     resp = mod_client.post("/api/auth/register", json={
         "username": student_username,
+        "full_name": "Test Student",
         "password": "password123",
         "school_code": school_code,
         "role": "student",

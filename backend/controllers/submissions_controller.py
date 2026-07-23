@@ -2,8 +2,10 @@ from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from db.data_events import emit_data_event, resolve_admin_audience, resolve_section_audience
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.assignment_model import Assignment
@@ -94,10 +96,31 @@ def create_submission(
         points_awarded=initial_points,
     )
     db.add(submission)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # Two concurrent submit requests can both pass the `existing` check
+        # above before either commits — the DB-level unique constraint on
+        # (assignment_id, student_id) is what actually prevents the
+        # duplicate row; this just turns that into a clean 409 instead of a
+        # 500.
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Already submitted for this assignment.")
 
     _award_points(current_user, initial_points, TransactionSourceEnum.assignment, assignment_id, db)
 
+    section = assignment.section
+    emit_data_event(
+        db, "submissions", "created", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section.section_id,
+        ids={"assignment_id": assignment_id, "submission_id": submission.submission_id},
+    )
+    emit_data_event(
+        db, "points", "updated", section.school_id,
+        resolve_admin_audience(db, section.school_id, [current_user.user_id]),
+        ids={"user_id": current_user.user_id},
+    )
     db.commit()
     db.refresh(submission)
     return submission
@@ -159,10 +182,20 @@ def grade_submission(
     if submission.status == SubmissionStatusEnum.graded:
         raise HTTPException(status_code=409, detail="Submission already finalized.")
 
-    _check_teacher_owns_section(submission.assignment.section_id, current_user, db)
+    section = _check_teacher_owns_section(submission.assignment.section_id, current_user, db)
 
     submission.grade = body.grade
     submission.status = SubmissionStatusEnum.pending
+    emit_data_event(
+        db, "submissions", "updated", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section.section_id,
+        ids={
+            "assignment_id": submission.assignment_id,
+            "submission_id": submission_id,
+            "user_id": submission.student_id,
+        },
+    )
     db.commit()
     db.refresh(submission)
     return submission
@@ -183,7 +216,7 @@ def finalize_submission(
     if submission.status == SubmissionStatusEnum.graded:
         raise HTTPException(status_code=409, detail="Submission already finalized.")
 
-    _check_teacher_owns_section(submission.assignment.section_id, current_user, db)
+    section = _check_teacher_owns_section(submission.assignment.section_id, current_user, db)
 
     if submission.grade is None:
         raise HTTPException(status_code=400, detail="Cannot finalize without a grade.")
@@ -225,6 +258,21 @@ def finalize_submission(
     submission.status = SubmissionStatusEnum.graded
     submission.finalized_at = datetime.now(timezone.utc)
 
+    emit_data_event(
+        db, "submissions", "updated", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section.section_id,
+        ids={
+            "assignment_id": submission.assignment_id,
+            "submission_id": submission_id,
+            "user_id": student.user_id,
+        },
+    )
+    emit_data_event(
+        db, "points", "updated", section.school_id,
+        resolve_admin_audience(db, section.school_id, [student.user_id]),
+        ids={"user_id": student.user_id},
+    )
     db.commit()
     db.refresh(submission)
     return submission

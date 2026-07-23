@@ -1,25 +1,8 @@
-import { useEffect, useState } from 'react'
-import api from '../../api'
+import { useSectionAnalytics } from '../../queries'
 import { formatPercent } from '../../utils/format'
 
 function AnalyticsPanel({ sectionId }) {
-  const [analytics, setAnalytics] = useState(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    api
-      .get(`/sections/${sectionId}/analytics`)
-      .then(({ data }) => {
-        if (!cancelled) setAnalytics(data)
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [sectionId])
+  const { data: analytics = null, isError: failed } = useSectionAnalytics(sectionId)
 
   if (failed) {
     return <p className="teacher-panel-placeholder">Could not load analytics.</p>

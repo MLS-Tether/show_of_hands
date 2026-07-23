@@ -1,10 +1,12 @@
+import DailyIframe from '@daily-co/daily-js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
 import { useDialog } from '../components/DialogContext'
-import { useAutoRefresh } from '../utils/autoRefresh'
+import { keys, useRoom } from '../queries'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
-import { wsUrlWithFreshToken } from '../utils/ws'
+import { wsConnectParams } from '../utils/ws'
 import '../styles/shared-ui.css'
 import './RoomDetail.css'
 
@@ -25,12 +27,10 @@ function formatCountdown(ms) {
 function RoomDetail() {
   const { roomId } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { confirm, alert } = useDialog()
   const currentUserId = Number(localStorage.getItem('user_id'))
 
-  const [room, setRoom] = useState(null)
-  const [loadFailed, setLoadFailed] = useState(false)
-  const [loadedRoomId, setLoadedRoomId] = useState(null)
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [now, setNow] = useState(() => Date.now())
@@ -38,37 +38,31 @@ function RoomDetail() {
   const [confirmResult, setConfirmResult] = useState(null)
   const [actionError, setActionError] = useState('')
   const [connectionStatus, setConnectionStatus] = useState('connecting')
+  const [videoJoined, setVideoJoined] = useState(false)
+  const [videoLoading, setVideoLoading] = useState(false)
+  const [videoError, setVideoError] = useState('')
   const wsRef = useRef(null)
   const reconnectTimeoutRef = useRef(null)
   const reconnectAttemptRef = useRef(0)
   const closingIntentionallyRef = useRef(false)
+  const videoContainerRef = useRef(null)
+  const callFrameRef = useRef(null)
+  // Deleting the room removes it server-side, so `room` goes null right when
+  // the confirmation prompt needs help_request_id — this outlives that.
+  const helpRequestIdRef = useRef(null)
 
-  const loadRoom = useCallback(() => {
-    let cancelled = false
-    api
-      .get(`/rooms/${roomId}`)
-      .then(({ data }) => {
-        if (cancelled) return
-        setRoom(data)
-        setLoadFailed(false)
-        setLoadedRoomId(roomId)
-        rememberRoom({ room_id: data.room_id })
-      })
-      .catch(() => {
-        if (cancelled) return
-        setLoadFailed(true)
-        setLoadedRoomId(roomId)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [roomId])
-
-  useEffect(() => loadRoom(), [loadRoom])
   // Kicks/leaves/status changes from other members aren't pushed in real
-  // time (only chat is) — keep this one on a shorter interval than the app
-  // default so room state doesn't feel stale for minutes at a time.
-  useAutoRefresh(loadRoom, 20000)
+  // time (only chat is) — the query's own 20s refetchInterval keeps this one
+  // shorter than the app default so room state doesn't feel stale for
+  // minutes at a time.
+  const { data: room = null, isError: loadFailed, isLoading: loadingRoom } = useRoom(roomId)
+
+  useEffect(() => {
+    if (room) {
+      rememberRoom({ room_id: room.room_id })
+      helpRequestIdRef.current = room.help_request_id
+    }
+  }, [room])
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
@@ -85,9 +79,9 @@ function RoomDetail() {
 
     function connect() {
       setConnectionStatus('connecting')
-      wsUrlWithFreshToken(`/rooms/${activeRoomId}/chat`).then((url) => {
+      wsConnectParams(`/rooms/${activeRoomId}/chat`).then(({ url, protocols }) => {
         if (cancelled) return
-        const ws = new WebSocket(url)
+        const ws = new WebSocket(url, protocols)
         wsRef.current = ws
 
         ws.onopen = () => {
@@ -107,7 +101,9 @@ function RoomDetail() {
             return
           }
           if (data.type === 'timer_extended') {
-            setRoom((prev) => (prev ? { ...prev, timer_ends_at: data.timer_ends_at } : prev))
+            queryClient.setQueryData(keys.room(roomId), (prev) =>
+              prev ? { ...prev, timer_ends_at: data.timer_ends_at } : prev
+            )
             return
           }
           setMessages((prev) => [...prev, data])
@@ -137,7 +133,44 @@ function RoomDetail() {
       wsRef.current?.close()
       wsRef.current = null
     }
-  }, [activeRoomId, roomId, navigate, alert])
+  }, [activeRoomId, roomId, navigate, alert, queryClient])
+
+  const leaveVideoCall = useCallback(() => {
+    callFrameRef.current?.destroy().catch(() => {})
+    callFrameRef.current = null
+    setVideoJoined(false)
+  }, [])
+
+  // Room going inactive (closed/deleted/navigated away) should always take
+  // the call down with it — nothing else tears down the iframe otherwise.
+  // The cleanup fires both on unmount and whenever activeRoomId changes
+  // (e.g. active -> null when the room closes), so no need to also call
+  // this from the effect body itself.
+  useEffect(() => {
+    return () => leaveVideoCall()
+  }, [activeRoomId, leaveVideoCall])
+
+  async function handleJoinVideo() {
+    setVideoError('')
+    setVideoLoading(true)
+    try {
+      const { data } = await api.post(`/rooms/${roomId}/video-token`)
+      const callFrame = DailyIframe.createFrame(videoContainerRef.current, {
+        showLeaveButton: true,
+        iframeStyle: { width: '100%', height: '100%', border: '0' },
+      })
+      callFrame.on('left-meeting', leaveVideoCall)
+      callFrameRef.current = callFrame
+      await callFrame.join({ url: data.room_url, token: data.token })
+      setVideoJoined(true)
+    } catch (err) {
+      setVideoError(err.response?.data?.message || 'Could not join the video call.')
+      callFrameRef.current?.destroy().catch(() => {})
+      callFrameRef.current = null
+    } finally {
+      setVideoLoading(false)
+    }
+  }
 
   function handleSend(e) {
     e.preventDefault()
@@ -159,7 +192,7 @@ function RoomDetail() {
     setActionError('')
     try {
       const { data } = await api.post(`/rooms/${roomId}/extend`)
-      setRoom((prev) => ({ ...prev, timer_ends_at: data.timer_ends_at }))
+      queryClient.setQueryData(keys.room(roomId), (prev) => ({ ...prev, timer_ends_at: data.timer_ends_at }))
     } catch (err) {
       setActionError(err.response?.data?.message || 'Could not extend the room.')
     }
@@ -170,7 +203,7 @@ function RoomDetail() {
     setActionError('')
     try {
       await api.post(`/rooms/${roomId}/close`)
-      setRoom((prev) => ({ ...prev, status: 'closed' }))
+      queryClient.setQueryData(keys.room(roomId), (prev) => ({ ...prev, status: 'closed' }))
       forgetRoom(Number(roomId))
     } catch (err) {
       setActionError(err.response?.data?.message || 'Could not close the room.')
@@ -182,7 +215,10 @@ function RoomDetail() {
     setActionError('')
     try {
       await api.post(`/rooms/${roomId}/kick`, { user_id: userId })
-      setRoom((prev) => ({ ...prev, members: prev.members.filter((m) => m.user_id !== userId) }))
+      queryClient.setQueryData(keys.room(roomId), (prev) => ({
+        ...prev,
+        members: prev.members.filter((m) => m.user_id !== userId),
+      }))
     } catch (err) {
       setActionError(err.response?.data?.message || 'Could not remove that member.')
     }
@@ -198,7 +234,8 @@ function RoomDetail() {
     try {
       await api.delete(`/rooms/${roomId}`)
       forgetRoom(Number(roomId))
-      navigate('/study-rooms')
+      // Stay put instead of navigating away — the requester still needs to
+      // answer the "did this happen?" prompt the delete just triggered.
     } catch (err) {
       setActionError(err.response?.data?.message || 'Could not delete the room.')
     }
@@ -219,7 +256,7 @@ function RoomDetail() {
 
   async function handleConfirm(sessionOccurred) {
     try {
-      const { data } = await api.post(`/help-requests/${room.help_request_id}/confirm`, {
+      const { data } = await api.post(`/help-requests/${helpRequestIdRef.current}/confirm`, {
         session_occurred: sessionOccurred,
       })
       setConfirmPending(false)
@@ -229,9 +266,7 @@ function RoomDetail() {
     }
   }
 
-  const loading = loadedRoomId !== roomId
-
-  if (loading) {
+  if (loadingRoom) {
     return (
       <section className="room-detail">
         <p className="admin-empty-card">Loading study room…</p>
@@ -239,7 +274,39 @@ function RoomDetail() {
     )
   }
 
-  if (loadFailed) {
+  const awaitingConfirmation = confirmPending || confirmResult != null
+
+  // Deleting the room removes it server-side, so the next refetch 404s and
+  // `room` goes null — but the requester still needs to see this prompt.
+  if (!room && awaitingConfirmation) {
+    return (
+      <section className="room-detail">
+        <h1 className="admin-page-h1">Study room</h1>
+        {confirmPending && (
+          <div className="room-detail-confirm">
+            <p>Did this study session happen?</p>
+            <div className="room-detail-confirm-actions">
+              <button type="button" className="admin-btn-primary" onClick={() => handleConfirm(true)}>
+                Yes
+              </button>
+              <button type="button" className="admin-btn-secondary" onClick={() => handleConfirm(false)}>
+                No
+              </button>
+            </div>
+          </div>
+        )}
+        {confirmResult != null && (
+          <p className="room-detail-confirm-result">
+            {confirmResult > 0
+              ? `Session confirmed — ${confirmResult} points awarded.`
+              : 'Session marked as not happened.'}
+          </p>
+        )}
+      </section>
+    )
+  }
+
+  if (loadFailed && !awaitingConfirmation) {
     return (
       <section className="room-detail">
         <p className="admin-empty-card">Room not found, or you're not a member.</p>
@@ -278,9 +345,11 @@ function RoomDetail() {
             Delete room
           </button>
         )}
-        <button type="button" className="admin-btn-secondary" onClick={handleLeave}>
-          Leave room
-        </button>
+        {!isRequester && (
+          <button type="button" className="admin-btn-secondary" onClick={handleLeave}>
+            Leave room
+          </button>
+        )}
       </div>
 
       {confirmPending && (
@@ -320,6 +389,27 @@ function RoomDetail() {
           </div>
         ))}
       </div>
+
+      {room.status === 'active' && room.daily_room_url && (
+        <>
+          <div className="widget-label">video call</div>
+          {videoError && <p className="room-detail-error">{videoError}</p>}
+          {!videoJoined && !videoLoading && (
+            <button
+              type="button"
+              className="admin-btn-secondary room-detail-video-join-btn"
+              onClick={handleJoinVideo}
+            >
+              Join video call
+            </button>
+          )}
+          <div
+            ref={videoContainerRef}
+            className="room-detail-video"
+            style={{ display: videoJoined || videoLoading ? 'block' : 'none' }}
+          />
+        </>
+      )}
 
       <div className="widget-label">chat</div>
       {room.status !== 'active' && (

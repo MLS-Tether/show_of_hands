@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
+import { keys, useSectionResources } from '../../queries'
 import { useDialog } from '../DialogContext'
 
 function domainOf(url) {
@@ -12,7 +14,7 @@ function domainOf(url) {
 
 function ResourcesPanel({ sectionId }) {
   const { confirm, alert } = useDialog()
-  const [resources, setResources] = useState(null)
+  const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [title, setTitle] = useState('')
@@ -22,22 +24,7 @@ function ResourcesPanel({ sectionId }) {
   const [submitting, setSubmitting] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
 
-  const load = useCallback(() => {
-    let cancelled = false
-    api
-      .get(`/sections/${sectionId}/resources`)
-      .then(({ data }) => {
-        if (!cancelled) setResources(data)
-      })
-      .catch(() => {
-        if (!cancelled) setResources((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [sectionId])
-
-  useEffect(() => load(), [load])
+  const { data: resources = null } = useSectionResources(sectionId)
 
   function resetForm() {
     setTitle('')
@@ -69,7 +56,7 @@ function ResourcesPanel({ sectionId }) {
         await api.post(`/sections/${sectionId}/resources`, body)
       }
       resetForm()
-      load()
+      queryClient.invalidateQueries({ queryKey: keys.sectionResources(sectionId) })
     } catch (err) {
       setError(err.response?.data?.message || 'Could not save resource.')
     } finally {
@@ -83,7 +70,7 @@ function ResourcesPanel({ sectionId }) {
     setDeletingId(resource.resource_id)
     try {
       await api.delete(`/resources/${resource.resource_id}`)
-      load()
+      queryClient.invalidateQueries({ queryKey: keys.sectionResources(sectionId) })
     } catch (err) {
       await alert(err.response?.data?.message || 'Could not delete resource.')
     } finally {

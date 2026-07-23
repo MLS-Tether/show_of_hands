@@ -1,9 +1,12 @@
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import List, Union
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
+import daily_client
+from db.data_events import emit_data_event, resolve_admin_audience, resolve_section_audience
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.enrollment_model import Enrollment
@@ -26,6 +29,7 @@ from schemas.help_request import (
 )
 
 router = APIRouter(tags=["help-requests"])
+logger = logging.getLogger(__name__)
 
 HELP_SESSION_POINTS = 25
 
@@ -198,6 +202,11 @@ def create_help_request(
             message=f"New help request posted: {body.topic}",
         ))
 
+    emit_data_event(
+        db, "help_requests", "created", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section_id, ids={"help_request_id": help_request.help_request_id},
+    )
     db.commit()
     db.refresh(help_request)
     return help_request
@@ -230,6 +239,12 @@ def update_help_request(
     if body.duration_minutes is not None:
         help_request.duration_minutes = body.duration_minutes
 
+    section = help_request.section
+    emit_data_event(
+        db, "help_requests", "updated", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section.section_id, ids={"help_request_id": help_request_id},
+    )
     db.commit()
     db.refresh(help_request)
     return help_request
@@ -284,6 +299,20 @@ def accept_help_request(
         db.add(room)
         db.flush()
         db.add(RoomMember(room_id=room.room_id, user_id=help_request.requester_id))
+
+        # Best-effort: a Daily outage shouldn't block room creation, since
+        # chat works fine without video. Room just won't offer a call.
+        if daily_client.is_configured():
+            try:
+                daily_room_name = f"study-room-{room.room_id}"
+                daily_room = daily_client.create_room(
+                    daily_room_name,
+                    int(room.timer_ends_at.timestamp()),
+                )
+                room.daily_room_name = daily_room_name
+                room.daily_room_url = daily_room["url"]
+            except Exception:
+                logger.exception("Failed to create Daily room for study room %s", room.room_id)
     else:
         room = help_request.study_room
 
@@ -316,6 +345,12 @@ def accept_help_request(
         message="Your help request has been accepted. Your study room is ready.",
     ))
 
+    emit_data_event(
+        db, "help_requests", "updated", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section.section_id,
+        ids={"help_request_id": help_request_id, "room_id": room.room_id},
+    )
     db.commit()
     db.refresh(room)
     return HelpRequestAcceptResponse(
@@ -342,6 +377,12 @@ def drop_help_request(
 
     help_request.status = HelpRequestStatusEnum.closed
     help_request.is_archived = True
+    section = help_request.section
+    emit_data_event(
+        db, "help_requests", "deleted", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section.section_id, ids={"help_request_id": help_request_id},
+    )
     db.commit()
     return {"message": "Help request closed."}
 
@@ -389,6 +430,13 @@ def confirm_session(
                     source_id=help_request_id,
                 ))
                 participant.total_points += HELP_SESSION_POINTS
+
+        section = help_request.section
+        emit_data_event(
+            db, "points", "updated", section.school_id,
+            resolve_admin_audience(db, section.school_id, participant_ids),
+            ids={},
+        )
 
     db.commit()
     return HelpRequestConfirmResponse(

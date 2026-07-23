@@ -98,6 +98,7 @@ def test_analytics_forbidden_for_non_owning_teacher(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": other_teacher_username,
         "password": "password123",
+        "full_name": "Test Teacher",
         "school_code": world.school_code,
         "role": "teacher",
     })

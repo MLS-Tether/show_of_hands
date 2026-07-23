@@ -5,11 +5,11 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from db.data_events import emit_data_event, resolve_admin_audience, resolve_section_audience
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from grading import compute_section_grade_for_student
 from image_utils import delete_avatar_image, save_avatar_image
-from validators import validate_full_name
 from models.enrollment_model import Enrollment
 from models.notification_model import Notification, NotificationTypeEnum
 from models.section_model import Section, SectionStatusEnum
@@ -25,6 +25,12 @@ from schemas.user import (
 
 class RejectSignupRequest(BaseModel):
     reason: Optional[str] = None
+
+
+class VerifyUserRequest(BaseModel):
+    # Required to match the target's own requested role when that role is
+    # "admin" — see verify_user for why.
+    confirm_role: Optional[RoleEnum] = None
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -54,8 +60,6 @@ def update_my_profile(
         if existing:
             raise HTTPException(status_code=409, detail="Username already taken.")
         current_user.username = username
-
-    current_user.full_name = validate_full_name(body.full_name)
 
     db.commit()
     db.refresh(current_user)
@@ -185,6 +189,7 @@ def get_student_grades(
 @router.patch("/{user_id}/verify")
 def verify_user(
     user_id: int,
+    body: Optional[VerifyUserRequest] = None,
     current_user: User = Depends(require_role(["admin"])),
     db: Session = Depends(get_db),
 ):
@@ -195,7 +200,23 @@ def verify_user(
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
+
+    # A self-registered admin account is otherwise approved by the same
+    # one-click flow as a student/teacher — this forces the approving admin
+    # to explicitly echo back "admin" first, so a careless click can't grant
+    # full admin rights to whoever requested them.
+    if user.role == RoleEnum.admin and (not body or body.confirm_role != RoleEnum.admin):
+        raise HTTPException(
+            status_code=400,
+            detail="Approving an admin signup requires confirming the requested role.",
+        )
+
     user.is_verified = True
+    emit_data_event(
+        db, "users", "updated", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id, [user_id]),
+        ids={"user_id": user_id},
+    )
     db.commit()
     return {"message": "User verified successfully."}
 
@@ -218,6 +239,11 @@ def reject_signup(
         raise HTTPException(status_code=409, detail="User is already verified.")
 
     user.rejection_reason = body.reason or "Rejected by admin"
+    emit_data_event(
+        db, "users", "updated", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id, [user_id]),
+        ids={"user_id": user_id},
+    )
     db.commit()
     return {"message": "Signup rejected."}
 
@@ -240,6 +266,11 @@ def deactivate_user(
         raise HTTPException(status_code=404, detail="User not found.")
 
     user.is_active = False
+    emit_data_event(
+        db, "users", "updated", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id, [user_id]),
+        ids={"user_id": user_id},
+    )
     db.commit()
     return {"message": "User deactivated successfully."}
 
@@ -258,6 +289,11 @@ def reactivate_user(
         raise HTTPException(status_code=404, detail="User not found.")
 
     user.is_active = True
+    emit_data_event(
+        db, "users", "updated", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id, [user_id]),
+        ids={"user_id": user_id},
+    )
     db.commit()
     return {"message": "User reactivated successfully."}
 
@@ -299,6 +335,16 @@ def delete_user(
                     type=NotificationTypeEnum.section_status,
                     message=f"Section #{section.section_id} is pending teacher reassignment.",
                 ))
+            emit_data_event(
+                db, "sections", "updated", section.school_id,
+                resolve_section_audience(db, section),
+                section_id=section.section_id,
+            )
 
+    emit_data_event(
+        db, "users", "deleted", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id),
+        ids={"user_id": user_id},
+    )
     db.commit()
     return {"message": "User deleted successfully."}

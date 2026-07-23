@@ -1,38 +1,33 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { useQueries } from '@tanstack/react-query'
 import api from '../api'
-import { useAutoRefresh } from '../utils/autoRefresh'
+import { keys } from '../queries'
 import { forgetRoom, getMyRooms } from '../utils/roomTracking'
 import '../styles/shared-ui.css'
 import './StudyRooms.css'
 
 function StudyRooms() {
-  const [rooms, setRooms] = useState(null)
+  const tracked = getMyRooms()
 
-  const load = useCallback(() => {
-    let cancelled = false
-    const tracked = getMyRooms()
-    Promise.allSettled(tracked.map((r) => api.get(`/rooms/${r.room_id}`))).then((results) => {
-      if (cancelled) return
-      const live = []
-      results.forEach((r, i) => {
-        if (r.status === 'fulfilled') {
-          live.push({ ...tracked[i], ...r.value.data })
-        } else {
-          forgetRoom(tracked[i].room_id)
-        }
-      })
-      setRooms(live)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const results = useQueries({
+    queries: tracked.map((r) => ({
+      queryKey: keys.room(r.room_id),
+      queryFn: () => api.get(`/rooms/${r.room_id}`).then((res) => res.data),
+      refetchInterval: 20 * 1000,
+    })),
+  })
 
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
+  const erroredRoomIds = results.flatMap((r, i) => (r.isError ? [tracked[i].room_id] : []))
 
-  const loading = rooms === null
+  useEffect(() => {
+    erroredRoomIds.forEach((id) => forgetRoom(id))
+  }, [erroredRoomIds])
+
+  const loading = results.some((r) => r.isLoading)
+  const rooms = loading
+    ? null
+    : results.flatMap((r, i) => (r.isSuccess ? [{ ...tracked[i], ...r.data }] : []))
 
   return (
     <section className="study-rooms-page">

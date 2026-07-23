@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
+import { keys, useSectionQuests } from '../../queries'
 import { useDialog } from '../DialogContext'
 import '../../styles/shared-ui.css'
 import '../../pages/Quests.css'
@@ -10,7 +12,7 @@ const SOCIAL_MULTIPLIER = 1.5
 
 function QuestsPanel({ sectionId }) {
   const { alert } = useDialog()
-  const [quests, setQuests] = useState(null)
+  const queryClient = useQueryClient()
   const [category, setCategory] = useState('all')
   const [showForm, setShowForm] = useState(false)
   const [title, setTitle] = useState('')
@@ -22,22 +24,7 @@ function QuestsPanel({ sectionId }) {
   const [submitting, setSubmitting] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
 
-  const load = useCallback(() => {
-    let cancelled = false
-    api
-      .get(`/sections/${sectionId}/quests`)
-      .then(({ data }) => {
-        if (!cancelled) setQuests(data)
-      })
-      .catch(() => {
-        if (!cancelled) setQuests((prev) => prev ?? [])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [sectionId])
-
-  useEffect(() => load(), [load])
+  const { data: quests = null } = useSectionQuests(sectionId)
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -56,7 +43,8 @@ function QuestsPanel({ sectionId }) {
       setDescription('')
       setPointValue(10)
       setShowForm(false)
-      load()
+      queryClient.invalidateQueries({ queryKey: keys.sectionQuests(sectionId) })
+      queryClient.invalidateQueries({ queryKey: keys.section(sectionId) })
     } catch (err) {
       setError(err.response?.data?.detail || 'Could not create quest.')
     } finally {
@@ -68,7 +56,10 @@ function QuestsPanel({ sectionId }) {
     setDeletingId(quest.quest_id)
     try {
       await api.delete(`/quests/${quest.quest_id}`)
-      setQuests((prev) => prev.filter((q) => q.quest_id !== quest.quest_id))
+      queryClient.setQueryData(keys.sectionQuests(sectionId), (prev) =>
+        (prev || []).filter((q) => q.quest_id !== quest.quest_id)
+      )
+      queryClient.invalidateQueries({ queryKey: keys.section(sectionId) })
     } catch (err) {
       if (err.response?.status === 403) {
         await alert("Can't delete a system quest.")

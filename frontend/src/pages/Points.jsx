@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import api from '../api'
-import { isTeacher } from '../utils/auth'
+import { keepPreviousData } from '@tanstack/react-query'
+import { usePoints } from '../queries'
+import { getUserId, isTeacher } from '../utils/auth'
 import '../styles/shared-ui.css'
 import './Points.css'
 
@@ -22,38 +23,17 @@ function formatAwardedAt(dateStr) {
 }
 
 function Points() {
-  const [data, setData] = useState(null)
   const [page, setPage] = useState(1)
-  const [error, setError] = useState(false)
-
-  useEffect(() => {
-    const userId = localStorage.getItem('user_id')
-    if (!userId) return
-    let cancelled = false
-
-    api
-      .get(`/users/${userId}/points`, { params: { page, page_size: PAGE_SIZE } })
-      .then(({ data }) => {
-        if (!cancelled) {
-          setData(data)
-          setError(false)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError(true)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [page])
+  const { data = null, isLoading, isError: error } = usePoints(getUserId(), page, PAGE_SIZE, {
+    placeholderData: keepPreviousData,
+  })
 
   // Teachers don't earn points; keep them off this student-only page
   if (isTeacher()) {
     return <Navigate to="/dashboard" replace />
   }
 
-  const loading = data === null && !error
+  const loading = isLoading
   const totalPages = data ? Math.max(1, Math.ceil(data.total_count / data.page_size)) : 1
 
   return (

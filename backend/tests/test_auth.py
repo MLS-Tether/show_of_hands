@@ -14,6 +14,7 @@ def test_register_and_login_student(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": username,
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": world.school_code,
         "role": "student",
     })
@@ -35,6 +36,7 @@ def test_register_unknown_school_code(client):
     resp = client.post("/api/auth/register", json={
         "username": unique("nope"),
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": "NOT_A_REAL_CODE",
         "role": "student",
     })
@@ -46,6 +48,7 @@ def test_register_duplicate_username_in_school(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": username,
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": world.school_code,
         "role": "student",
     })
@@ -55,6 +58,7 @@ def test_register_duplicate_username_in_school(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": username,
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": world.school_code,
         "role": "student",
     })
@@ -66,6 +70,7 @@ def test_teacher_login_blocked_until_verified(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": username,
         "password": "password123",
+        "full_name": "Test Teacher",
         "school_code": world.school_code,
         "role": "teacher",
     })
@@ -102,6 +107,7 @@ def test_refresh_and_logout(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": username,
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": world.school_code,
         "role": "student",
     })
@@ -124,6 +130,64 @@ def test_refresh_and_logout(client, world, cleanup):
     assert resp.status_code == 200, resp.text
 
 
+def test_refresh_rotates_and_detects_reuse(client, world, cleanup):
+    username = unique("rotatestudent")
+    resp = client.post("/api/auth/register", json={
+        "username": username,
+        "password": "password123",
+        "full_name": "Test Student",
+        "school_code": world.school_code,
+        "role": "student",
+    })
+    assert resp.status_code == 201, resp.text
+    cleanup(User, resp.json()["user_id"])
+
+    resp = client.post("/api/auth/login", json={"username": username, "password": "password123"})
+    assert resp.status_code == 200, resp.text
+    original_refresh = resp.json()["refresh_token"]
+
+    resp = client.post("/api/auth/refresh", json={"refresh_token": original_refresh})
+    assert resp.status_code == 200, resp.text
+    rotated_refresh = resp.json()["refresh_token"]
+    assert rotated_refresh != original_refresh
+
+    resp = client.post("/api/auth/refresh", json={"refresh_token": rotated_refresh})
+    assert resp.status_code == 200, resp.text
+    latest_refresh = resp.json()["refresh_token"]
+
+    # Replaying the original (already-rotated-away) token is detected as
+    # reuse and revokes the whole chain, including the most recently issued one.
+    resp = client.post("/api/auth/refresh", json={"refresh_token": original_refresh})
+    assert resp.status_code == 401
+
+    resp = client.post("/api/auth/refresh", json={"refresh_token": latest_refresh})
+    assert resp.status_code == 401
+
+
+def test_verify_admin_requires_role_confirmation(client, world, cleanup):
+    username = unique("adminsignup")
+    resp = client.post("/api/auth/register", json={
+        "username": username,
+        "password": "password123",
+        "full_name": "Test Admin",
+        "school_code": world.school_code,
+        "role": "admin",
+    })
+    assert resp.status_code == 201, resp.text
+    user_id = resp.json()["user_id"]
+    cleanup(User, user_id)
+
+    resp = client.patch(f"/api/users/{user_id}/verify", headers=auth_header(world.admin_token))
+    assert resp.status_code == 400
+
+    resp = client.patch(
+        f"/api/users/{user_id}/verify",
+        json={"confirm_role": "admin"},
+        headers=auth_header(world.admin_token),
+    )
+    assert resp.status_code == 200, resp.text
+
+
 def test_reset_password_only_for_students(client, world):
     resp = client.post(
         "/api/auth/reset-password",
@@ -138,6 +202,7 @@ def test_reset_password_student(client, world, cleanup):
     resp = client.post("/api/auth/register", json={
         "username": username,
         "password": "password123",
+        "full_name": "Test Student",
         "school_code": world.school_code,
         "role": "student",
     })

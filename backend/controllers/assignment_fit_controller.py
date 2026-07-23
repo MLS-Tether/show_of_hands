@@ -9,11 +9,17 @@ from dependencies import require_role
 from gemini_advisor import generate_fit_verdict, is_configured
 from models.section_model import Section
 from models.user_model import User
+from rate_limit import rate_limiter
 from schemas.assignment_fit import AssignmentDraft, AssignmentFitResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["assignment-fit"])
+
+# This endpoint calls the (metered) Gemini API on every request with no
+# caching — without a cap, abuse or a buggy client retry loop translates
+# directly into unbounded Gemini API cost.
+_assignment_fit_rate_limit = rate_limiter(max_calls=10, window_seconds=60)
 
 
 @router.post("/sections/{section_id}/assignment-fit", response_model=AssignmentFitResponse)
@@ -22,6 +28,7 @@ def check_assignment_fit(
     body: AssignmentDraft,
     current_user: User = Depends(require_role(["teacher"])),
     db: Session = Depends(get_db),
+    _rate_limited: User = Depends(_assignment_fit_rate_limit),
 ):
     section = db.query(Section).filter(
         Section.section_id == section_id,

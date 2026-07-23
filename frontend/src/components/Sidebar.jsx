@@ -1,19 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import api, { mediaUrl } from '../api'
+import { useClassRequests, useSchool, useUser, useUsers } from '../queries'
 import { getUserId, isAdmin, isTeacher } from '../utils/auth'
-import { useAutoRefresh } from '../utils/autoRefresh'
 import { initials } from '../utils/format'
 import './Sidebar.css'
 
 const ADMIN_NAV_GROUPS = [
-  { label: null, items: [{ label: 'Overview', to: '/admin/overview', end: true }] },
-  { label: 'Approvals', items: [{ label: 'Inbox', to: '/admin/inbox', badge: 'inbox' }] },
+  { label: null, items: [{ label: 'Overview', to: '/admin/overview', end: true, tour: 'nav-overview' }] },
+  { label: 'Approvals', items: [{ label: 'Inbox', to: '/admin/inbox', badge: 'inbox', tour: 'nav-inbox' }] },
   {
     label: 'Manage',
     items: [
-      { label: 'Sections', to: '/admin/sections' },
-      { label: 'Users', to: '/admin/users' },
+      { label: 'Sections', to: '/admin/sections', tour: 'nav-sections' },
+      { label: 'Users', to: '/admin/users', tour: 'nav-users' },
     ],
   },
   { label: 'School', items: [{ label: 'Settings', to: '/admin/settings' }] },
@@ -21,11 +21,11 @@ const ADMIN_NAV_GROUPS = [
 
 const APP_NAV_ITEMS = [
   { label: 'Dashboard', to: '/dashboard', end: true },
-  { label: 'My sections', to: '/sections' },
-  { label: 'Assignments', to: '/assignments', studentOnly: true },
-  { label: 'Quests', to: '/quests' },
-  { label: 'Bulletin board', to: '/bulletin-board', studentOnly: true },
-  { label: 'Study rooms', to: '/study-rooms', studentOnly: true },
+  { label: 'My sections', to: '/sections', tour: 'nav-sections' },
+  { label: 'Assignments', to: '/assignments', studentOnly: true, tour: 'nav-assignments' },
+  { label: 'Quests', to: '/quests', tour: 'nav-quests' },
+  { label: 'Bulletin board', to: '/bulletin-board', studentOnly: true, tour: 'nav-bulletin' },
+  { label: 'Study rooms', to: '/study-rooms', studentOnly: true, tour: 'nav-rooms' },
   { label: 'Points', to: '/points', studentOnly: true },
 ]
 
@@ -33,45 +33,18 @@ function Sidebar() {
   const navigate = useNavigate()
   const admin = isAdmin()
   const teacher = isTeacher()
-  const [school, setSchool] = useState(null)
-  const [user, setUser] = useState(null)
-  const [inboxCount, setInboxCount] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
 
-  const load = useCallback(() => {
-    let cancelled = false
-    const userId = getUserId()
+  const { data: school = null } = useSchool()
+  const { data: user = null } = useUser(getUserId())
+  const { data: users = null } = useUsers({}, { enabled: admin })
+  const { data: classRequests = null } = useClassRequests({ enabled: admin })
 
-    const requests = [api.get('/schools/me'), api.get(`/users/${userId}`)]
-    if (admin) requests.push(api.get('/users'), api.get('/class-requests'))
-
-    Promise.all(requests)
-      .then(([schoolRes, userRes, usersRes, classRequestsRes]) => {
-        if (cancelled) return
-        setSchool(schoolRes.data)
-        setUser(userRes.data)
-        if (admin) {
-          const pendingSignups = usersRes.data.filter(
-            (u) => u.role !== 'student' && !u.is_verified
-          ).length
-          const pendingClassRequests = classRequestsRes.data.filter(
-            (r) => r.status === 'pending'
-          ).length
-          setInboxCount(pendingSignups + pendingClassRequests)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setInboxCount((prev) => prev ?? 0)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [admin])
-
-  useEffect(() => load(), [load])
-  useAutoRefresh(load)
+  const inboxCount = admin
+    ? (users?.filter((u) => u.role !== 'student' && !u.is_verified).length || 0) +
+      (classRequests?.filter((r) => r.status === 'pending').length || 0)
+    : null
 
   useEffect(() => {
     if (!menuOpen) return
@@ -123,6 +96,7 @@ function Sidebar() {
                 key={item.to}
                 to={item.to}
                 end={item.end}
+                data-tour={item.tour}
                 className={({ isActive }) => `admin-sidebar-link${isActive ? ' active' : ''}`}
               >
                 <span>{item.label}</span>
@@ -169,7 +143,7 @@ function Sidebar() {
               )}
             </div>
             <div className="admin-sidebar-footer-text">
-              <div className="admin-sidebar-footer-name">{user.full_name || user.username}</div>
+              <div className="admin-sidebar-footer-name">{user.username}</div>
               <div className="admin-sidebar-footer-role">{user.role}</div>
             </div>
           </button>
