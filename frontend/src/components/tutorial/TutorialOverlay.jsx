@@ -145,13 +145,25 @@ function TutorialOverlay({ step, stepIndex, stepCount, onNext, onPrev, onSkip })
       )}
       <div className="tutorial-card" style={{ left: geo.cardLeft, top: geo.cardTop }}>
         <div className="tutorial-card-header">
-          <span className="tutorial-badge">{step.badge}</span>
+          <div className="tutorial-icon">✋</div>
+          <div className="tutorial-header-text">
+            <div className="tutorial-badge">{step.badge}</div>
+            <div className="tutorial-progress-label">
+              {isLast ? 'All quests cleared!' : `Quest ${stepIndex} of ${stepCount - 2}`}
+            </div>
+          </div>
           <button type="button" className="tutorial-skip" onClick={onSkip}>
             Skip
           </button>
         </div>
         <div className="tutorial-title">{step.title}</div>
         <div className="tutorial-body">{step.body}</div>
+        <div className="tutorial-progress-track">
+          <div
+            className="tutorial-progress-fill"
+            style={{ width: `${Math.round((stepIndex / (stepCount - 1)) * 100)}%` }}
+          />
+        </div>
         <div className="tutorial-actions">
           {!isFirst && (
             <button type="button" className="tutorial-back" onClick={onPrev}>
@@ -159,7 +171,7 @@ function TutorialOverlay({ step, stepIndex, stepCount, onNext, onPrev, onSkip })
             </button>
           )}
           <button type="button" className="tutorial-next" onClick={onNext}>
-            {isLast ? step.cta : 'Next'}
+            {isLast ? step.cta : 'Next →'}
           </button>
         </div>
       </div>
