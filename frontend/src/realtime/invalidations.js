@@ -12,6 +12,11 @@ export function invalidateForEvent(queryClient, event) {
     case 'sections':
       queryClient.invalidateQueries({ queryKey: ['sections'] })
       if (sectionId) queryClient.invalidateQueries({ queryKey: keys.section(sectionId) })
+      // A student's section membership changed (enrolled or dropped), which
+      // changes which assignments they can see — but assignments() is a flat
+      // key with no section scoping, so it never self-heals from a sections
+      // refetch the way section-scoped keys (quests, resources) do.
+      queryClient.invalidateQueries({ queryKey: keys.assignments() })
       break
     case 'quests':
       if (sectionId) {
