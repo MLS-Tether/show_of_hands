@@ -56,7 +56,7 @@ function TeacherDashboard() {
       )}
       {!loading && (
         <div className="teacher-dashboard-grid">
-          {visibleOwnedSections.map((s) => {
+          {visibleOwnedSections.map((s, i) => {
             const badge = pending[s.section_id]
             const badgeCount = badge ? badge.pendingRequests + badge.ungraded : 0
             return (
@@ -64,6 +64,7 @@ function TeacherDashboard() {
                 type="button"
                 className="teacher-section-card"
                 key={s.section_id}
+                data-tour={i === 0 ? 'widget-teacher' : undefined}
                 onClick={() => navigate(`/sections/${s.section_id}`)}
               >
                 {badgeCount > 0 && (
