@@ -116,7 +116,11 @@ async def notifications_stream(websocket: WebSocket):
         await websocket.close(code=4001)
         return
 
-    await websocket.accept()
+    # The client sent the auth token as a Sec-WebSocket-Protocol subprotocol
+    # (see utils/ws.js) — per RFC 6455, the server must echo one back or the
+    # browser treats the handshake itself as failed, even though the raw
+    # upgrade otherwise succeeds.
+    await websocket.accept(subprotocol=token)
     notification_registry.setdefault(user_id, []).append(websocket)
 
     try:
