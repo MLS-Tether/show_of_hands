@@ -142,7 +142,7 @@ function Sidebar() {
               )}
             </div>
             <div className="admin-sidebar-footer-text">
-              <div className="admin-sidebar-footer-name">{user.full_name || user.username}</div>
+              <div className="admin-sidebar-footer-name">{user.username}</div>
               <div className="admin-sidebar-footer-role">{user.role}</div>
             </div>
           </button>
