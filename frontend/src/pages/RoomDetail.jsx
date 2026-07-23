@@ -47,6 +47,9 @@ function RoomDetail() {
   const closingIntentionallyRef = useRef(false)
   const videoContainerRef = useRef(null)
   const callFrameRef = useRef(null)
+  // Deleting the room removes it server-side, so `room` goes null right when
+  // the confirmation prompt needs help_request_id — this outlives that.
+  const helpRequestIdRef = useRef(null)
 
   // Kicks/leaves/status changes from other members aren't pushed in real
   // time (only chat is) — the query's own 20s refetchInterval keeps this one
@@ -55,7 +58,10 @@ function RoomDetail() {
   const { data: room = null, isError: loadFailed, isLoading: loadingRoom } = useRoom(roomId)
 
   useEffect(() => {
-    if (room) rememberRoom({ room_id: room.room_id })
+    if (room) {
+      rememberRoom({ room_id: room.room_id })
+      helpRequestIdRef.current = room.help_request_id
+    }
   }, [room])
 
   useEffect(() => {
@@ -228,7 +234,8 @@ function RoomDetail() {
     try {
       await api.delete(`/rooms/${roomId}`)
       forgetRoom(Number(roomId))
-      navigate('/study-rooms')
+      // Stay put instead of navigating away — the requester still needs to
+      // answer the "did this happen?" prompt the delete just triggered.
     } catch (err) {
       setActionError(err.response?.data?.message || 'Could not delete the room.')
     }
@@ -249,7 +256,7 @@ function RoomDetail() {
 
   async function handleConfirm(sessionOccurred) {
     try {
-      const { data } = await api.post(`/help-requests/${room.help_request_id}/confirm`, {
+      const { data } = await api.post(`/help-requests/${helpRequestIdRef.current}/confirm`, {
         session_occurred: sessionOccurred,
       })
       setConfirmPending(false)
@@ -267,7 +274,39 @@ function RoomDetail() {
     )
   }
 
-  if (loadFailed) {
+  const awaitingConfirmation = confirmPending || confirmResult != null
+
+  // Deleting the room removes it server-side, so the next refetch 404s and
+  // `room` goes null — but the requester still needs to see this prompt.
+  if (!room && awaitingConfirmation) {
+    return (
+      <section className="room-detail">
+        <h1 className="admin-page-h1">Study room</h1>
+        {confirmPending && (
+          <div className="room-detail-confirm">
+            <p>Did this study session happen?</p>
+            <div className="room-detail-confirm-actions">
+              <button type="button" className="admin-btn-primary" onClick={() => handleConfirm(true)}>
+                Yes
+              </button>
+              <button type="button" className="admin-btn-secondary" onClick={() => handleConfirm(false)}>
+                No
+              </button>
+            </div>
+          </div>
+        )}
+        {confirmResult != null && (
+          <p className="room-detail-confirm-result">
+            {confirmResult > 0
+              ? `Session confirmed — ${confirmResult} points awarded.`
+              : 'Session marked as not happened.'}
+          </p>
+        )}
+      </section>
+    )
+  }
+
+  if (loadFailed && !awaitingConfirmation) {
     return (
       <section className="room-detail">
         <p className="admin-empty-card">Room not found, or you're not a member.</p>
