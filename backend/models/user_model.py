@@ -44,3 +44,4 @@ class User(Base):
     help_requests_made = relationship("HelpRequest", back_populates="requester", foreign_keys="HelpRequest.requester_id")
     help_request_acceptances = relationship("HelpRequestAcceptance", back_populates="user", foreign_keys="HelpRequestAcceptance.user_id")
     room_memberships = relationship("RoomMember", back_populates="user", foreign_keys="RoomMember.user_id")
+    inventory_items = relationship("InventoryItem", back_populates="student")

@@ -16,6 +16,7 @@ from models.quest_completion_model import QuestCompletion
 from models.help_request_model import HelpRequest
 from models.notification_model import Notification, NotificationTypeEnum
 from models.point_transaction_model import PointTransaction, TransactionSourceEnum
+from models.shop_item_model import ShopItem, ShopItemTypeEnum
 
 DEFAULT_CLASSES = [
     "Algebra",
@@ -42,6 +43,77 @@ DEFAULT_CLASSES = [
 DEV_SCHOOL_CODE = "DEV001"
 DEV_PASSWORD = "Passw0rd!"
 
+# Placeholder catalog — image_url points at hand-authored placeholder SVGs
+# under frontend/public/shop-placeholders/, swappable for real art later
+# without touching this seed data's shape.
+DEFAULT_SHOP_ITEMS = [
+    {
+        "name": "Forest Sprite",
+        "description": "A leafy little companion.",
+        "item_type": ShopItemTypeEnum.avatar_base,
+        "cost": 50,
+        "image_url": "/shop-placeholders/avatar-base-1.svg",
+    },
+    {
+        "name": "Ocean Drifter",
+        "description": "Cool blue and always calm.",
+        "item_type": ShopItemTypeEnum.avatar_base,
+        "cost": 50,
+        "image_url": "/shop-placeholders/avatar-base-2.svg",
+    },
+    {
+        "name": "Adventurer's Cap",
+        "description": "For explorers of all subjects.",
+        "item_type": ShopItemTypeEnum.avatar_accessory,
+        "cost": 30,
+        "image_url": "/shop-placeholders/avatar-accessory-1.svg",
+    },
+    {
+        "name": "Star Crown",
+        "description": "Wear it like you earned it.",
+        "item_type": ShopItemTypeEnum.avatar_accessory,
+        "cost": 40,
+        "image_url": "/shop-placeholders/avatar-accessory-2.svg",
+    },
+    {
+        "name": "First Steps",
+        "description": "Awarded for getting started.",
+        "item_type": ShopItemTypeEnum.badge,
+        "cost": 20,
+        "image_url": "/shop-placeholders/badge-1.svg",
+    },
+    {
+        "name": "Study Streak",
+        "description": "Show off your consistency.",
+        "item_type": ShopItemTypeEnum.badge,
+        "cost": 35,
+        "image_url": "/shop-placeholders/badge-2.svg",
+    },
+    {
+        "name": "Helping Hand",
+        "description": "For showing up for classmates.",
+        "item_type": ShopItemTypeEnum.badge,
+        "cost": 35,
+        "image_url": "/shop-placeholders/badge-3.svg",
+    },
+    {
+        "name": "Ocean Breeze",
+        "description": "Recolors the app in cool blues.",
+        "item_type": ShopItemTypeEnum.theme,
+        "cost": 60,
+        "image_url": "/shop-placeholders/theme-1.svg",
+        "theme_key": "ocean",
+    },
+    {
+        "name": "Sunset Glow",
+        "description": "Recolors the app in warm oranges.",
+        "item_type": ShopItemTypeEnum.theme,
+        "cost": 60,
+        "image_url": "/shop-placeholders/theme-2.svg",
+        "theme_key": "sunset",
+    },
+]
+
 
 def seed_classes():
     db = SessionLocal()
@@ -49,6 +121,17 @@ def seed_classes():
         if db.query(Class_).count() == 0:
             for name in DEFAULT_CLASSES:
                 db.add(Class_(name=name))
+            db.commit()
+    finally:
+        db.close()
+
+
+def seed_shop_items():
+    db = SessionLocal()
+    try:
+        if db.query(ShopItem).count() == 0:
+            for item in DEFAULT_SHOP_ITEMS:
+                db.add(ShopItem(**item))
             db.commit()
     finally:
         db.close()

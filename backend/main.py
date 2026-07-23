@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from db.pool import SessionLocal
-from db.seed import seed_classes, seed_dev_data, seed_second_teacher_data, seed_more_cs_students
+from db.seed import seed_classes, seed_dev_data, seed_second_teacher_data, seed_more_cs_students, seed_shop_items
 from db.ws_broadcast import start_listener, stop_listener, deliver_loop
 from models.assignment_model import Assignment
 from models.enrollment_model import Enrollment
@@ -119,6 +119,7 @@ def check_overdue_assignments():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     seed_classes()
+    seed_shop_items()
     seed_dev_data()
     seed_second_teacher_data()
     seed_more_cs_students()
