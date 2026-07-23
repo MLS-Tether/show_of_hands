@@ -306,9 +306,11 @@ function RoomDetail() {
             Delete room
           </button>
         )}
-        <button type="button" className="admin-btn-secondary" onClick={handleLeave}>
-          Leave room
-        </button>
+        {!isRequester && (
+          <button type="button" className="admin-btn-secondary" onClick={handleLeave}>
+            Leave room
+          </button>
+        )}
       </div>
 
       {confirmPending && (
