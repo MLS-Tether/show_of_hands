@@ -353,20 +353,19 @@ function RoomDetail() {
         <>
           <div className="widget-label">video call</div>
           {videoError && <p className="room-detail-error">{videoError}</p>}
-          {!videoJoined && (
+          {!videoJoined && !videoLoading && (
             <button
               type="button"
               className="admin-btn-secondary room-detail-video-join-btn"
-              disabled={videoLoading}
               onClick={handleJoinVideo}
             >
-              {videoLoading ? 'Joining…' : 'Join video call'}
+              Join video call
             </button>
           )}
           <div
             ref={videoContainerRef}
             className="room-detail-video"
-            style={{ display: videoJoined ? 'block' : 'none' }}
+            style={{ display: videoJoined || videoLoading ? 'block' : 'none' }}
           />
         </>
       )}
