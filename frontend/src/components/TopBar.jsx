@@ -86,7 +86,7 @@ function TopBar({ sidebarHidden, onToggleSidebar }) {
       </div>
       <div className="admin-topbar-actions">
         {!teacher && points !== null && (
-          <span className="admin-topbar-points">
+          <span className="admin-topbar-points" data-tour="topbar-points">
             {points.toLocaleString()} {admin ? 'school pts' : 'pts'}
           </span>
         )}
