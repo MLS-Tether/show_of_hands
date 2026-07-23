@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { TutorialContext } from './TutorialContext'
 import TutorialOverlay from './TutorialOverlay'
 import { getTutorialSteps } from './tutorialSteps'
@@ -6,6 +7,7 @@ import { getRole, getUserId } from '../../utils/auth'
 import { hasSeenTutorial, markTutorialSeen } from '../../utils/tutorial'
 
 export function TutorialProvider({ children }) {
+  const navigate = useNavigate()
   const [active, setActive] = useState(false)
   const [step, setStep] = useState(0)
   const role = getRole()
@@ -21,6 +23,11 @@ export function TutorialProvider({ children }) {
   function finish() {
     markTutorialSeen(userId)
     setActive(false)
+  }
+
+  function finishAndBrowseSections() {
+    finish()
+    navigate('/sections')
   }
 
   function next() {
@@ -46,7 +53,7 @@ export function TutorialProvider({ children }) {
           step={steps[step]}
           stepIndex={step}
           stepCount={steps.length}
-          onNext={isLastStep ? finish : next}
+          onNext={isLastStep ? finishAndBrowseSections : next}
           onPrev={prev}
           onSkip={finish}
         />
