@@ -15,7 +15,7 @@ export function TutorialProvider({ children }) {
   const steps = getTutorialSteps(role)
 
   useEffect(() => {
-    if (!hasSeenTutorial(userId)) {
+    if (userId && !hasSeenTutorial(userId)) {
       setActive(true)
     }
   }, [userId])
