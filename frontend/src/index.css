@@ -128,6 +128,15 @@
   --danger-border: rgba(248, 113, 113, 0.4);
 }
 
+/* Without this, any element combining `width: 100%` with padding/border
+   (and there's no shortage of those) overflows its container by exactly
+   that padding/border amount — e.g. .teacher-panel-row did, silently. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html {
   height: 100%;
 }
