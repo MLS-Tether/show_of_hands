@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import api, { mediaUrl } from '../api'
 import Modal from '../components/Modal'
 import { useToast } from '../components/ToastContext'
-import { useTutorial } from '../components/tutorial/TutorialContext'
 import { keys, useSchool, useUser } from '../queries'
 import { getUserId } from '../utils/auth'
 import { initials } from '../utils/format'
@@ -101,7 +100,6 @@ function ChangePasswordModal({ onClose, onSuccess }) {
 
 function Profile() {
   const { showToast } = useToast()
-  const { replay } = useTutorial()
   const queryClient = useQueryClient()
   const userId = getUserId()
   const [editing, setEditing] = useState(false)
@@ -335,18 +333,6 @@ function Profile() {
             </div>
           </div>
         )}
-
-        <div>
-          <div className="widget-label">help</div>
-          <div className="profile-card">
-            <div className="profile-row">
-              <span className="profile-row-label">Onboarding tutorial</span>
-              <button type="button" className="admin-btn-text" onClick={replay}>
-                ↻ Replay tutorial
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
 
       {showPasswordModal && (
