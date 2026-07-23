@@ -1,0 +1,95 @@
+.tutorial-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+}
+
+.tutorial-wash {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 10, 18, 0.4);
+}
+
+.tutorial-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 344px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: rgba(0, 0, 0, 0.22) 0 20px 48px -14px;
+  padding: 20px 22px 18px;
+}
+
+.tutorial-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.tutorial-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: 16px;
+  padding: 3px 10px;
+}
+
+.tutorial-skip {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.tutorial-title {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text-h);
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+}
+
+.tutorial-body {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.tutorial-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.tutorial-back {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.tutorial-next {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px 18px;
+  cursor: pointer;
+}
