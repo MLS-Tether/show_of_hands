@@ -165,6 +165,11 @@ def update_enrollment_request(
         section_id=request.section_id,
     )
     if body.status == EnrollmentStatusEnum.accepted:
+        # resolve_section_audience queries Enrollment directly; the session is
+        # autoflush=False, so without this flush the just-added Enrollment
+        # row above isn't visible yet and the newly-accepted student is
+        # dropped from the audience of their own acceptance event.
+        db.flush()
         emit_data_event(
             db, "sections", "updated", section.school_id,
             resolve_section_audience(db, section),
