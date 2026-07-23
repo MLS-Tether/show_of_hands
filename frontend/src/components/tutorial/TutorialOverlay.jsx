@@ -56,6 +56,7 @@ function computeGeometry(rect, containerWidth, containerHeight) {
   const pick =
     candidates.find(([l, t]) => !overlapsTarget(l, t) && inBounds(l, t)) ||
     candidates.find(([l, t]) => !overlapsTarget(l, t)) ||
+    candidates.find(([l, t]) => inBounds(l, t)) ||
     candidates[0]
   const [cardLeft, cardTop] = pick
 
