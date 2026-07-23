@@ -114,10 +114,14 @@ function TutorialOverlay({ step, stepIndex, stepCount, onNext, onPrev, onSkip })
     // Double rAF: waits for the browser to finish the layout pass triggered
     // by the step change (e.g. a newly-mounted target element) before
     // measuring, same as the original prototype this was ported from.
-    const raf1 = requestAnimationFrame(() => requestAnimationFrame(measure))
+    let raf2 = null
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(measure)
+    })
     window.addEventListener('resize', measure)
     return () => {
       cancelAnimationFrame(raf1)
+      if (raf2 !== null) cancelAnimationFrame(raf2)
       window.removeEventListener('resize', measure)
     }
   }, [step])

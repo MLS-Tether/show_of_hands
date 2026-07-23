@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { TutorialContext } from './TutorialContext'
 import TutorialOverlay from './TutorialOverlay'
 import { getTutorialSteps } from './tutorialSteps'
-import { getRole, getUserId } from '../../utils/auth'
+import { getRole, getUserId, isAdmin } from '../../utils/auth'
 import { hasSeenTutorial, markTutorialSeen } from '../../utils/tutorial'
 
 export function TutorialProvider({ children }) {
@@ -27,7 +27,7 @@ export function TutorialProvider({ children }) {
 
   function finishAndBrowseSections() {
     finish()
-    navigate('/sections')
+    navigate(isAdmin() ? '/admin/sections' : '/sections')
   }
 
   function next() {
