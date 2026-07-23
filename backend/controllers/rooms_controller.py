@@ -97,24 +97,21 @@ async def _close_room_connections(
     notify_type: Optional[str] = None,
 ):
     """Disconnect all WS connections for a room. If requester_id is given, that
-    connection first gets a session-confirmation prompt. If notify_type is given,
-    every connection first gets a {"type": notify_type} message (e.g. room deletion)."""
+    connection first gets a session-confirmation prompt instead of notify_type —
+    a "room deleted" notice would otherwise navigate the requester away before
+    they can answer it. Every other connection first gets a {"type": notify_type}
+    message, if given (e.g. room deletion)."""
     room_messages.pop(room_id, None)
 
     if room_id not in room_registry:
         return
 
-    if notify_type:
-        for ws in list(room_registry[room_id].values()):
-            try:
-                await ws.send_json({"type": notify_type})
-            except Exception:
-                pass
-    elif requester_id and requester_id in room_registry[room_id]:
+    for user_id, ws in list(room_registry[room_id].items()):
         try:
-            await room_registry[room_id][requester_id].send_json({
-                "type": "session_confirmation_required",
-            })
+            if requester_id is not None and user_id == requester_id:
+                await ws.send_json({"type": "session_confirmation_required"})
+            elif notify_type:
+                await ws.send_json({"type": notify_type})
         except Exception:
             pass
 
@@ -317,6 +314,12 @@ async def close_room(
     if room.status == StudyRoomStatusEnum.closed:
         raise HTTPException(status_code=409, detail="Room is already closed.")
 
+    # Prompt the requester over their still-live chat socket now — the
+    # "updated" event below reaches their own client almost immediately and
+    # causes it to tear that socket down on its own, racing (and often
+    # beating) a prompt sent any later.
+    await _close_room_connections(room_id, requester_id=current_user.user_id)
+
     room.status = StudyRoomStatusEnum.closed
 
     # Closing the room is terminal for its help request too — without this,
@@ -330,7 +333,6 @@ async def close_room(
     db.commit()
 
     _teardown_daily_room(room)
-    await _close_room_connections(room_id, requester_id=current_user.user_id)
     return {"message": "Room closed."}
 
 
@@ -344,10 +346,11 @@ async def delete_room(
     _require_requester(room, current_user.user_id)
 
     # The requester has full autonomy to delete the room at any time, active or
-    # closed — this is a hard teardown, not the graceful /close flow, so there's
-    # no session-confirmation prompt: just notify everyone and disconnect them.
+    # closed — but they still need the same session-confirmation prompt as a
+    # graceful close, otherwise nobody gets points for a session that happened
+    # before the room was torn down. Everyone else just gets the deletion notice.
     _teardown_daily_room(room)
-    await _close_room_connections(room_id, notify_type="room_deleted")
+    await _close_room_connections(room_id, requester_id=current_user.user_id, notify_type="room_deleted")
 
     # Deletion is terminal — archive the help request too so it stops
     # cluttering the bulletin board now that its room is gone for good.
