@@ -12,15 +12,39 @@
 
 .tutorial-card {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   width: 344px;
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: rgba(0, 0, 0, 0.22) 0 20px 48px -14px;
   padding: 20px 22px 18px;
+  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1), top 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tutorial-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.tutorial-ellipse {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.tutorial-arrow-path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+.tutorial-arrow-head {
+  fill: var(--accent);
 }
 
 .tutorial-card-header {
