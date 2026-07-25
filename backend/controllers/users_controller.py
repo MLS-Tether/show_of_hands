@@ -5,7 +5,8 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from db.data_events import emit_data_event, resolve_admin_audience, resolve_section_audience
+from auth_utils import RefreshToken
+from db.data_events import emit_data_event, resolve_admin_audience, resolve_admin_ids, resolve_section_audience
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from grading import compute_section_grade_for_student
@@ -298,29 +299,16 @@ def reactivate_user(
     return {"message": "User reactivated successfully."}
 
 
-@router.delete("/{user_id}")
-def delete_user(
-    user_id: int,
-    current_user: User = Depends(require_role(["admin"])),
-    db: Session = Depends(get_db),
-):
-    if user_id == current_user.user_id:
-        raise HTTPException(status_code=400, detail="Cannot delete your own account.")
-
-    user = db.query(User).filter(
-        User.user_id == user_id,
-        User.school_id == current_user.school_id,
-        User.is_archived == False,
-    ).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
-
+def _soft_delete_user(db: Session, user: User) -> None:
+    """Archives a user and, for teachers, cascades the fallout onto their
+    sections (pending_reassignment + notify enrolled students). Shared by
+    the admin-on-others delete and the self-service delete below."""
     user.is_archived = True
     user.deleted_at = datetime.now(timezone.utc)
 
     if user.role == RoleEnum.teacher:
         sections = db.query(Section).filter(
-            Section.teacher_id == user_id,
+            Section.teacher_id == user.user_id,
             Section.is_archived == False,
         ).all()
         for section in sections:
@@ -340,6 +328,72 @@ def delete_user(
                 resolve_section_audience(db, section),
                 section_id=section.section_id,
             )
+
+
+@router.delete("/me")
+def delete_my_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role == RoleEnum.admin:
+        other_admin = db.query(User).filter(
+            User.school_id == current_user.school_id,
+            User.role == RoleEnum.admin,
+            User.is_archived == False,
+            User.user_id != current_user.user_id,
+        ).first()
+        if not other_admin:
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot delete the last remaining admin at your school.",
+            )
+
+    _soft_delete_user(db, current_user)
+    db.query(RefreshToken).filter(RefreshToken.user_id == current_user.user_id).delete()
+
+    emit_data_event(
+        db, "users", "deleted", current_user.school_id,
+        resolve_admin_audience(db, current_user.school_id),
+        ids={"user_id": current_user.user_id},
+    )
+    db.commit()
+    return {"message": "Account deleted successfully."}
+
+
+@router.post("/me/request-password-reset")
+def request_password_reset(
+    current_user: User = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    admin_ids = resolve_admin_ids(db, current_user.school_id)
+    for admin_id in admin_ids:
+        db.add(Notification(
+            user_id=admin_id,
+            type=NotificationTypeEnum.password_reset_requested,
+            message=f"{current_user.full_name} ({current_user.username}) has requested a password reset.",
+        ))
+    db.commit()
+    return {"message": f"Notified {len(admin_ids)} admin(s)."}
+
+
+@router.delete("/{user_id}")
+def delete_user(
+    user_id: int,
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db),
+):
+    if user_id == current_user.user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account.")
+
+    user = db.query(User).filter(
+        User.user_id == user_id,
+        User.school_id == current_user.school_id,
+        User.is_archived == False,
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    _soft_delete_user(db, user)
 
     emit_data_event(
         db, "users", "deleted", current_user.school_id,

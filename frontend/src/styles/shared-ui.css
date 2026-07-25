@@ -112,7 +112,16 @@
 .admin-btn-danger {
   background: transparent;
   color: var(--danger);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--danger-border);
+}
+
+.admin-btn-danger:hover {
+  background: var(--danger-bg);
+}
+
+.admin-btn-danger:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .admin-btn-text {
