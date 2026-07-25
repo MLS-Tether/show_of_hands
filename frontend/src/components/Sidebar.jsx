@@ -29,7 +29,7 @@ const APP_NAV_ITEMS = [
   { label: 'Points', to: '/points', studentOnly: true },
 ]
 
-function Sidebar() {
+function Sidebar({ className = '' }) {
   const navigate = useNavigate()
   const admin = isAdmin()
   const teacher = isTeacher()
@@ -76,7 +76,7 @@ function Sidebar() {
     : [{ label: null, items: APP_NAV_ITEMS.filter((item) => !item.studentOnly || !teacher) }]
 
   return (
-    <nav className="admin-sidebar" aria-label="Main">
+    <nav className={`admin-sidebar ${className}`.trim()} aria-label="Main">
       <div className="admin-sidebar-brand">
         <div className="admin-sidebar-logo">
           Show of Hands{' '}

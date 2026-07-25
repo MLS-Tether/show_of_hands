@@ -27,6 +27,7 @@ class AssignmentListResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     assignment_id: int
+    section_id: int
     title: str
     due_date: datetime
     point_value: int

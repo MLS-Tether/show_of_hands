@@ -32,6 +32,89 @@
   color: var(--text-muted);
 }
 
+.section-card-wrap {
+  position: relative;
+}
+
+.section-card-wrap .section-card {
+  height: 100%;
+}
+
+.section-hover-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 10px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  pointer-events: none;
+}
+
+.section-card-wrap:hover .section-hover-panel,
+.section-card-wrap:focus-within .section-hover-panel {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.section-hover-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.section-hover-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+
+.section-hover-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 5px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.section-hover-row:hover,
+.section-hover-row:focus-visible {
+  background: var(--surface-2);
+}
+
+.section-hover-row-title {
+  font-size: 12.5px;
+  color: var(--text-h);
+}
+
+.section-hover-row-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .join-section-card {
   border: 1px dashed var(--border-strong);
   border-radius: 8px;
