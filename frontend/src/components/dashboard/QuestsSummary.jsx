@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useQuestsForSections } from '../../queries'
+import { useSidebarPeek } from '../SidebarPeekContext'
 import './QuestsSummary.css'
 
 function QuestsSummary({ sections }) {
+  const peekSidebar = useSidebarPeek()
   const sectionIds = (sections ?? []).map((s) => s.section_id)
   const { data: rawQuests, isLoading: questsLoading } = useQuestsForSections(sectionIds)
 
@@ -27,6 +29,7 @@ function QuestsSummary({ sections }) {
               className="quest-row"
               key={q.quest_id}
               to={`/quests#quest-${q.quest_id}`}
+              onClick={() => peekSidebar()}
             >
               <span className="quest-title">{q.title}</span>
               <span className="quest-category">{q.category}</span>

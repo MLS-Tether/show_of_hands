@@ -10,7 +10,10 @@ import { isEscapeClaimed } from '../utils/escapeClaim'
 import { isTeacher } from '../utils/auth'
 import './Layout.css'
 
-const SIDEBAR_PEEK_DURATION_MS = 750
+// Kept slightly longer than the 0.75s CSS animation (see Sidebar.css
+// `sidebar-peek` keyframes) so the slide-out always finishes visually
+// before React unmounts the peek sidebar, instead of racing it mid-slide.
+const SIDEBAR_PEEK_DURATION_MS = 850
 
 function Layout() {
   const navigate = useNavigate()
