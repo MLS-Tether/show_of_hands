@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
 import { useDialog } from '../components/DialogContext'
@@ -22,6 +22,7 @@ function Quests() {
   const { alert } = useDialog()
   const queryClient = useQueryClient()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const { data: sections = null } = useSections()
   const [category, setCategory] = useState('all')
   const [completingId, setCompletingId] = useState(null)
@@ -29,6 +30,7 @@ function Quests() {
   const highlightId = location.hash.startsWith('#quest-')
     ? location.hash.slice('#quest-'.length)
     : null
+  const sectionFilter = searchParams.get('section')
 
   const sectionIds = (sections ?? []).map((s) => s.section_id)
   const { data: rawQuests, isLoading: questsLoading } = useQuestsForSections(sectionIds)
@@ -38,7 +40,10 @@ function Quests() {
     ? null
     : (() => {
         const sectionNameById = new Map(sections.map((s) => [s.section_id, s.class_name]))
-        return [...(rawQuests ?? [])]
+        const base = sectionFilter
+          ? (rawQuests ?? []).filter((q) => String(q.section_id) === sectionFilter)
+          : (rawQuests ?? [])
+        return [...base]
           .map((q) => ({ ...q, section_name: sectionNameById.get(q.section_id) }))
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       })()

@@ -64,6 +64,41 @@ def test_list_my_assignments_across_sections(client, world, cleanup):
     assert resp.status_code == 403
 
 
+def test_list_my_assignments_includes_section_id(client, world, cleanup):
+    # The dashboard's per-section hover panel (and the Assignments page's
+    # ?section= filter) group this bulk endpoint's results by section_id
+    # client-side, so it must be present on every row.
+    resp = client.post(
+        f"/api/sections/{world.section_id}/assignments",
+        json={"title": unique("HW"), "due_date": _due_date(), "point_value": 50},
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 201, resp.text
+    assignment_id = resp.json()["assignment_id"]
+    cleanup(Assignment, assignment_id)
+
+    resp = client.get("/api/assignments", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+    match = next(a for a in resp.json() if a["assignment_id"] == assignment_id)
+    assert match["section_id"] == world.section_id
+
+
+def test_list_section_assignments_includes_section_id(client, world, cleanup):
+    resp = client.post(
+        f"/api/sections/{world.section_id}/assignments",
+        json={"title": unique("HW"), "due_date": _due_date(), "point_value": 50},
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 201, resp.text
+    assignment_id = resp.json()["assignment_id"]
+    cleanup(Assignment, assignment_id)
+
+    resp = client.get(f"/api/sections/{world.section_id}/assignments", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+    match = next(a for a in resp.json() if a["assignment_id"] == assignment_id)
+    assert match["section_id"] == world.section_id
+
+
 def test_get_assignment_detail(client, world, cleanup):
     resp = client.post(
         f"/api/sections/{world.section_id}/assignments",

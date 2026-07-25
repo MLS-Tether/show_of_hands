@@ -27,6 +27,11 @@
   border-color: var(--border-strong);
 }
 
+.assignments-row-highlight {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 2px var(--accent-bg);
+}
+
 .assignments-row-title {
   font-size: 14px;
   color: var(--text-h);
