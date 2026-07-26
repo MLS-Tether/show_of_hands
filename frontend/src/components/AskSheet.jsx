@@ -73,6 +73,9 @@ function AskSheet({ open, onClose }) {
       aria-hidden={!open}
     >
       <div className="ask-sheet" ref={sheetRef} role="dialog" aria-modal="true" aria-label="Ask for help">
+        <button type="button" className="ask-sheet-close" aria-label="Close" onClick={onClose}>
+          ×
+        </button>
         <div className="ask-sheet-handle" />
         <div className="ask-sheet-header">
           <h2>Ask for help</h2>

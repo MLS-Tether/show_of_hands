@@ -54,6 +54,7 @@ function MobileNav() {
             key={item.to}
             to={item.to}
             end={item.end}
+            data-tour={item.tour}
             className={({ isActive }) => `mobile-nav-tab${isActive ? ' active' : ''}`}
           >
             <span className="mobile-nav-icon" aria-hidden="true">
@@ -65,6 +66,7 @@ function MobileNav() {
         <button
           type="button"
           className={`mobile-nav-tab mobile-nav-more${moreOpen ? ' active' : ''}`}
+          data-tour="mobile-more"
           aria-expanded={moreOpen}
           onClick={() => setMoreOpen((open) => !open)}
         >

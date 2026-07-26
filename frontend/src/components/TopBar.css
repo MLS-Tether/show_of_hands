@@ -37,24 +37,31 @@
   background: var(--surface-2);
 }
 
+.admin-topbar-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.admin-topbar-back:hover {
+  color: var(--text-h);
+  background: var(--surface-2);
+}
+
 .admin-topbar-breadcrumb {
   display: flex;
   align-items: center;
   gap: 10px;
   font-size: 13.5px;
   color: var(--text-muted);
-}
-
-.admin-topbar-esc-hint {
-  font-size: 11px;
-  color: var(--text-muted);
-  opacity: 0.7;
-}
-
-/* The opacity above washes out the already-low-contrast --text-muted in
-   light mode; drop it there while leaving dark mode's look untouched. */
-:root[data-theme='light'] .admin-topbar-esc-hint {
-  opacity: 1;
 }
 
 .admin-topbar-actions {
@@ -93,11 +100,6 @@
   /* Nothing to toggle on mobile — the bottom tab bar replaces the sidebar
      entirely, it isn't a collapsible affordance there. */
   .admin-topbar-sidebar-toggle {
-    display: none;
-  }
-
-  /* A keyboard-only affordance, meaningless on a touch device. */
-  .admin-topbar-esc-hint {
     display: none;
   }
 
