@@ -148,3 +148,22 @@
     flex-wrap: wrap;
   }
 }
+
+@media (max-width: 380px) {
+  .bulletin-request-form {
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .bulletin-request-form-row {
+    gap: 8px;
+  }
+
+  .bulletin-request-card {
+    padding: 10px 12px;
+  }
+
+  .bulletin-request-card-actions {
+    gap: 6px;
+  }
+}
