@@ -4,8 +4,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
 import Modal from '../components/Modal'
 import { useDialog } from '../components/DialogContext'
-import { keys, useHelpRequestsBoard, useSections } from '../queries'
-import { forgetRoom, getMyHelpRequestIds, getMyRooms, rememberHelpRequestId, rememberRoom } from '../utils/roomTracking'
+import { keys, useCreateHelpRequest, useHelpRequestsBoard, useSections } from '../queries'
+import { forgetRoom, getMyHelpRequestIds, getMyRooms, rememberRoom } from '../utils/roomTracking'
 import '../styles/shared-ui.css'
 import './BulletinBoard.css'
 
@@ -16,7 +16,8 @@ const STATUS_LABELS = {
   expired: 'Expired',
 }
 
-function NewRequestForm({ sections, onCreated }) {
+function NewRequestForm({ sections }) {
+  const createHelpRequest = useCreateHelpRequest(sections)
   const [sectionId, setSectionId] = useState(sections[0]?.section_id ?? '')
   const [topic, setTopic] = useState('')
   const [description, setDescription] = useState('')
@@ -30,15 +31,7 @@ function NewRequestForm({ sections, onCreated }) {
     setError('')
     setSubmitting(true)
     try {
-      const { data } = await api.post(`/sections/${sectionId}/help-requests`, {
-        topic,
-        description: description || null,
-        group_size: Number(groupSize),
-        duration_minutes: Number(durationMinutes),
-      })
-      rememberHelpRequestId(data.help_request_id)
-      const section = sections.find((s) => s.section_id === Number(sectionId))
-      onCreated({ ...data, section_id: Number(sectionId), section_name: section?.class_name })
+      await createHelpRequest({ sectionId, topic, description, groupSize, durationMinutes })
       setTopic('')
       setDescription('')
       setGroupSize(2)
@@ -282,12 +275,7 @@ function BulletinBoard() {
       {!loading && sections.length > 0 && (
         <>
           <div className="widget-label">post a help request</div>
-          <NewRequestForm
-            sections={sections}
-            onCreated={(hr) =>
-              queryClient.setQueryData(keys.helpRequests(), (prev) => [hr, ...(prev || [])])
-            }
-          />
+          <NewRequestForm sections={sections} />
 
           <h2 className="bulletin-board-subheading">Help requests</h2>
           {requests.length === 0 && (

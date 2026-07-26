@@ -181,6 +181,17 @@
   color: var(--text-muted);
 }
 
+@media (max-width: 768px) {
+  .admin-detail-row {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .admin-detail-label {
+    width: auto;
+  }
+}
+
 .admin-settings-card-title {
   font-size: 15px;
   font-weight: 600;

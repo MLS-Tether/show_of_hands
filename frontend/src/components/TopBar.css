@@ -84,3 +84,32 @@
 .admin-topbar-theme:hover {
   border-color: var(--text-muted);
 }
+
+@media (max-width: 768px) {
+  .admin-topbar {
+    padding: 0 14px;
+  }
+
+  /* Nothing to toggle on mobile — the bottom tab bar replaces the sidebar
+     entirely, it isn't a collapsible affordance there. */
+  .admin-topbar-sidebar-toggle {
+    display: none;
+  }
+
+  /* A keyboard-only affordance, meaningless on a touch device. */
+  .admin-topbar-esc-hint {
+    display: none;
+  }
+
+  .admin-topbar-actions {
+    gap: 8px;
+  }
+
+  /* Tutorial-replay and the theme toggle move into the More sheet on
+     mobile (as "Replay tutorial" / "Appearance" rows) instead of living
+     here icon-only — there isn't room for a third+fourth topbar button
+     next to the points pill and notification bell at this width. */
+  .admin-topbar-theme {
+    display: none;
+  }
+}

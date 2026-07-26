@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import TopBar from './TopBar'
 import Sidebar from './Sidebar'
+import MobileNav from './MobileNav'
+import AskButton from './AskButton'
 import { SidebarPeekContext } from './SidebarPeekContext'
 import { RealtimeProvider } from '../realtime/RealtimeProvider'
 import { TutorialProvider } from './tutorial/TutorialProvider'
@@ -77,6 +79,8 @@ function Layout() {
                 </div>
               </main>
             </div>
+            <MobileNav />
+            <AskButton />
           </SidebarPeekContext.Provider>
         </TutorialProvider>
       </div>

@@ -4,6 +4,19 @@
   gap: 10px;
 }
 
+@media (max-width: 768px) {
+  .sections-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Hover doesn't exist on touch — below this width, section cards just
+     link straight to the section detail page like they did before this
+     panel existed. */
+  .section-hover-panel {
+    display: none;
+  }
+}
+
 .section-card {
   display: block;
   background: var(--surface-1);

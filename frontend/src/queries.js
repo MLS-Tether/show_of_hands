@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from './api'
+import { rememberHelpRequestId } from './utils/roomTracking'
 
 // Single source of truth for query keys, shared between the components that
 // read data and realtime/invalidations.js, which maps push events to these
@@ -165,6 +166,26 @@ export function useHelpRequestsBoard(options = {}) {
     queryFn: () => unwrap(api.get('/help-requests')),
     ...options,
   })
+}
+
+// Shared by the Bulletin board's own create form and the mobile floating
+// Ask button, so the post + cache-prepend sequence only lives in one place.
+export function useCreateHelpRequest(sections) {
+  const queryClient = useQueryClient()
+
+  return async function createHelpRequest({ sectionId, topic, description, groupSize, durationMinutes }) {
+    const { data } = await api.post(`/sections/${sectionId}/help-requests`, {
+      topic,
+      description: description || null,
+      group_size: Number(groupSize),
+      duration_minutes: Number(durationMinutes),
+    })
+    rememberHelpRequestId(data.help_request_id)
+    const section = (sections ?? []).find((s) => s.section_id === Number(sectionId))
+    const hr = { ...data, section_id: Number(sectionId), section_name: section?.class_name }
+    queryClient.setQueryData(keys.helpRequests(), (prev) => [hr, ...(prev || [])])
+    return hr
+  }
 }
 
 export function useNotifications(options = {}) {
