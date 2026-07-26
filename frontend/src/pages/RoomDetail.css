@@ -31,6 +31,15 @@
   margin-bottom: 18px;
 }
 
+@media (max-width: 768px) {
+  /* Up to 3 buttons (+10 min / Close room / Delete room) can render here
+     at once — wrap instead of overflowing on a narrow phone. */
+  .room-detail-controls,
+  .room-detail-confirm-actions {
+    flex-wrap: wrap;
+  }
+}
+
 .room-detail-confirm {
   border: 1px solid var(--accent-border);
   background: var(--accent-bg);

@@ -60,6 +60,7 @@
 .tutorial-card {
   position: absolute;
   width: 344px;
+  max-width: calc(100vw - 32px);
   background: var(--surface-1);
   border: 2px solid var(--accent);
   border-radius: 18px;
