@@ -167,6 +167,12 @@
   border-color: rgba(20, 184, 166, 0.3);
 }
 
+.kind-unenroll {
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.13);
+  border-color: rgba(244, 63, 94, 0.3);
+}
+
 .admin-detail-row {
   display: flex;
   gap: 10px;

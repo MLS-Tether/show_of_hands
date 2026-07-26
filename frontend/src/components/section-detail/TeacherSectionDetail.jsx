@@ -33,7 +33,7 @@ const STATUS_BADGE_CLASS = {
 // if an admin archives it while the teacher has one open, kick them back to
 // the read-only grid instead of leaving those forms live (see the
 // `isArchived` effect below).
-const MUTATING_CARD_KEYS = ['enrollment-requests', 'assignments', 'quests']
+const MUTATING_CARD_KEYS = ['roster', 'enrollment-requests', 'assignments', 'quests']
 
 const CARDS = [
   { key: 'roster', label: 'Roster' },
@@ -199,7 +199,7 @@ function TeacherSectionDetail() {
             (viewingStudent ? (
               <StudentGradeDetail sectionId={sectionId} student={viewingStudent} />
             ) : (
-              <RosterPanel section={section} onSelectStudent={setViewingStudent} />
+              <RosterPanel section={section} sectionId={sectionId} onSelectStudent={setViewingStudent} />
             ))}
           {activeCard === 'enrollment-requests' && <EnrollmentRequestsPanel sectionId={sectionId} />}
           {activeCard === 'assignments' && (
