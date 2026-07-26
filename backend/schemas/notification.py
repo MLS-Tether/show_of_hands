@@ -27,6 +27,8 @@ class NotificationResponse(BaseModel):
     message: str
     is_read: bool
     assignment_id: Optional[int] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[int] = None
     created_at: datetime
 
 

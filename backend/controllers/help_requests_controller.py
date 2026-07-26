@@ -200,6 +200,8 @@ def create_help_request(
             user_id=enrollment.student_id,
             type=NotificationTypeEnum.new_help_request,
             message=f"New help request posted: {body.topic}",
+            entity_type="section",
+            entity_id=section_id,
         ))
 
     emit_data_event(
@@ -343,6 +345,8 @@ def accept_help_request(
         user_id=help_request.requester_id,
         type=NotificationTypeEnum.help_request_accepted,
         message="Your help request has been accepted. Your study room is ready.",
+        entity_type="room",
+        entity_id=room.room_id,
     ))
 
     emit_data_event(

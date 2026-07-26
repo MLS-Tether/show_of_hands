@@ -201,6 +201,8 @@ def create_quest(
             user_id=uid,
             type=NotificationTypeEnum.new_quest,
             message=f"New quest '{quest.title}' is available.",
+            entity_type="quest",
+            entity_id=quest.quest_id,
         ))
 
     emit_data_event(

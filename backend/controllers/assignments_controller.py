@@ -127,6 +127,8 @@ def create_assignment(
             user_id=enrollment.student_id,
             type=NotificationTypeEnum.new_assignment,
             message=f"New assignment posted: {body.title}",
+            entity_type="assignment",
+            entity_id=assignment.assignment_id,
         ))
 
     emit_data_event(

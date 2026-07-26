@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, Text, Boolean, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, Integer, Text, Boolean, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import relationship
 from db.pool import Base
 
@@ -29,6 +29,8 @@ class Notification(Base):
     message = Column(Text, nullable=False)
     is_read = Column(Boolean, nullable=False, default=False)
     assignment_id = Column(Integer, ForeignKey("assignments.assignment_id"), nullable=True)
+    entity_type = Column(String, nullable=True)
+    entity_id = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="notifications")

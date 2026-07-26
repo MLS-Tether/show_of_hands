@@ -66,6 +66,8 @@ def check_pending_grades():
                         f"Submission #{submission.submission_id} has been pending "
                         "grading for over 10 days."
                     ),
+                    entity_type="section",
+                    entity_id=section.section_id,
                 )
             )
         db.commit()
@@ -109,6 +111,8 @@ def check_overdue_assignments():
                     user_id=enrollment.student_id,
                     type=NotificationTypeEnum.assignment_overdue,
                     assignment_id=assignment.assignment_id,
+                    entity_type="assignment",
+                    entity_id=assignment.assignment_id,
                     message=f"Assignment '{assignment.title}' is overdue.",
                 ))
         db.commit()

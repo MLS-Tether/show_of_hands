@@ -186,6 +186,8 @@ async def deliver_notifications():
                 "type": notification.type.value,
                 "message": notification.message,
                 "is_read": notification.is_read,
+                "entity_type": notification.entity_type,
+                "entity_id": notification.entity_id,
                 "created_at": notification.created_at.isoformat(),
             },
         }

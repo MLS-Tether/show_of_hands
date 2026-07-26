@@ -148,6 +148,8 @@ def update_enrollment_request(
                 user_id=request.student_id,
                 type="enrollment_approved",
                 message=f"Your request to join {section.period} was approved.",
+                entity_type="section",
+                entity_id=request.section_id,
             )
         )
     elif body.status == EnrollmentStatusEnum.rejected:
@@ -156,6 +158,8 @@ def update_enrollment_request(
                 user_id=request.student_id,
                 type="enrollment_rejected",
                 message=f"Your request to join {section.period} was rejected.",
+                entity_type="section",
+                entity_id=request.section_id,
             )
         )
 

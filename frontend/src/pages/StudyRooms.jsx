@@ -2,13 +2,15 @@ import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQueries } from '@tanstack/react-query'
 import api from '../api'
-import { keys } from '../queries'
+import { keys, useNotificationCountsByEntity } from '../queries'
 import { forgetRoom, getMyRooms } from '../utils/roomTracking'
+import NotificationCountBadge from '../components/NotificationCountBadge'
 import '../styles/shared-ui.css'
 import './StudyRooms.css'
 
 function StudyRooms() {
   const tracked = getMyRooms()
+  const notifCounts = useNotificationCountsByEntity()
 
   const results = useQueries({
     queries: tracked.map((r) => ({
@@ -46,6 +48,7 @@ function StudyRooms() {
         <div className="study-rooms-list">
           {rooms.map((r) => (
             <Link key={r.room_id} to={`/rooms/${r.room_id}`} className="study-room-row">
+              <NotificationCountBadge count={notifCounts[`room:${r.room_id}`]} />
               <span className="study-room-row-topic">{r.topic || `Room #${r.room_id}`}</span>
               <span className={`study-room-row-status study-room-row-status-${r.status}`}>
                 {r.status}

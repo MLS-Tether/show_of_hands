@@ -4,9 +4,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
 import { useDialog } from '../components/DialogContext'
-import { keys, useRoom } from '../queries'
+import { keys, useRoom, useNotificationCountsByEntity } from '../queries'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
 import { wsConnectParams } from '../utils/ws'
+import NotificationCountBadge from '../components/NotificationCountBadge'
 import '../styles/shared-ui.css'
 import './RoomDetail.css'
 
@@ -28,6 +29,7 @@ function RoomDetail() {
   const { roomId } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const notifCounts = useNotificationCountsByEntity()
   const { confirm, alert } = useDialog()
   const currentUserId = Number(localStorage.getItem('user_id'))
 
@@ -319,7 +321,13 @@ function RoomDetail() {
 
   return (
     <section className="room-detail">
-      <h1 className="admin-page-h1">Study room #{room.room_id}</h1>
+      <h1 className="admin-page-h1">
+        Study room #{room.room_id}
+        <NotificationCountBadge
+          count={notifCounts[`room:${roomId}`]}
+          className="notification-count-badge-inline"
+        />
+      </h1>
       <div className="room-detail-meta">
         <span className={`admin-status-badge ${STATUS_BADGE_CLASS[room.status] || ''}`}>
           {room.status}

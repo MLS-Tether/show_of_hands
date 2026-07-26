@@ -1,10 +1,13 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { formatDueDate } from '../../utils/formatDueDate'
 import { useSidebarPeek } from '../SidebarPeekContext'
+import { useNotificationCountsByEntity } from '../../queries'
+import NotificationCountBadge from '../NotificationCountBadge'
 
 function SectionCard({ section, assignments, quests, dataLoading }) {
   const navigate = useNavigate()
   const peekSidebar = useSidebarPeek()
+  const notifCounts = useNotificationCountsByEntity()
 
   function goTo(path) {
     navigate(path)
@@ -13,6 +16,7 @@ function SectionCard({ section, assignments, quests, dataLoading }) {
 
   return (
     <div className="section-card-wrap">
+      <NotificationCountBadge count={notifCounts[`section:${section.section_id}`]} />
       <Link to={`/sections/${section.section_id}`} className="section-card">
         <div className="section-card-title">{section.class_name}</div>
         <div className="section-card-sub">{section.period}</div>
