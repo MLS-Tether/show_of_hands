@@ -121,10 +121,12 @@ function TeacherSectionDetail() {
   const sectionNotifCount = notifCounts[`section:${sectionId}`] || 0
   const isArchived = section?.status === 'archived'
 
-  useEscapeBack(() => {
+  function handleBack() {
     if (viewingStudent) setViewingStudent(null)
     else setActiveCard(null)
-  }, Boolean(activeCard))
+  }
+
+  useEscapeBack(handleBack, Boolean(activeCard))
 
   // An admin can archive this section while the teacher has a mutating panel
   // (accept/reject requests, create assignments/quests) open — the realtime
@@ -194,10 +196,14 @@ function TeacherSectionDetail() {
 
       {activeCard ? (
         <div>
-          {!viewingStudent && <p className="teacher-section-back">Press ESC to go back</p>}
+          {!viewingStudent && (
+            <button type="button" className="teacher-section-back" onClick={handleBack}>
+              ← Back
+            </button>
+          )}
           {activeCard === 'roster' &&
             (viewingStudent ? (
-              <StudentGradeDetail sectionId={sectionId} student={viewingStudent} />
+              <StudentGradeDetail sectionId={sectionId} student={viewingStudent} onBack={handleBack} />
             ) : (
               <RosterPanel section={section} onSelectStudent={setViewingStudent} />
             ))}

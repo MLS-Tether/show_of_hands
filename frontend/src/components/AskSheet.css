@@ -50,6 +50,26 @@
   margin: 0 auto 14px;
 }
 
+.ask-sheet-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.ask-sheet-close:hover {
+  background: var(--surface-1);
+  color: var(--text-h);
+}
+
 .ask-sheet-header h2 {
   margin: 0 0 14px;
   font-size: 19px;

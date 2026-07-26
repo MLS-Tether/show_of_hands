@@ -65,6 +65,9 @@ function MoreSheet({ open, onClose, groups, inboxCount }) {
       aria-hidden={!open}
     >
       <div className="more-sheet" ref={sheetRef} role="dialog" aria-modal="true" aria-label="More">
+        <button type="button" className="more-sheet-close" aria-label="Close" onClick={onClose}>
+          ×
+        </button>
         <div className="more-sheet-handle" />
         {groups.map((group, i) => (
           <div className="more-sheet-group" key={group.label ?? i}>

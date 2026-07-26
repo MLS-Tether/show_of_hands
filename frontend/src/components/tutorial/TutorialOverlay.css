@@ -20,7 +20,10 @@
 .tutorial-overlay {
   position: absolute;
   inset: 0;
-  z-index: 50;
+  /* Above .mobile-nav (80) and .ask-button (70) — otherwise a card that
+     lands near the bottom of a mobile viewport renders underneath those
+     fixed elements, and its Next/Back buttons become untappable. */
+  z-index: 100;
 }
 
 .tutorial-wash {
@@ -173,4 +176,37 @@
   border-radius: 99px;
   padding: 8px 20px;
   cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .tutorial-card {
+    padding: 16px 18px 14px;
+    border-radius: 14px;
+  }
+
+  .tutorial-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+    border-radius: 10px;
+  }
+
+  .tutorial-title {
+    font-size: 17px;
+    margin-bottom: 6px;
+  }
+
+  .tutorial-body {
+    font-size: 13px;
+  }
+
+  .tutorial-progress-track {
+    margin: 12px 0 10px;
+  }
+
+  .tutorial-back,
+  .tutorial-next {
+    padding: 7px 14px;
+    font-size: 12.5px;
+  }
 }
