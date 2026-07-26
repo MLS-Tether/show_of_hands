@@ -106,11 +106,18 @@
   min-height: 220px;
   max-width: 95vw;
   max-height: 85vh;
+  box-sizing: border-box;
   resize: both;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   overflow: hidden;
   margin: 10px 0 24px;
+  /* The embedded call iframe is width/height:100%, so without this padding
+     the native resize grip sits flush against live video with no visual
+     margin — easy to miss since it's just a faint ~12px triangle. Reserving
+     this corner makes the grip visible and easy to find/grab. */
+  padding: 0 14px 14px 0;
+  background: var(--surface-1);
 }
 
 .room-detail-video-hint {
