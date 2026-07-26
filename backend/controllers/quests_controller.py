@@ -164,12 +164,16 @@ def create_quest(
     assigned_to_id: Optional[int] = None if body.assigned_to == "all" else body.assigned_to
 
     if assigned_to_id is not None:
-        from models.user_model import User as UserModel
-        target_student = db.query(UserModel).filter(
-            UserModel.user_id == assigned_to_id,
-            UserModel.is_archived == False,
+        # Requiring enrollment in this exact section (rather than just an
+        # is_archived check) also guarantees the target is in the teacher's
+        # own school — a student at a different school can never be enrolled
+        # here.
+        target_enrollment = db.query(Enrollment).filter(
+            Enrollment.section_id == section_id,
+            Enrollment.student_id == assigned_to_id,
+            Enrollment.is_archived == False,
         ).first()
-        if not target_student:
+        if not target_enrollment:
             raise HTTPException(status_code=404, detail="Target student not found.")
 
     point_value = int(body.point_value * 1.5) if body.category == QuestCategoryEnum.social else body.point_value
@@ -201,6 +205,8 @@ def create_quest(
             user_id=uid,
             type=NotificationTypeEnum.new_quest,
             message=f"New quest '{quest.title}' is available.",
+            entity_type="quest",
+            entity_id=quest.quest_id,
         ))
 
     emit_data_event(

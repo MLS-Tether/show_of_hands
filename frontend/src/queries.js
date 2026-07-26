@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from './api'
 import { rememberHelpRequestId } from './utils/roomTracking'
@@ -194,6 +195,22 @@ export function useNotifications(options = {}) {
     queryFn: () => unwrap(api.get('/notifications')),
     ...options,
   })
+}
+
+// Single source of truth for "how many unread notifications point at this
+// card" — every card badge must read from this instead of computing its own
+// count, so the bell's unread count and every card badge always agree.
+export function useNotificationCountsByEntity() {
+  const { data: notifications = null } = useNotifications()
+  return useMemo(() => {
+    const counts = {}
+    ;(notifications || []).forEach((n) => {
+      if (n.is_read || n.entity_type == null || n.entity_id == null) return
+      const key = `${n.entity_type}:${n.entity_id}`
+      counts[key] = (counts[key] || 0) + 1
+    })
+    return counts
+  }, [notifications])
 }
 
 export function usePoints(userId, page = 1, pageSize = 20, options = {}) {

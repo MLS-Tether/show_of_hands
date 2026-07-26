@@ -1,9 +1,10 @@
 import { useQueries } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../api'
-import { keys, useSections } from '../queries'
+import { keys, useSections, useNotificationCountsByEntity } from '../queries'
 import { getUserId } from '../utils/auth'
 import AddSectionForm from '../components/dashboard/AddSectionForm'
+import NotificationCountBadge from '../components/NotificationCountBadge'
 import '../styles/shared-ui.css'
 import './TeacherDashboard.css'
 
@@ -11,6 +12,7 @@ function TeacherDashboard() {
   const navigate = useNavigate()
   const userId = getUserId()
   const { data: sections = null } = useSections()
+  const notifCounts = useNotificationCountsByEntity()
 
   const loading = sections === null
   const ownedSections = loading ? [] : sections.filter((s) => s.teacher_id === userId)
@@ -37,7 +39,8 @@ function TeacherDashboard() {
       (sum, a) => sum + (a.submitted_count - a.graded_count),
       0
     )
-    pending[s.section_id] = { pendingRequests: enrollmentRequests.data.length, ungraded }
+    const notif = notifCounts[`section:${s.section_id}`] || 0
+    pending[s.section_id] = { pendingRequests: enrollmentRequests.data.length, ungraded, notif }
   })
   const otherSections = loading ? [] : sections.filter((s) => s.teacher_id !== userId)
   const visibleOwnedSections = ownedSections.slice(0, 3)
@@ -58,7 +61,7 @@ function TeacherDashboard() {
         <div className="teacher-dashboard-grid">
           {visibleOwnedSections.map((s, i) => {
             const badge = pending[s.section_id]
-            const badgeCount = badge ? badge.pendingRequests + badge.ungraded : 0
+            const badgeCount = badge ? badge.pendingRequests + badge.ungraded + badge.notif : 0
             return (
               <button
                 type="button"
@@ -67,9 +70,7 @@ function TeacherDashboard() {
                 data-tour={i === 0 ? 'widget-teacher' : undefined}
                 onClick={() => navigate(`/sections/${s.section_id}`)}
               >
-                {badgeCount > 0 && (
-                  <span className="teacher-section-card-badge">{badgeCount}</span>
-                )}
+                <NotificationCountBadge count={badgeCount} className="teacher-section-card-badge" />
                 <div className="teacher-section-card-title">{s.class_name}</div>
                 <div className="teacher-section-card-sub">{s.period}</div>
                 <div className="teacher-section-card-meta">

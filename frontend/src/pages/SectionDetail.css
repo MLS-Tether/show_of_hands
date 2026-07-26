@@ -60,6 +60,7 @@
 }
 
 .section-detail-row {
+  position: relative;
   display: flex;
   justify-content: space-between;
   padding: 8px 10px;

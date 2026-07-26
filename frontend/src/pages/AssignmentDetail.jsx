@@ -2,10 +2,17 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
-import { keys, useAssignment, useAssignmentMySubmission, useAssignmentSubmissions } from '../queries'
+import {
+  keys,
+  useAssignment,
+  useAssignmentMySubmission,
+  useAssignmentSubmissions,
+  useNotificationCountsByEntity,
+} from '../queries'
 import { isTeacher } from '../utils/auth'
 import { formatPercent } from '../utils/format'
 import { useDialog } from '../components/DialogContext'
+import NotificationCountBadge from '../components/NotificationCountBadge'
 import '../styles/shared-ui.css'
 import './AssignmentDetail.css'
 
@@ -345,6 +352,7 @@ function TeacherAssignmentView({ assignmentId, assignment }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { confirm } = useDialog()
+  const notifCounts = useNotificationCountsByEntity()
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -392,7 +400,13 @@ function TeacherAssignmentView({ assignmentId, assignment }) {
         />
       ) : (
         <>
-          <h1 className="admin-page-h1">{assignment.title}</h1>
+          <h1 className="admin-page-h1">
+            {assignment.title}
+            <NotificationCountBadge
+              count={notifCounts[`assignment:${assignmentId}`]}
+              className="notification-count-badge-inline"
+            />
+          </h1>
           <p className="assignment-detail-due">
             Due {formatFullDate(assignment.due_date)} · {assignment.point_value} pts
           </p>
@@ -434,6 +448,7 @@ function TeacherAssignmentView({ assignmentId, assignment }) {
 function AssignmentDetail() {
   const { assignmentId } = useParams()
   const teacher = isTeacher()
+  const notifCounts = useNotificationCountsByEntity()
 
   const { data: assignment = null, isError: assignmentFailed } = useAssignment(assignmentId)
   const {
@@ -464,7 +479,13 @@ function AssignmentDetail() {
 
   return (
     <section className="assignment-detail">
-      <h1 className="admin-page-h1">{assignment.title}</h1>
+      <h1 className="admin-page-h1">
+        {assignment.title}
+        <NotificationCountBadge
+          count={notifCounts[`assignment:${assignmentId}`]}
+          className="notification-count-badge-inline"
+        />
+      </h1>
       <p className="assignment-detail-due">
         Due {formatFullDate(assignment.due_date)} · {assignment.point_value} pts
       </p>

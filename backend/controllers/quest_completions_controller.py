@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from db.data_events import emit_data_event, resolve_admin_audience, resolve_section_audience
@@ -60,7 +61,15 @@ def complete_quest(
         points_awarded=quest.point_value,
     )
     db.add(completion)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # Two concurrent complete requests can both pass the `already_completed`
+        # check above before either commits — the DB-level unique constraint on
+        # (quest_id, student_id) is what actually prevents the double-award;
+        # this just turns that into a clean 409 instead of a 500.
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Quest already completed.")
 
     db.add(PointTransaction(
         user_id=current_user.user_id,

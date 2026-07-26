@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { useAssignments } from '../queries'
+import { useAssignments, useNotificationCountsByEntity } from '../queries'
 import { formatDueDate } from '../utils/formatDueDate'
 import { isTeacher } from '../utils/auth'
+import NotificationCountBadge from '../components/NotificationCountBadge'
 import '../styles/shared-ui.css'
 import './Assignments.css'
 
@@ -11,6 +12,7 @@ function Assignments() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const [tab, setTab] = useState('upcoming')
+  const notifCounts = useNotificationCountsByEntity()
   // Tracks which deep-linked assignment we've already auto-selected a tab
   // for, so re-navigating to a different highlighted assignment re-triggers
   // the tab pick without re-running it on every unrelated render.
@@ -112,6 +114,7 @@ function Assignments() {
               }`}
               onClick={() => navigate(`/assignments/${a.assignment_id}`)}
             >
+              <NotificationCountBadge count={notifCounts[`assignment:${a.assignment_id}`]} />
               <span className="assignments-row-title">{a.title}</span>
               <span className="assignments-row-meta">
                 <span>{formatDueDate(a.due_date)}</span>

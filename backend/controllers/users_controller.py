@@ -322,6 +322,8 @@ def _soft_delete_user(db: Session, user: User) -> None:
                     user_id=enrollment.student_id,
                     type=NotificationTypeEnum.section_status,
                     message=f"Section #{section.section_id} is pending teacher reassignment.",
+                    entity_type="section",
+                    entity_id=section.section_id,
                 ))
             emit_data_event(
                 db, "sections", "updated", section.school_id,
@@ -371,6 +373,8 @@ def request_password_reset(
             user_id=admin_id,
             type=NotificationTypeEnum.password_reset_requested,
             message=f"{current_user.full_name} ({current_user.username}) has requested a password reset.",
+            entity_type="student",
+            entity_id=current_user.user_id,
         ))
     db.commit()
     return {"message": f"Notified {len(admin_ids)} admin(s)."}

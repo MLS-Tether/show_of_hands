@@ -1,11 +1,14 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from db.pool import Base
 
 
 class QuestCompletion(Base):
     __tablename__ = "quest_completions"
+    __table_args__ = (
+        UniqueConstraint("quest_id", "student_id", name="uq_quest_completion_quest_student"),
+    )
 
     quest_completion_id = Column(Integer, primary_key=True)
     quest_id = Column(Integer, ForeignKey("quests.quest_id"), nullable=False)

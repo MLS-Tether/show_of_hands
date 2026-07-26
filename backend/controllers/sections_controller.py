@@ -45,7 +45,7 @@ def _build_list_item(section: Section, enrolled_count: int) -> dict:
 
 
 def _build_detail(section: Section) -> dict:
-    approved = [e for e in section.enrollments if not e.is_archived]
+    approved = [e for e in section.enrollments if not e.is_archived and not e.student.is_archived]
     assignments = [a for a in section.assignments if not a.is_archived]
     quests = [q for q in section.quests if not q.is_archived]
     return {
@@ -111,9 +111,11 @@ def list_sections(
     if sections:
         counts = dict(
             db.query(Enrollment.section_id, func.count(Enrollment.enrollment_id))
+            .join(User, User.user_id == Enrollment.student_id)
             .filter(
                 Enrollment.section_id.in_([s.section_id for s in sections]),
                 Enrollment.is_archived == False,
+                User.is_archived == False,
             )
             .group_by(Enrollment.section_id)
             .all()
@@ -208,7 +210,7 @@ def get_section_analytics(
     if current_user.role == RoleEnum.teacher and section.teacher_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not your section.")
 
-    approved_enrollments = [e for e in section.enrollments if not e.is_archived]
+    approved_enrollments = [e for e in section.enrollments if not e.is_archived and not e.student.is_archived]
     enrolled_count = len(approved_enrollments)
     assignments = [a for a in section.assignments if not a.is_archived]
 
@@ -368,6 +370,14 @@ def update_section(
         if body.status is not None:
             section.status = body.status
         if body.teacher_id is not None:
+            new_teacher = db.query(User).filter(
+                User.user_id == body.teacher_id,
+                User.school_id == current_user.school_id,
+                User.role == RoleEnum.teacher,
+                User.is_archived == False,
+            ).first()
+            if not new_teacher:
+                raise HTTPException(status_code=404, detail="Teacher not found.")
             section.teacher_id = body.teacher_id
 
     emit_data_event(

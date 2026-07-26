@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import Modal from './Modal'
 import ToastStack from './ToastStack'
+import NotificationCountBadge from './NotificationCountBadge'
 import api from '../api'
 import { keys, useNotifications } from '../queries'
 import { useRealtimeToasts } from '../realtime/realtimeContext'
@@ -16,15 +17,28 @@ function formatTimestamp(dateStr) {
   }).format(new Date(dateStr))
 }
 
-function typeLabel(type) {
-  const words = type.split('_')
-  return words[0][0].toUpperCase() + words[0].slice(1) + ' ' + words.slice(1).join(' ')
+// One route resolver per NotificationTypeEnum value. Each falls back to the
+// closest list page when entity_id is null (legacy rows, or types with no
+// per-entity id such as class_request_*).
+const NOTIFICATION_ROUTES = {
+  new_assignment: (n) => (n.entity_id != null ? `/assignments/${n.entity_id}` : '/assignments'),
+  assignment_overdue: (n) => (n.entity_id != null ? `/assignments/${n.entity_id}` : '/assignments'),
+  new_quest: () => '/quests',
+  new_help_request: (n) => (n.entity_id != null ? `/sections/${n.entity_id}` : '/sections'),
+  help_request_accepted: (n) => (n.entity_id != null ? `/rooms/${n.entity_id}` : '/study-rooms'),
+  section_status: (n) => (n.entity_id != null ? `/sections/${n.entity_id}` : '/sections'),
+  class_request_approved: () => '/sections',
+  class_request_rejected: () => '/sections',
+  enrollment_approved: (n) => (n.entity_id != null ? `/sections/${n.entity_id}` : '/sections'),
+  enrollment_rejected: (n) => (n.entity_id != null ? `/sections/${n.entity_id}` : '/sections'),
+  grade_finalization_reminder: (n) => (n.entity_id != null ? `/sections/${n.entity_id}` : '/sections'),
+  password_reset_requested: (n) => (n.entity_id != null ? `/admin/users/${n.entity_id}` : '/admin/users'),
 }
 
 function NotificationBell() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
-  const [selectedNotification, setSelectedNotification] = useState(null)
   const menuRef = useRef(null)
   const { toasts, dismissToast } = useRealtimeToasts()
 
@@ -67,7 +81,9 @@ function NotificationBell() {
   function handleRowClick(notification) {
     if (!notification.is_read) markRead(notification.notification_id)
     setOpen(false)
-    setSelectedNotification(notification)
+    const resolveRoute = NOTIFICATION_ROUTES[notification.type]
+    const path = resolveRoute ? resolveRoute(notification) : null
+    if (path) navigate(path)
   }
 
   return (
@@ -80,7 +96,7 @@ function NotificationBell() {
         onClick={() => setOpen((o) => !o)}
       >
         <span aria-hidden="true">🔔</span>
-        {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
+        <NotificationCountBadge count={unreadCount} />
       </button>
 
       {open && (
@@ -112,16 +128,6 @@ function NotificationBell() {
               ))}
           </div>
         </div>
-      )}
-
-      {selectedNotification && (
-        <Modal onClose={() => setSelectedNotification(null)}>
-          <div className="notification-modal-type">{typeLabel(selectedNotification.type)}</div>
-          <p className="notification-modal-message">{selectedNotification.message}</p>
-          <div className="notification-modal-time">
-            {formatTimestamp(selectedNotification.created_at)}
-          </div>
-        </Modal>
       )}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
