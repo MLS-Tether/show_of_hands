@@ -27,6 +27,7 @@ const NOTIFICATION_ROUTES = {
   new_help_request: (n) => (n.entity_id != null ? `/sections/${n.entity_id}` : '/sections'),
   help_request_accepted: (n) => (n.entity_id != null ? `/rooms/${n.entity_id}` : '/study-rooms'),
   section_status: (n) => (n.entity_id != null ? `/sections/${n.entity_id}` : '/sections'),
+  new_class_request: () => '/admin/inbox',
   class_request_approved: () => '/sections',
   class_request_rejected: () => '/sections',
   enrollment_approved: (n) => (n.entity_id != null ? `/sections/${n.entity_id}` : '/sections'),
@@ -122,8 +123,15 @@ function NotificationBell() {
                   className={`notification-row${n.is_read ? '' : ' unread'}`}
                   onClick={() => handleRowClick(n)}
                 >
-                  <span className="notification-message">{n.message}</span>
-                  <span className="notification-time">{formatTimestamp(n.created_at)}</span>
+                  <span className="notification-row-text">
+                    <span className="notification-message">{n.message}</span>
+                    <span className="notification-time">{formatTimestamp(n.created_at)}</span>
+                  </span>
+                  {NOTIFICATION_ROUTES[n.type] && (
+                    <span className="notification-go" aria-hidden="true">
+                      Go →
+                    </span>
+                  )}
                 </button>
               ))}
           </div>

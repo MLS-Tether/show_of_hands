@@ -12,9 +12,10 @@ from dependencies import get_current_user, require_role
 from grading import compute_section_grade_for_student
 from image_utils import delete_avatar_image, save_avatar_image
 from models.enrollment_model import Enrollment
-from models.notification_model import Notification, NotificationTypeEnum
+from models.notification_model import NotificationTypeEnum
 from models.section_model import Section, SectionStatusEnum
 from models.user_model import User, RoleEnum
+from notifications import notify
 from schemas.user import (
     UserResponse,
     UserListResponse,
@@ -317,14 +318,14 @@ def _soft_delete_user(db: Session, user: User) -> None:
                 Enrollment.section_id == section.section_id,
                 Enrollment.is_archived == False,
             ).all()
-            for enrollment in enrollments:
-                db.add(Notification(
-                    user_id=enrollment.student_id,
-                    type=NotificationTypeEnum.section_status,
-                    message=f"Section #{section.section_id} is pending teacher reassignment.",
-                    entity_type="section",
-                    entity_id=section.section_id,
-                ))
+            notify(
+                db,
+                [enrollment.student_id for enrollment in enrollments],
+                NotificationTypeEnum.section_status,
+                f"Section #{section.section_id} is pending teacher reassignment.",
+                entity_type="section",
+                entity_id=section.section_id,
+            )
             emit_data_event(
                 db, "sections", "updated", section.school_id,
                 resolve_section_audience(db, section),
@@ -368,14 +369,14 @@ def request_password_reset(
     db: Session = Depends(get_db),
 ):
     admin_ids = resolve_admin_ids(db, current_user.school_id)
-    for admin_id in admin_ids:
-        db.add(Notification(
-            user_id=admin_id,
-            type=NotificationTypeEnum.password_reset_requested,
-            message=f"{current_user.full_name} ({current_user.username}) has requested a password reset.",
-            entity_type="student",
-            entity_id=current_user.user_id,
-        ))
+    notify(
+        db,
+        admin_ids,
+        NotificationTypeEnum.password_reset_requested,
+        f"{current_user.full_name} ({current_user.username}) has requested a password reset.",
+        entity_type="student",
+        entity_id=current_user.user_id,
+    )
     db.commit()
     return {"message": f"Notified {len(admin_ids)} admin(s)."}
 

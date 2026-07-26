@@ -8,11 +8,12 @@ from db.data_events import emit_data_event, resolve_section_audience
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.enrollment_model import Enrollment
-from models.notification_model import Notification, NotificationTypeEnum
+from models.notification_model import NotificationTypeEnum
 from models.quest_completion_model import QuestCompletion
 from models.quest_model import Quest, QuestCategoryEnum, QuestSourceEnum
 from models.section_model import Section
 from models.user_model import User, RoleEnum
+from notifications import notify
 from schemas.quest import QuestCreate, QuestResponse, QuestCreateResponse
 
 router = APIRouter(tags=["quests"])
@@ -200,14 +201,14 @@ def create_quest(
         ).all()
         notify_user_ids = [e.student_id for e in enrolled]
 
-    for uid in notify_user_ids:
-        db.add(Notification(
-            user_id=uid,
-            type=NotificationTypeEnum.new_quest,
-            message=f"New quest '{quest.title}' is available.",
-            entity_type="quest",
-            entity_id=quest.quest_id,
-        ))
+    notify(
+        db,
+        notify_user_ids,
+        NotificationTypeEnum.new_quest,
+        f"New quest '{quest.title}' is available.",
+        entity_type="quest",
+        entity_id=quest.quest_id,
+    )
 
     emit_data_event(
         db, "quests", "created", section.school_id,

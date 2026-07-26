@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 
-from db.data_events import emit_data_event, resolve_admin_audience
+from db.data_events import emit_data_event, resolve_admin_audience, resolve_admin_ids
 from db.pool import get_db
 from dependencies import require_role
 from models.user_model import User
 from models.class__model import Class_
 from models.class_request_model import ClassRequest, ClassRequestStatusEnum
-from models.notification_model import Notification, NotificationTypeEnum
+from models.notification_model import NotificationTypeEnum
+from notifications import notify
 from schemas.class_request import (
     ClassRequestCreate,
     ClassRequestUpdateStatus,
@@ -34,6 +35,15 @@ def create_class_request(
         school_id=current_user.school_id,
     )
     db.add(req)
+    db.flush()
+    notify(
+        db,
+        resolve_admin_ids(db, current_user.school_id),
+        NotificationTypeEnum.new_class_request,
+        f"{current_user.full_name} ({current_user.username}) requested a new class: '{req.class_name}'.",
+        entity_type="class_request",
+        entity_id=req.class_request_id,
+    )
     emit_data_event(
         db, "class_requests", "created", current_user.school_id,
         resolve_admin_audience(db, current_user.school_id, [current_user.user_id]),
@@ -112,11 +122,7 @@ def update_class_request_status(
         notification_type = NotificationTypeEnum.class_request_rejected
         notification_msg = f"Your class request for '{req.class_name}' has been rejected."
 
-    db.add(Notification(
-        user_id=req.requested_by,
-        type=notification_type,
-        message=notification_msg,
-    ))
+    notify(db, req.requested_by, notification_type, notification_msg)
     emit_data_event(
         db, "class_requests", "updated", current_user.school_id,
         resolve_admin_audience(db, current_user.school_id, [req.requested_by]),
