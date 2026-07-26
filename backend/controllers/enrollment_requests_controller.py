@@ -21,6 +21,14 @@ from schemas.enrollment import (
 
 router = APIRouter(tags=["enrollment-requests"])
 
+
+def archive_enrollment(enrollment: Enrollment) -> None:
+    """Soft-deletes an Enrollment row. Shared by the direct admin-drop
+    endpoint below and the teacher-request approval flow in
+    unenroll_requests_controller.py — caller still owns the commit."""
+    enrollment.is_archived = True
+    enrollment.deleted_at = datetime.now(timezone.utc)
+
 @router.post(
     "/sections/{section_id}/enrollment-requests",
     response_model=EnrollmentRequestCreateResponse,
@@ -233,8 +241,7 @@ def drop_student_from_section(
     if not enrollment:
         raise HTTPException(status_code=404, detail="Enrollment not found")
 
-    enrollment.is_archived = True
-    enrollment.deleted_at = datetime.now(timezone.utc)
+    archive_enrollment(enrollment)
     audience = resolve_section_audience(db, section)
     audience.append(student_id)
     emit_data_event(
