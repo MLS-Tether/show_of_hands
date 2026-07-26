@@ -42,6 +42,7 @@
 
 .bulletin-request-form-row .bulletin-request-form-field {
   flex: 1;
+  min-width: 0;
 }
 
 .bulletin-request-form-field {
@@ -92,12 +93,15 @@
 .bulletin-request-card-topic {
   font-size: 14px;
   color: var(--text-h);
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .bulletin-request-card-section {
   font-size: 11px;
   color: var(--text-muted);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .bulletin-request-card-description {
@@ -136,4 +140,11 @@
   display: flex;
   gap: 8px;
   margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+  .bulletin-request-form-row,
+  .bulletin-request-card-actions {
+    flex-wrap: wrap;
+  }
 }
