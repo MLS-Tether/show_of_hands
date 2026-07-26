@@ -263,6 +263,11 @@ function RoomDetail() {
       })
       setConfirmPending(false)
       setConfirmResult(data.points_awarded)
+      forgetRoom(Number(roomId))
+      // Give the requester a moment to read the points-awarded message, then
+      // send them back to their room list — otherwise they're left stranded
+      // on this now-defunct room page with nothing left to do.
+      setTimeout(() => navigate('/study-rooms'), 1500)
     } catch (err) {
       await alert(err.response?.data?.message || 'Could not confirm the session.')
     }
@@ -278,9 +283,15 @@ function RoomDetail() {
 
   const awaitingConfirmation = confirmPending || confirmResult != null
 
-  // Deleting the room removes it server-side, so the next refetch 404s and
-  // `room` goes null — but the requester still needs to see this prompt.
-  if (!room && awaitingConfirmation) {
+  // A close/kick/leave can flip the room to closed (or delete it outright)
+  // server-side while the requester is still looking at the live page — the
+  // `session_confirmation_required` push sets confirmPending immediately, so
+  // switch to this standalone prompt right away instead of leaving them
+  // staring at now-stale chat/video/member controls until the next 20s poll
+  // or a manual reload catches up. Checked ahead of the `!room` case too,
+  // since deleting the room (rather than closing it) nulls `room` out on the
+  // next failed refetch, but the requester still needs to see this prompt.
+  if (awaitingConfirmation) {
     return (
       <section className="room-detail">
         <h1 className="admin-page-h1">Study room</h1>
@@ -308,7 +319,7 @@ function RoomDetail() {
     )
   }
 
-  if (loadFailed && !awaitingConfirmation) {
+  if (loadFailed) {
     return (
       <section className="room-detail">
         <p className="admin-empty-card">Room not found, or you're not a member.</p>
