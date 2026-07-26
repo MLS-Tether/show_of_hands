@@ -18,6 +18,12 @@
   gap: 14px;
 }
 
+@media (max-width: 768px) {
+  .section-detail-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
 .section-detail-grade-summary {
   display: flex;
   align-items: baseline;

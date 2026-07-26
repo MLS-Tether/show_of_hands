@@ -28,3 +28,13 @@
   font-size: 17px;
   line-height: 1;
 }
+
+@media (max-width: 380px) {
+  .ask-button {
+    right: 12px;
+    bottom: 78px;
+    padding: 10px 16px;
+    gap: 5px;
+    font-size: 13px;
+  }
+}

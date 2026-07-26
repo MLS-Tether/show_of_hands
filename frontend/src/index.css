@@ -200,3 +200,18 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* Every form control across the app is hand-set to 13px (auth, admin
+   settings, ask sheet, teacher panels, bulletin board, add-section,
+   room chat, assignment submission, admin broadcast — see each
+   component's own .css). Below 16px, iOS Safari and Chrome zoom the
+   whole page in on focus; overriding it in one place here is simpler
+   and less error-prone than bumping every one of those rules
+   individually, and keeps their intentional 13px on desktop. */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
