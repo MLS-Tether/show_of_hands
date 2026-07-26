@@ -408,6 +408,11 @@ function RoomDetail() {
             className="room-detail-video"
             style={{ display: videoJoined || videoLoading ? 'block' : 'none' }}
           />
+          {videoJoined && (
+            <p className="room-detail-video-hint">
+              Drag the bottom-right corner to resize the video window — handy when someone's sharing their screen.
+            </p>
+          )}
         </>
       )}
 
