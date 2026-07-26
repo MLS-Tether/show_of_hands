@@ -19,6 +19,7 @@ from models.submission_model import Submission, SubmissionStatusEnum
 from models.notification_model import Notification, NotificationTypeEnum
 from models.study_room_model import StudyRoom, StudyRoomStatusEnum
 from models.help_request_model import HelpRequestStatusEnum
+from notifications import notify
 
 from controllers.auth_controller import router as auth_router
 from controllers.schools_controller import router as schools_router
@@ -74,17 +75,16 @@ def check_pending_grades():
             section = submission.assignment.section
             if section.teacher_id is None:
                 continue
-            db.add(
-                Notification(
-                    user_id=section.teacher_id,
-                    type=NotificationTypeEnum.grade_finalization_reminder,
-                    message=(
-                        f"Submission #{submission.submission_id} has been pending "
-                        "grading for over 10 days."
-                    ),
-                    entity_type="section",
-                    entity_id=section.section_id,
-                )
+            notify(
+                db,
+                section.teacher_id,
+                NotificationTypeEnum.grade_finalization_reminder,
+                (
+                    f"Submission #{submission.submission_id} has been pending "
+                    "grading for over 10 days."
+                ),
+                entity_type="section",
+                entity_id=section.section_id,
             )
             submission.reminder_sent_at = datetime.now(timezone.utc)
         db.commit()
@@ -124,14 +124,15 @@ def check_overdue_assignments():
                 if already_notified:
                     continue
 
-                db.add(Notification(
-                    user_id=enrollment.student_id,
-                    type=NotificationTypeEnum.assignment_overdue,
-                    assignment_id=assignment.assignment_id,
+                notify(
+                    db,
+                    enrollment.student_id,
+                    NotificationTypeEnum.assignment_overdue,
+                    f"Assignment '{assignment.title}' is overdue.",
                     entity_type="assignment",
                     entity_id=assignment.assignment_id,
-                    message=f"Assignment '{assignment.title}' is overdue.",
-                ))
+                    assignment_id=assignment.assignment_id,
+                )
         db.commit()
     finally:
         db.close()

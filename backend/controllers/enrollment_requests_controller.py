@@ -9,7 +9,8 @@ from dependencies import get_current_user, require_role
 from models.user_model import User
 from models.section_model import Section
 from models.enrollment_model import Enrollment, EnrollmentRequest, EnrollmentStatusEnum
-from models.notification_model import Notification
+from models.notification_model import NotificationTypeEnum
+from notifications import notify
 from schemas.enrollment import (
     EnrollmentRequestCreateResponse,
     EnrollmentRequestListItem,
@@ -160,24 +161,22 @@ def update_enrollment_request(
 
     if body.status == EnrollmentStatusEnum.accepted:
         db.add(Enrollment(section_id=request.section_id, student_id=request.student_id))
-        db.add(
-            Notification(
-                user_id=request.student_id,
-                type="enrollment_approved",
-                message=f"Your request to join {section.period} was approved.",
-                entity_type="section",
-                entity_id=request.section_id,
-            )
+        notify(
+            db,
+            request.student_id,
+            NotificationTypeEnum.enrollment_approved,
+            f"Your request to join {section.period} was approved.",
+            entity_type="section",
+            entity_id=request.section_id,
         )
     elif body.status == EnrollmentStatusEnum.rejected:
-        db.add(
-            Notification(
-                user_id=request.student_id,
-                type="enrollment_rejected",
-                message=f"Your request to join {section.period} was rejected.",
-                entity_type="section",
-                entity_id=request.section_id,
-            )
+        notify(
+            db,
+            request.student_id,
+            NotificationTypeEnum.enrollment_rejected,
+            f"Your request to join {section.period} was rejected.",
+            entity_type="section",
+            entity_id=request.section_id,
         )
 
     emit_data_event(

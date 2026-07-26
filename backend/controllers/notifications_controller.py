@@ -15,6 +15,7 @@ from models.enrollment_model import Enrollment
 from models.notification_model import Notification, NotificationTypeEnum
 from models.section_model import Section
 from models.user_model import User
+from notifications import notify
 from schemas.notification import NotificationResponse, NotificationReadResponse
 
 router = APIRouter(tags=["notifications"])
@@ -97,12 +98,14 @@ def notify_section(
         Enrollment.is_archived == False,
     ).all()
 
-    for e in enrolled:
-        db.add(Notification(
-            user_id=e.student_id,
-            type=NotificationTypeEnum.section_status,
-            message=body.message,
-        ))
+    notify(
+        db,
+        [e.student_id for e in enrolled],
+        NotificationTypeEnum.section_status,
+        body.message,
+        entity_type="section",
+        entity_id=section_id,
+    )
 
     db.commit()
     return {"message": f"Notification sent to {len(enrolled)} student(s)."}

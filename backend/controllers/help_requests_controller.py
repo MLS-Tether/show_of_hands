@@ -12,11 +12,12 @@ from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.enrollment_model import Enrollment
 from models.help_request_model import HelpRequest, HelpRequestAcceptance, HelpRequestStatusEnum
-from models.notification_model import Notification, NotificationTypeEnum
+from models.notification_model import NotificationTypeEnum
 from models.point_transaction_model import PointTransaction, TransactionSourceEnum
 from models.section_model import Section
 from models.study_room_model import StudyRoom, RoomMember
 from models.user_model import User, RoleEnum
+from notifications import notify
 from schemas.help_request import (
     AcceptedByEntry,
     HelpRequestBoardResponse,
@@ -196,14 +197,14 @@ def create_help_request(
         Enrollment.is_archived == False,
     ).all()
 
-    for enrollment in classmates:
-        db.add(Notification(
-            user_id=enrollment.student_id,
-            type=NotificationTypeEnum.new_help_request,
-            message=f"New help request posted: {body.topic}",
-            entity_type="section",
-            entity_id=section_id,
-        ))
+    notify(
+        db,
+        [enrollment.student_id for enrollment in classmates],
+        NotificationTypeEnum.new_help_request,
+        f"New help request posted: {body.topic}",
+        entity_type="section",
+        entity_id=section_id,
+    )
 
     emit_data_event(
         db, "help_requests", "created", section.school_id,
@@ -346,13 +347,14 @@ def accept_help_request(
     if help_request.current_size >= help_request.group_size:
         help_request.status = HelpRequestStatusEnum.active
 
-    db.add(Notification(
-        user_id=help_request.requester_id,
-        type=NotificationTypeEnum.help_request_accepted,
-        message="Your help request has been accepted. Your study room is ready.",
+    notify(
+        db,
+        help_request.requester_id,
+        NotificationTypeEnum.help_request_accepted,
+        "Your help request has been accepted. Your study room is ready.",
         entity_type="room",
         entity_id=room.room_id,
-    ))
+    )
 
     emit_data_event(
         db, "help_requests", "updated", section.school_id,
