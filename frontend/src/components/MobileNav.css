@@ -47,3 +47,15 @@
 .mobile-nav-tab.active .mobile-nav-label {
   font-weight: 600;
 }
+
+@media (max-width: 380px) {
+  /* Five tabs is tight on the smallest phones (iPhone SE-class, ~320-375px) —
+     trim the icon/label a bit rather than letting labels wrap to 2 lines. */
+  .mobile-nav-icon {
+    font-size: 17px;
+  }
+
+  .mobile-nav-label {
+    font-size: 9.5px;
+  }
+}
