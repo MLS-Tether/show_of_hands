@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TutorialContext } from './TutorialContext'
 import TutorialOverlay from './TutorialOverlay'
@@ -8,17 +8,14 @@ import { hasSeenTutorial, markTutorialSeen } from '../../utils/tutorial'
 
 export function TutorialProvider({ children }) {
   const navigate = useNavigate()
-  const [active, setActive] = useState(false)
-  const [step, setStep] = useState(0)
   const role = getRole()
   const userId = getUserId()
   const steps = getTutorialSteps(role)
-
-  useEffect(() => {
-    if (userId && !hasSeenTutorial(userId)) {
-      setActive(true)
-    }
-  }, [userId])
+  // TutorialProvider only mounts inside the authenticated Layout, fresh on
+  // every login, so userId is stable for its whole lifetime — safe to
+  // compute once here instead of via an effect.
+  const [active, setActive] = useState(() => Boolean(userId) && !hasSeenTutorial(userId))
+  const [step, setStep] = useState(0)
 
   function finish() {
     markTutorialSeen(userId)

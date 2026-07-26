@@ -113,14 +113,17 @@ async def _close_room_connections(
             elif notify_type:
                 await ws.send_json({"type": notify_type})
         except Exception:
-            pass
+            # Expected if that client already disconnected — debug-level so
+            # it doesn't spam logs, but still traceable if something else
+            # is actually wrong here.
+            logger.debug("Failed to notify room %s connection during teardown", room_id, exc_info=True)
 
     connections = list(room_registry.pop(room_id, {}).values())
     for ws in connections:
         try:
             await ws.close(code=1000)
         except Exception:
-            pass
+            logger.debug("Failed to close a room %s connection during teardown", room_id, exc_info=True)
 
 
 @router.get("/{room_id}", response_model=StudyRoomResponse)
@@ -208,7 +211,7 @@ async def kick_member(
         try:
             await room_registry[room_id][body.user_id].close(code=1000)
         except Exception:
-            pass
+            logger.debug("Failed to close kicked user's room %s connection", room_id, exc_info=True)
         del room_registry[room_id][body.user_id]
 
     # Check if only the requester remains in DB members
@@ -247,7 +250,7 @@ async def leave_room(
         try:
             await room_registry[room_id][current_user.user_id].close(code=1000)
         except Exception:
-            pass
+            logger.debug("Failed to close leaving user's room %s connection", room_id, exc_info=True)
         del room_registry[room_id][current_user.user_id]
 
     # Only tear the room down once it's truly empty — a solo requester's room
@@ -373,7 +376,15 @@ async def chat(websocket: WebSocket, room_id: int):
         token = ws_token_from_subprotocol(websocket)
         payload = decode_token(token)
         user_id: int = payload["user_id"]
+    except (ValueError, HTTPException):
+        # Expected/benign: no token, or an expired/invalid one.
+        await websocket.close(code=4001)
+        return
     except Exception:
+        # Anything else (e.g. a malformed payload missing "user_id") is a
+        # real bug, not just a stale token — log it so it doesn't disappear
+        # into the same silent close as the expected case above.
+        logger.exception("Unexpected error during room chat WS auth")
         await websocket.close(code=4001)
         return
 

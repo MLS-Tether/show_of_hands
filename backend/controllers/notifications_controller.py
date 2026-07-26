@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -17,6 +18,7 @@ from models.user_model import User
 from schemas.notification import NotificationResponse, NotificationReadResponse
 
 router = APIRouter(tags=["notifications"])
+logger = logging.getLogger(__name__)
 
 # In-memory registry — never persisted to DB.
 # Structure: { user_id: [WebSocket, ...] } — a list since a user may have
@@ -112,7 +114,15 @@ async def notifications_stream(websocket: WebSocket):
         token = ws_token_from_subprotocol(websocket)
         payload = decode_token(token)
         user_id: int = payload["user_id"]
+    except (ValueError, HTTPException):
+        # Expected/benign: no token, or an expired/invalid one.
+        await websocket.close(code=4001)
+        return
     except Exception:
+        # Anything else (e.g. a malformed payload missing "user_id") is a
+        # real bug, not just a stale token — log it so it doesn't disappear
+        # into the same silent close as the expected case above.
+        logger.exception("Unexpected error during notifications WS auth")
         await websocket.close(code=4001)
         return
 
@@ -185,6 +195,8 @@ async def deliver_notifications():
             try:
                 await ws.send_json(message)
             except Exception:
+                # Expected if that client already disconnected.
+                logger.debug("Failed to deliver notification to user %s", user_id, exc_info=True)
                 dead_connections.append(ws)
         for ws in dead_connections:
             connections.remove(ws)
@@ -208,6 +220,8 @@ async def route_data_event(data: dict, registry: dict):
             try:
                 await ws.send_json(message)
             except Exception:
+                # Expected if that client already disconnected.
+                logger.debug("Failed to deliver data event to user %s", user_id, exc_info=True)
                 dead_connections.append(ws)
         for ws in dead_connections:
             connections.remove(ws)
