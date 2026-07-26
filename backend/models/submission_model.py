@@ -26,6 +26,7 @@ class Submission(Base):
     grade = Column(Float, nullable=True)
     points_awarded = Column(Integer, nullable=False, default=0)
     finalized_at = Column(DateTime(timezone=True), nullable=True)
+    reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
     is_archived = Column(Boolean, nullable=False, default=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))

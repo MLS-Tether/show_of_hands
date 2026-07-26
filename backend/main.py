@@ -17,6 +17,8 @@ from models.assignment_model import Assignment
 from models.enrollment_model import Enrollment
 from models.submission_model import Submission, SubmissionStatusEnum
 from models.notification_model import Notification, NotificationTypeEnum
+from models.study_room_model import StudyRoom, StudyRoomStatusEnum
+from models.help_request_model import HelpRequestStatusEnum
 
 from controllers.auth_controller import router as auth_router
 from controllers.schools_controller import router as schools_router
@@ -30,7 +32,14 @@ from controllers.quests_controller import router as quests_router
 from controllers.quest_completions_controller import router as quest_completions_router
 from controllers.points_controller import router as points_router
 from controllers.help_requests_controller import router as help_requests_router
-from controllers.rooms_controller import router as rooms_router, room_registry, room_messages
+from controllers.rooms_controller import (
+    router as rooms_router,
+    room_registry,
+    room_messages,
+    _close_room_connections,
+    _teardown_daily_room,
+    _emit_room_events,
+)
 from controllers.notifications_controller import (
     router as notifications_router,
     deliver_notifications,
@@ -40,7 +49,13 @@ from controllers.users_controller import router as users_router
 from controllers.resources_controller import router as resources_router
 from controllers.assignment_fit_controller import router as assignment_fit_router
 
+logger = logging.getLogger(__name__)
 scheduler = BackgroundScheduler()
+
+# Set once the asyncio loop is running (see lifespan below) so the
+# thread-based scheduler can hand async websocket teardown work back to it —
+# BackgroundScheduler jobs run in their own worker threads, not on the loop.
+_event_loop = None
 
 
 def check_pending_grades():
@@ -51,6 +66,7 @@ def check_pending_grades():
             db.query(Submission)
             .filter(Submission.status == SubmissionStatusEnum.pending)
             .filter(Submission.updated_at <= cutoff)
+            .filter(Submission.reminder_sent_at.is_(None))
             .filter(Submission.is_archived == False)
             .all()
         )
@@ -70,6 +86,7 @@ def check_pending_grades():
                     entity_id=section.section_id,
                 )
             )
+            submission.reminder_sent_at = datetime.now(timezone.utc)
         db.commit()
     finally:
         db.close()
@@ -120,17 +137,61 @@ def check_overdue_assignments():
         db.close()
 
 
+def check_expired_rooms():
+    """A room whose countdown timer lapses is never auto-closed server-side —
+    closing has always relied on an explicit /close, /leave, or /kick call.
+    A requester who just closes the tab (or whose device dies) leaves the
+    room 'active' in the DB forever, and its full chat history sits in the
+    in-memory room_messages dict permanently. Run this on the same interval
+    as the other jobs to reclaim those."""
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        expired_rooms = (
+            db.query(StudyRoom)
+            .filter(StudyRoom.status == StudyRoomStatusEnum.active)
+            .filter(StudyRoom.timer_ends_at < now)
+            .all()
+        )
+        for room in expired_rooms:
+            help_request = room.help_request
+            requester_id = help_request.requester_id if help_request else None
+
+            room.status = StudyRoomStatusEnum.closed
+            if help_request is not None:
+                help_request.status = HelpRequestStatusEnum.closed
+                help_request.is_archived = True
+            _emit_room_events(db, room, "updated", hr_action="deleted" if help_request else None)
+            db.commit()
+
+            _teardown_daily_room(room)
+            if _event_loop is not None:
+                future = asyncio.run_coroutine_threadsafe(
+                    _close_room_connections(room.room_id, requester_id=requester_id),
+                    _event_loop,
+                )
+                try:
+                    future.result(timeout=5)
+                except Exception:
+                    logger.exception("Failed to tear down connections for expired room %s", room.room_id)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _event_loop
     seed_classes()
     seed_dev_data()
     seed_second_teacher_data()
     seed_more_cs_students()
     scheduler.add_job(check_pending_grades, "interval", days=1)
     scheduler.add_job(check_overdue_assignments, "interval", days=1)
+    scheduler.add_job(check_expired_rooms, "interval", minutes=5)
     scheduler.start()
 
     loop = asyncio.get_event_loop()
+    _event_loop = loop
     start_listener(loop)
     delivery_task = asyncio.create_task(deliver_loop(room_registry, room_messages))
     notifications_task = asyncio.create_task(deliver_notifications())

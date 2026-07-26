@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, Integer, DateTime, Enum, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from db.pool import Base
 
@@ -13,6 +13,9 @@ class TransactionSourceEnum(str, enum.Enum):
 
 class PointTransaction(Base):
     __tablename__ = "point_transactions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "source", "source_id", name="uq_point_transaction_user_source"),
+    )
 
     transaction_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)

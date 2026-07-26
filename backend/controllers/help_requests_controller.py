@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Union
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 import daily_client
@@ -258,10 +259,14 @@ def accept_help_request(
     current_user: User = Depends(require_role(["student"])),
     db: Session = Depends(get_db),
 ):
+    # Locked for the rest of this transaction so two students accepting the
+    # same request at the same instant can't both pass the capacity check
+    # below — the second request blocks here until the first commits, then
+    # re-reads the now-updated current_size/status.
     help_request = db.query(HelpRequest).filter(
         HelpRequest.help_request_id == help_request_id,
         HelpRequest.is_archived == False,
-    ).first()
+    ).with_for_update().first()
     if not help_request:
         raise HTTPException(status_code=404, detail="Help request not found.")
     if help_request.status != HelpRequestStatusEnum.open:
@@ -434,6 +439,17 @@ def confirm_session(
                     source_id=help_request_id,
                 ))
                 participant.total_points += HELP_SESSION_POINTS
+
+        try:
+            db.flush()
+        except IntegrityError:
+            # Two concurrent confirm requests can both pass the
+            # `already_confirmed` check above before either commits — the
+            # DB-level unique constraint on (user_id, source, source_id) is
+            # what actually prevents the double-award; this just turns that
+            # into a clean 409 instead of a 500.
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Session already confirmed.")
 
         section = help_request.section
         emit_data_event(

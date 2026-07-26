@@ -95,7 +95,11 @@ function AdminInbox() {
   }, [items, filter])
 
   function patchUser(userId, patch) {
-    queryClient.setQueryData(keys.users({}), (prev) =>
+    // Match every `useUsers(filters)` cache entry regardless of its filters
+    // object (e.g. AdminSections' teacher picker), not just the
+    // default-filtered one this page reads — otherwise sibling caches stay
+    // stale until the next realtime round-trip.
+    queryClient.setQueriesData({ queryKey: ['users'] }, (prev) =>
       (prev || []).map((u) => (u.user_id === userId ? { ...u, ...patch } : u))
     )
   }

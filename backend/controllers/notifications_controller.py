@@ -201,7 +201,12 @@ async def deliver_notifications():
                 logger.debug("Failed to deliver notification to user %s", user_id, exc_info=True)
                 dead_connections.append(ws)
         for ws in dead_connections:
-            connections.remove(ws)
+            # This same connection can already have been removed by the
+            # socket's own disconnect handler while the send above was
+            # in flight — an unguarded .remove() would raise ValueError and
+            # kill this whole delivery loop for the rest of the process.
+            if ws in connections:
+                connections.remove(ws)
 
 
 async def route_data_event(data: dict, registry: dict):
@@ -209,7 +214,21 @@ async def route_data_event(data: dict, registry: dict):
     Separated from the queue loop so tests can call it directly."""
     message = {"type": "data_event", "event": data}
     if data.get("broadcast_school"):
-        target_ids = list(registry.keys())
+        # A large-audience event only carries school_id, not individual
+        # user_ids (see BROADCAST_AUDIENCE_THRESHOLD in db/data_events.py) —
+        # resolve which connected users actually belong to that school so
+        # this doesn't fan out to every tenant on the server.
+        school_id = data.get("school_id")
+        db = SessionLocal()
+        try:
+            rows = db.query(User.user_id).filter(
+                User.school_id == school_id,
+                User.is_archived == False,
+            ).all()
+        finally:
+            db.close()
+        school_user_ids = {r[0] for r in rows}
+        target_ids = [uid for uid in registry.keys() if uid in school_user_ids]
     else:
         target_ids = data.get("user_ids") or []
 
@@ -226,7 +245,8 @@ async def route_data_event(data: dict, registry: dict):
                 logger.debug("Failed to deliver data event to user %s", user_id, exc_info=True)
                 dead_connections.append(ws)
         for ws in dead_connections:
-            connections.remove(ws)
+            if ws in connections:
+                connections.remove(ws)
 
 
 async def deliver_data_events():

@@ -32,7 +32,11 @@ def create_enrollment_request(
 ):
     section = (
         db.query(Section)
-        .filter(Section.section_id == section_id, Section.is_archived == False)  # noqa: E712
+        .filter(
+            Section.section_id == section_id,
+            Section.school_id == current_user.school_id,
+            Section.is_archived == False,  # noqa: E712
+        )
         .first()
     )
     if not section:
@@ -89,7 +93,11 @@ def get_enrollment_requests(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["teacher", "admin"])),
 ):
-    section = db.query(Section).filter(Section.section_id == section_id).first()
+    section = (
+        db.query(Section)
+        .filter(Section.section_id == section_id, Section.school_id == current_user.school_id)
+        .first()
+    )
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
 
@@ -137,6 +145,15 @@ def update_enrollment_request(
     section = db.query(Section).filter(Section.section_id == request.section_id).first()
     if not section or section.teacher_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not the section owner")
+
+    if body.status == EnrollmentStatusEnum.accepted:
+        enrolled_count = (
+            db.query(Enrollment)
+            .filter(Enrollment.section_id == section.section_id, Enrollment.is_archived == False)  # noqa: E712
+            .count()
+        )
+        if enrolled_count >= section.capacity:
+            raise HTTPException(status_code=409, detail="Section is at capacity.")
 
     request.status = body.status
     request.updated_at = datetime.now(timezone.utc)
@@ -197,12 +214,20 @@ def drop_student_from_section(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
+    section = (
+        db.query(Section)
+        .filter(Section.section_id == section_id, Section.school_id == current_user.school_id)
+        .first()
+    )
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found")
+
     enrollment = (
         db.query(Enrollment)
         .filter(
             Enrollment.section_id == section_id,
             Enrollment.student_id == student_id,
-            Enrollment.is_archived == False,  
+            Enrollment.is_archived == False,
         )
         .first()
     )
@@ -211,7 +236,6 @@ def drop_student_from_section(
 
     enrollment.is_archived = True
     enrollment.deleted_at = datetime.now(timezone.utc)
-    section = enrollment.section
     audience = resolve_section_audience(db, section)
     audience.append(student_id)
     emit_data_event(
