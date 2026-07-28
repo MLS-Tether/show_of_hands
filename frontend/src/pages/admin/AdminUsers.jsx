@@ -4,8 +4,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
 import { useDialog } from '../../components/DialogContext'
 import { useToast } from '../../components/ToastContext'
-import { keys, useUsers } from '../../queries'
+import { useUsers, useNotificationCountsByEntity } from '../../queries'
 import { initials } from '../../utils/format'
+import NotificationCountBadge from '../../components/NotificationCountBadge'
 import '../../styles/shared-ui.css'
 import './AdminUsers.css'
 
@@ -41,6 +42,7 @@ function AdminUsers() {
   const [search, setSearch] = useState('')
 
   const { data: users = null } = useUsers()
+  const notifCounts = useNotificationCountsByEntity()
 
   const counts = useMemo(() => {
     const list = users || []
@@ -63,7 +65,11 @@ function AdminUsers() {
   }, [users, filter, search])
 
   function patchLocal(userId, patch) {
-    queryClient.setQueryData(keys.users({}), (prev) =>
+    // Match every `useUsers(filters)` cache entry regardless of its filters
+    // object (e.g. AdminSections' `useUsers({ role: 'teacher' })` teacher
+    // picker), not just the default-filtered one this page reads — otherwise
+    // sibling caches stay stale until the next realtime round-trip.
+    queryClient.setQueriesData({ queryKey: ['users'] }, (prev) =>
       (prev || []).map((u) => (u.user_id === userId ? { ...u, ...patch } : u))
     )
   }
@@ -134,6 +140,7 @@ function AdminUsers() {
               key={user.user_id}
               onClick={isClickable ? () => navigate(`/admin/users/${user.user_id}`) : undefined}
             >
+              <NotificationCountBadge count={notifCounts[`student:${user.user_id}`]} />
               <div className="admin-user-avatar">{initials(user.username)}</div>
               <div className="admin-user-main">
                 <div className="admin-user-name-line">

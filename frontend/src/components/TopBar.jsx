@@ -57,6 +57,11 @@ function TopBar({ sidebarHidden, onToggleSidebar }) {
     setThemeState(next)
   }
 
+  function handleBack() {
+    if (parentPath === 'BACK') navigate(-1)
+    else navigate(parentPath)
+  }
+
   // The tour's steps target elements on the user's own landing page (the
   // dashboard, or the overview for admins) — replaying it from some other
   // page would show the overlay with nothing behind it to point at.
@@ -90,10 +95,26 @@ function TopBar({ sidebarHidden, onToggleSidebar }) {
             {!sidebarHidden && <rect x="2.6" y="3.6" width="2.5" height="8.8" fill="currentColor" />}
           </svg>
         </button>
-        <div className="admin-topbar-breadcrumb">
-          {breadcrumb}
-          {parentPath && <span className="admin-topbar-esc-hint">Press ESC to go back</span>}
-        </div>
+        {parentPath && (
+          <button
+            type="button"
+            className="admin-topbar-back"
+            onClick={handleBack}
+            aria-label="Back"
+            title="Back"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M10 3L5 8l5 5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        )}
+        <div className="admin-topbar-breadcrumb">{breadcrumb}</div>
       </div>
       <div className="admin-topbar-actions">
         {!teacher && points !== null && (

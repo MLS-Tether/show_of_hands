@@ -22,6 +22,15 @@
   border-color: var(--border-strong);
 }
 
+.teacher-section-card-tile:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.teacher-section-card-tile:disabled:hover {
+  border-color: var(--border);
+}
+
 .teacher-section-card-badge {
   position: absolute;
   top: 10px;
@@ -38,9 +47,19 @@
 }
 
 .teacher-section-back {
+  display: inline-flex;
+  align-items: center;
   color: var(--text-muted);
   font-size: 13px;
+  background: none;
+  border: none;
+  padding: 0;
   margin: 0 0 14px;
+  cursor: pointer;
+}
+
+.teacher-section-back:hover {
+  color: var(--text-h);
 }
 
 .teacher-panel-placeholder {
@@ -187,6 +206,35 @@ button.teacher-panel-row:hover {
 .teacher-panel-row-actions {
   display: flex;
   gap: 6px;
+}
+
+.teacher-panel-row-name {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-h);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.teacher-panel-row-name:hover {
+  text-decoration: underline;
+}
+
+.teacher-panel-textarea {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-h);
+  width: 100%;
+  min-height: 60px;
+  resize: vertical;
+  box-sizing: border-box;
 }
 
 .teacher-panel-accept {

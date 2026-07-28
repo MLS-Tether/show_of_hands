@@ -1,8 +1,12 @@
 import { Link } from 'react-router-dom'
-import { useQuestsForSections } from '../../queries'
+import { useQuestsForSections, useNotificationCountsByEntity } from '../../queries'
+import { useSidebarPeek } from '../SidebarPeekContext'
+import NotificationCountBadge from '../NotificationCountBadge'
 import './QuestsSummary.css'
 
 function QuestsSummary({ sections }) {
+  const peekSidebar = useSidebarPeek()
+  const notifCounts = useNotificationCountsByEntity()
   const sectionIds = (sections ?? []).map((s) => s.section_id)
   const { data: rawQuests, isLoading: questsLoading } = useQuestsForSections(sectionIds)
 
@@ -27,7 +31,9 @@ function QuestsSummary({ sections }) {
               className="quest-row"
               key={q.quest_id}
               to={`/quests#quest-${q.quest_id}`}
+              onClick={() => peekSidebar()}
             >
+              <NotificationCountBadge count={notifCounts[`quest:${q.quest_id}`]} />
               <span className="quest-title">{q.title}</span>
               <span className="quest-category">{q.category}</span>
             </Link>

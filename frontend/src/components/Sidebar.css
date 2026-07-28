@@ -10,6 +10,40 @@
   overflow-y: auto;
 }
 
+/* Below 768px the bottom tab bar (MobileNav) replaces the sidebar entirely,
+   including its collapse/peek affordance — neither makes sense once the
+   sidebar isn't part of the layout at all. */
+@media (max-width: 768px) {
+  .admin-sidebar,
+  .admin-sidebar-peek {
+    display: none;
+  }
+}
+
+.admin-sidebar-peek {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  box-shadow: var(--shadow);
+  animation: sidebar-peek 0.75s ease-in-out forwards;
+}
+
+@keyframes sidebar-peek {
+  0% {
+    transform: translateX(-100%);
+  }
+  18% {
+    transform: translateX(0);
+  }
+  78% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
 .admin-sidebar-brand {
   padding: 20px 18px 16px;
   border-bottom: 1px solid var(--border);

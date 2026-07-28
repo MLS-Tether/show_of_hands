@@ -1,9 +1,11 @@
 import GradeSummary from './GradeSummary'
 
-function StudentGradeDetail({ sectionId, student }) {
+function StudentGradeDetail({ sectionId, student, onBack }) {
   return (
     <div>
-      <p className="teacher-section-back">Press ESC to go back</p>
+      <button type="button" className="teacher-section-back" onClick={onBack}>
+        ← Back
+      </button>
       <div className="widget-label">{student.username}'s grade</div>
       <GradeSummary sectionId={sectionId} studentId={student.user_id} />
     </div>

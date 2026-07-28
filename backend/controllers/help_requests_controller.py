@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Union
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 import daily_client
@@ -11,11 +12,12 @@ from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.enrollment_model import Enrollment
 from models.help_request_model import HelpRequest, HelpRequestAcceptance, HelpRequestStatusEnum
-from models.notification_model import Notification, NotificationTypeEnum
+from models.notification_model import NotificationTypeEnum
 from models.point_transaction_model import PointTransaction, TransactionSourceEnum
 from models.section_model import Section
 from models.study_room_model import StudyRoom, RoomMember
 from models.user_model import User, RoleEnum
+from notifications import notify
 from schemas.help_request import (
     AcceptedByEntry,
     HelpRequestBoardResponse,
@@ -195,12 +197,14 @@ def create_help_request(
         Enrollment.is_archived == False,
     ).all()
 
-    for enrollment in classmates:
-        db.add(Notification(
-            user_id=enrollment.student_id,
-            type=NotificationTypeEnum.new_help_request,
-            message=f"New help request posted: {body.topic}",
-        ))
+    notify(
+        db,
+        [enrollment.student_id for enrollment in classmates],
+        NotificationTypeEnum.new_help_request,
+        f"New help request posted: {body.topic}",
+        entity_type="section",
+        entity_id=section_id,
+    )
 
     emit_data_event(
         db, "help_requests", "created", section.school_id,
@@ -256,10 +260,14 @@ def accept_help_request(
     current_user: User = Depends(require_role(["student"])),
     db: Session = Depends(get_db),
 ):
+    # Locked for the rest of this transaction so two students accepting the
+    # same request at the same instant can't both pass the capacity check
+    # below — the second request blocks here until the first commits, then
+    # re-reads the now-updated current_size/status.
     help_request = db.query(HelpRequest).filter(
         HelpRequest.help_request_id == help_request_id,
         HelpRequest.is_archived == False,
-    ).first()
+    ).with_for_update().first()
     if not help_request:
         raise HTTPException(status_code=404, detail="Help request not found.")
     if help_request.status != HelpRequestStatusEnum.open:
@@ -339,11 +347,14 @@ def accept_help_request(
     if help_request.current_size >= help_request.group_size:
         help_request.status = HelpRequestStatusEnum.active
 
-    db.add(Notification(
-        user_id=help_request.requester_id,
-        type=NotificationTypeEnum.help_request_accepted,
-        message="Your help request has been accepted. Your study room is ready.",
-    ))
+    notify(
+        db,
+        help_request.requester_id,
+        NotificationTypeEnum.help_request_accepted,
+        "Your help request has been accepted. Your study room is ready.",
+        entity_type="room",
+        entity_id=room.room_id,
+    )
 
     emit_data_event(
         db, "help_requests", "updated", section.school_id,
@@ -430,6 +441,17 @@ def confirm_session(
                     source_id=help_request_id,
                 ))
                 participant.total_points += HELP_SESSION_POINTS
+
+        try:
+            db.flush()
+        except IntegrityError:
+            # Two concurrent confirm requests can both pass the
+            # `already_confirmed` check above before either commits — the
+            # DB-level unique constraint on (user_id, source, source_id) is
+            # what actually prevents the double-award; this just turns that
+            # into a clean 409 instead of a 500.
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Session already confirmed.")
 
         section = help_request.section
         emit_data_event(

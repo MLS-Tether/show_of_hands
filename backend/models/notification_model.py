@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, Text, Boolean, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, Integer, Text, Boolean, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import relationship
 from db.pool import Base
 
@@ -13,10 +13,16 @@ class NotificationTypeEnum(str, enum.Enum):
     new_help_request = "new_help_request"
     help_request_accepted = "help_request_accepted"
     section_status = "section_status"
+    new_class_request = "new_class_request"
     class_request_approved = "class_request_approved"
     class_request_rejected = "class_request_rejected"
     grade_finalization_reminder = "grade_finalization_reminder"
     assignment_overdue = "assignment_overdue"
+    password_reset_requested = "password_reset_requested"
+    new_unenroll_request = "new_unenroll_request"
+    unenroll_request_approved = "unenroll_request_approved"
+    unenroll_request_rejected = "unenroll_request_rejected"
+    removed_from_section = "removed_from_section"
 
 
 class Notification(Base):
@@ -28,6 +34,8 @@ class Notification(Base):
     message = Column(Text, nullable=False)
     is_read = Column(Boolean, nullable=False, default=False)
     assignment_id = Column(Integer, ForeignKey("assignments.assignment_id"), nullable=True)
+    entity_type = Column(String, nullable=True)
+    entity_id = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="notifications")

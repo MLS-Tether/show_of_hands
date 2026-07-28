@@ -112,7 +112,16 @@
 .admin-btn-danger {
   background: transparent;
   color: var(--danger);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--danger-border);
+}
+
+.admin-btn-danger:hover {
+  background: var(--danger-bg);
+}
+
+.admin-btn-danger:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .admin-btn-text {
@@ -158,6 +167,12 @@
   border-color: rgba(20, 184, 166, 0.3);
 }
 
+.kind-unenroll {
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.13);
+  border-color: rgba(244, 63, 94, 0.3);
+}
+
 .admin-detail-row {
   display: flex;
   gap: 10px;
@@ -170,6 +185,17 @@
   flex-shrink: 0;
   width: 130px;
   color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .admin-detail-row {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .admin-detail-label {
+    width: auto;
+  }
 }
 
 .admin-settings-card-title {
@@ -255,4 +281,28 @@
   color: var(--text-muted);
   background: transparent;
   border: 1px solid var(--border);
+}
+
+.notification-count-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* For placement next to inline content (e.g. a page heading) rather than
+   pinned to the corner of a positioned card. */
+.notification-count-badge-inline {
+  position: static;
+  display: inline-block;
+  margin-left: 8px;
+  vertical-align: middle;
 }

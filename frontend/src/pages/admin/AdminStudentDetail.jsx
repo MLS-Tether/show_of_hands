@@ -3,9 +3,10 @@ import { useParams } from 'react-router-dom'
 import api from '../../api'
 import Modal from '../../components/Modal'
 import { useToast } from '../../components/ToastContext'
-import { useUser, useUserGrades } from '../../queries'
+import { useUser, useUserGrades, useNotificationCountsByEntity } from '../../queries'
 import { formatPercent } from '../../utils/format'
 import { downloadReportCard, printReportCard } from '../../utils/reportCard'
+import NotificationCountBadge from '../../components/NotificationCountBadge'
 import '../../styles/shared-ui.css'
 import './AdminStudentDetail.css'
 
@@ -84,6 +85,7 @@ function AdminStudentDetail() {
   const [showResetModal, setShowResetModal] = useState(false)
   const { data: student = null, isError: studentFailed } = useUser(studentId)
   const { data: grades = null, isError: gradesFailed } = useUserGrades(studentId)
+  const notifCounts = useNotificationCountsByEntity()
   const notFound = studentFailed || gradesFailed
 
   if (notFound) {
@@ -104,7 +106,13 @@ function AdminStudentDetail() {
 
   return (
     <div className="admin-student-detail">
-      <h1 className="admin-page-h1">{student.username}</h1>
+      <h1 className="admin-page-h1">
+        {student.username}
+        <NotificationCountBadge
+          count={notifCounts[`student:${studentId}`]}
+          className="notification-count-badge-inline"
+        />
+      </h1>
       <p className="admin-page-subtitle">Cumulative grades across all enrolled sections</p>
 
       <div className="admin-student-actions">

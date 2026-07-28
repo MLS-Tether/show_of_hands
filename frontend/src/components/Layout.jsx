@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import TopBar from './TopBar'
 import Sidebar from './Sidebar'
+import MobileNav from './MobileNav'
+import AskButton from './AskButton'
+import { SidebarPeekContext } from './SidebarPeekContext'
 import { RealtimeProvider } from '../realtime/RealtimeProvider'
 import { TutorialProvider } from './tutorial/TutorialProvider'
 import { getAdminParentPath, getParentPath } from '../utils/escNavigation'
@@ -9,12 +12,19 @@ import { isEscapeClaimed } from '../utils/escapeClaim'
 import { isTeacher } from '../utils/auth'
 import './Layout.css'
 
+// Kept slightly longer than the 0.75s CSS animation (see Sidebar.css
+// `sidebar-peek` keyframes) so the slide-out always finishes visually
+// before React unmounts the peek sidebar, instead of racing it mid-slide.
+const SIDEBAR_PEEK_DURATION_MS = 850
+
 function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarHidden, setSidebarHidden] = useState(
     () => localStorage.getItem('sidebar_hidden') === '1'
   )
+  const [peeking, setPeeking] = useState(false)
+  const peekTimeoutRef = useRef(null)
 
   function toggleSidebar() {
     setSidebarHidden((hidden) => {
@@ -22,6 +32,19 @@ function Layout() {
       return !hidden
     })
   }
+
+  const peekSidebar = useCallback(() => {
+    if (!sidebarHidden) return
+    if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
+    setPeeking(true)
+    peekTimeoutRef.current = setTimeout(() => setPeeking(false), SIDEBAR_PEEK_DURATION_MS)
+  }, [sidebarHidden])
+
+  useEffect(() => {
+    return () => {
+      if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     function handleKeyDown(e) {
@@ -45,15 +68,20 @@ function Layout() {
     <RealtimeProvider>
       <div className="admin-shell">
         <TutorialProvider>
-          {!sidebarHidden && <Sidebar />}
-          <div className="admin-main">
-            <TopBar sidebarHidden={sidebarHidden} onToggleSidebar={toggleSidebar} />
-            <main className="admin-content">
-              <div className="admin-content-inner">
-                <Outlet />
-              </div>
-            </main>
-          </div>
+          <SidebarPeekContext.Provider value={peekSidebar}>
+            {!sidebarHidden && <Sidebar />}
+            {sidebarHidden && peeking && <Sidebar className="admin-sidebar-peek" />}
+            <div className="admin-main">
+              <TopBar sidebarHidden={sidebarHidden} onToggleSidebar={toggleSidebar} />
+              <main className="admin-content">
+                <div className="admin-content-inner">
+                  <Outlet />
+                </div>
+              </main>
+            </div>
+            <MobileNav />
+            <AskButton />
+          </SidebarPeekContext.Provider>
         </TutorialProvider>
       </div>
     </RealtimeProvider>

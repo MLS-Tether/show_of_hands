@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAssignments } from '../../queries'
+import { useAssignments, useNotificationCountsByEntity } from '../../queries'
 import { formatDueDate } from '../../utils/formatDueDate'
+import { useSidebarPeek } from '../SidebarPeekContext'
+import NotificationCountBadge from '../NotificationCountBadge'
 import './AssignmentsSummary.css'
 
 function AssignmentsSummary() {
   const navigate = useNavigate()
+  const peekSidebar = useSidebarPeek()
+  const notifCounts = useNotificationCountsByEntity()
   const { data: rawAssignments = null } = useAssignments()
   // Lazy-initialized once at mount rather than recomputed on every render,
   // which would call the impure Date.now() during render.
@@ -34,8 +38,12 @@ function AssignmentsSummary() {
               type="button"
               className="assignment-row"
               key={a.assignment_id}
-              onClick={() => navigate(`/assignments/${a.assignment_id}`)}
+              onClick={() => {
+                navigate(`/assignments/${a.assignment_id}`)
+                peekSidebar()
+              }}
             >
+              <NotificationCountBadge count={notifCounts[`assignment:${a.assignment_id}`]} />
               <span className="assignment-title">{a.title}</span>
               <span className="assignment-due">{formatDueDate(a.due_date)}</span>
             </button>

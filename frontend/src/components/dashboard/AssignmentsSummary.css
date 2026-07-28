@@ -5,6 +5,7 @@
 }
 
 .assignment-row {
+  position: relative;
   display: flex;
   width: 100%;
   justify-content: space-between;
