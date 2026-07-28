@@ -9,6 +9,7 @@ class TransactionSourceEnum(str, enum.Enum):
     assignment = "assignment"
     quest = "quest"
     help_request = "help_request"
+    shop_purchase = "shop_purchase"
 
 
 class PointTransaction(Base):

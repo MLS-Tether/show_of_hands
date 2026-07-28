@@ -26,6 +26,8 @@ from models.point_transaction_model import PointTransaction
 from models.help_request_model import HelpRequest
 from models.notification_model import Notification
 from models.study_room_model import StudyRoom
+from models.shop_item_model import ShopItem
+from models.inventory_model import InventoryItem
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

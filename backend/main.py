@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from db.pool import SessionLocal
-from db.seed import seed_classes, seed_dev_data, seed_second_teacher_data, seed_more_cs_students
+from db.seed import seed_classes, seed_dev_data, seed_second_teacher_data, seed_more_cs_students, seed_shop_items
 from db.ws_broadcast import start_listener, stop_listener, deliver_loop
 from models.assignment_model import Assignment
 from models.enrollment_model import Enrollment
@@ -50,6 +50,7 @@ from controllers.notifications_controller import (
 from controllers.users_controller import router as users_router
 from controllers.resources_controller import router as resources_router
 from controllers.assignment_fit_controller import router as assignment_fit_router
+from controllers.shop_controller import router as shop_router
 
 logger = logging.getLogger(__name__)
 scheduler = BackgroundScheduler()
@@ -184,6 +185,7 @@ def check_expired_rooms():
 async def lifespan(app: FastAPI):
     global _event_loop
     seed_classes()
+    seed_shop_items()
     seed_dev_data()
     seed_second_teacher_data()
     seed_more_cs_students()
@@ -278,3 +280,4 @@ app.include_router(notifications_router, prefix="/api", tags=["notifications"])
 app.include_router(users_router, prefix="/api", tags=["users"])
 app.include_router(resources_router, prefix="/api", tags=["resources"])
 app.include_router(assignment_fit_router, prefix="/api", tags=["assignment-fit"])
+app.include_router(shop_router, prefix="/api", tags=["shop"])
