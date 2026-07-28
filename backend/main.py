@@ -39,6 +39,7 @@ from controllers.notifications_controller import (
 from controllers.users_controller import router as users_router
 from controllers.resources_controller import router as resources_router
 from controllers.assignment_fit_controller import router as assignment_fit_router
+from controllers.shop_controller import router as shop_router
 
 scheduler = BackgroundScheduler()
 
@@ -211,3 +212,4 @@ app.include_router(notifications_router, prefix="/api", tags=["notifications"])
 app.include_router(users_router, prefix="/api", tags=["users"])
 app.include_router(resources_router, prefix="/api", tags=["resources"])
 app.include_router(assignment_fit_router, prefix="/api", tags=["assignment-fit"])
+app.include_router(shop_router, prefix="/api", tags=["shop"])

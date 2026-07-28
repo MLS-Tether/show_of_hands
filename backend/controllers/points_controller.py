@@ -7,6 +7,7 @@ from models.assignment_model import Assignment
 from models.help_request_model import HelpRequest
 from models.point_transaction_model import PointTransaction, TransactionSourceEnum
 from models.quest_model import Quest
+from models.shop_item_model import ShopItem
 from models.user_model import User, RoleEnum
 from schemas.point_transaction import PointBalanceResponse
 
@@ -14,6 +15,7 @@ _SOURCE_LOOKUPS = {
     TransactionSourceEnum.assignment: (Assignment, "assignment_id", "title"),
     TransactionSourceEnum.quest: (Quest, "quest_id", "title"),
     TransactionSourceEnum.help_request: (HelpRequest, "help_request_id", "topic"),
+    TransactionSourceEnum.shop_purchase: (ShopItem, "item_id", "name"),
 }
 
 router = APIRouter(prefix="/users", tags=["points"])
