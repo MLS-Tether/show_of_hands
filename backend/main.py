@@ -27,6 +27,7 @@ from controllers.classes_controller import router as classes_router
 from controllers.class_requests_controller import router as class_requests_router
 from controllers.sections_controller import router as sections_router
 from controllers.enrollment_requests_controller import router as enrollment_requests_router
+from controllers.unenroll_requests_controller import router as unenroll_requests_router
 from controllers.assignments_controller import router as assignments_router
 from controllers.submissions_controller import router as submissions_router
 from controllers.quests_controller import router as quests_router
@@ -265,6 +266,7 @@ app.include_router(classes_router, prefix="/api", tags=["classes"])
 app.include_router(class_requests_router, prefix="/api", tags=["class-requests"])
 app.include_router(sections_router, prefix="/api", tags=["sections"])
 app.include_router(enrollment_requests_router, prefix="/api", tags=["enrollment-requests"])
+app.include_router(unenroll_requests_router, prefix="/api", tags=["unenroll-requests"])
 app.include_router(assignments_router, prefix="/api", tags=["assignments"])
 app.include_router(submissions_router, prefix="/api", tags=["submissions"])
 app.include_router(quests_router, prefix="/api", tags=["quests"])

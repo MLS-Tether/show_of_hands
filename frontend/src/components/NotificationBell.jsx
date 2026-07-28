@@ -34,6 +34,10 @@ const NOTIFICATION_ROUTES = {
   enrollment_rejected: (n) => (n.entity_id != null ? `/sections/${n.entity_id}` : '/sections'),
   grade_finalization_reminder: (n) => (n.entity_id != null ? `/sections/${n.entity_id}` : '/sections'),
   password_reset_requested: (n) => (n.entity_id != null ? `/admin/users/${n.entity_id}` : '/admin/users'),
+  new_unenroll_request: () => '/admin/inbox',
+  unenroll_request_approved: (n) => (n.entity_id != null ? `/sections/${n.entity_id}` : '/sections'),
+  unenroll_request_rejected: (n) => (n.entity_id != null ? `/sections/${n.entity_id}` : '/sections'),
+  removed_from_section: () => '/sections',
 }
 
 function NotificationBell() {
