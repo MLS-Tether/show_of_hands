@@ -1,0 +1,107 @@
+.shop-page {
+  text-align: left;
+}
+
+.shop-balance {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+
+.shop-balance-value {
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--text-h);
+  letter-spacing: -0.5px;
+}
+
+.shop-balance-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.shop-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.shop-card-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96px;
+  margin-bottom: 12px;
+}
+
+.shop-card-image img {
+  max-width: 96px;
+  max-height: 96px;
+}
+
+.shop-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.shop-card-title {
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.shop-card-type {
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.shop-card-description {
+  font-size: 13px;
+  color: var(--text);
+  margin: 8px 0 0;
+  flex-grow: 1;
+}
+
+.shop-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.shop-card-cost {
+  font-size: 13px;
+  color: var(--text-h);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+.shop-card-status {
+  font-size: 11px;
+  border-radius: 10px;
+  padding: 2px 9px;
+}
+
+.shop-card-status-owned {
+  color: var(--success);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+}

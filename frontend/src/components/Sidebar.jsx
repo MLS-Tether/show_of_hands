@@ -27,6 +27,7 @@ const APP_NAV_ITEMS = [
   { label: 'Bulletin board', to: '/bulletin-board', studentOnly: true, tour: 'nav-bulletin' },
   { label: 'Study rooms', to: '/study-rooms', studentOnly: true, tour: 'nav-rooms' },
   { label: 'Points', to: '/points', studentOnly: true },
+  { label: 'Shop', to: '/shop', studentOnly: true },
 ]
 
 function Sidebar() {
