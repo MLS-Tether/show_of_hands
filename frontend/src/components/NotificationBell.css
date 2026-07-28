@@ -13,21 +13,6 @@
   padding: 4px;
 }
 
-.notification-badge {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 3px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
-  line-height: 15px;
-  text-align: center;
-}
-
 .notification-panel {
   position: absolute;
   top: calc(100% + 8px);
@@ -82,8 +67,8 @@
 
 .notification-row {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   text-align: left;
   padding: 10px 12px;
@@ -91,6 +76,26 @@
   border: none;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
+}
+
+.notification-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.notification-go {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  border-radius: 10px;
+  padding: 2px 8px;
+  white-space: nowrap;
 }
 
 .notification-row:last-child {
@@ -112,22 +117,5 @@
 
 .notification-time {
   font-size: 11px;
-  color: var(--text-muted);
-}
-
-.notification-modal-type {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: 10px;
-}
-
-.notification-modal-message {
-  font-size: 16px;
-  color: var(--text-h);
-  margin-bottom: 14px;
-}
-
-.notification-modal-time {
-  font-size: 12px;
   color: var(--text-muted);
 }

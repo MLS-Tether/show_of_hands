@@ -1,36 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import api, { mediaUrl } from '../api'
+import { mediaUrl } from '../api'
 import { useClassRequests, useSchool, useUser, useUsers } from '../queries'
 import { getUserId, isAdmin, isTeacher } from '../utils/auth'
 import { initials } from '../utils/format'
+import { logout } from '../utils/logout'
+import { ADMIN_NAV_GROUPS, APP_NAV_ITEMS } from './navConfig'
 import './Sidebar.css'
 
-const ADMIN_NAV_GROUPS = [
-  { label: null, items: [{ label: 'Overview', to: '/admin/overview', end: true, tour: 'nav-overview' }] },
-  { label: 'Approvals', items: [{ label: 'Inbox', to: '/admin/inbox', badge: 'inbox', tour: 'nav-inbox' }] },
-  {
-    label: 'Manage',
-    items: [
-      { label: 'Sections', to: '/admin/sections', tour: 'nav-sections' },
-      { label: 'Users', to: '/admin/users', tour: 'nav-users' },
-    ],
-  },
-  { label: 'School', items: [{ label: 'Settings', to: '/admin/settings' }] },
-]
-
-const APP_NAV_ITEMS = [
-  { label: 'Dashboard', to: '/dashboard', end: true },
-  { label: 'My sections', to: '/sections', tour: 'nav-sections' },
-  { label: 'Assignments', to: '/assignments', studentOnly: true, tour: 'nav-assignments' },
-  { label: 'Quests', to: '/quests', tour: 'nav-quests' },
-  { label: 'Bulletin board', to: '/bulletin-board', studentOnly: true, tour: 'nav-bulletin' },
-  { label: 'Study rooms', to: '/study-rooms', studentOnly: true, tour: 'nav-rooms' },
-  { label: 'Points', to: '/points', studentOnly: true },
-  { label: 'Shop', to: '/shop', studentOnly: true },
-]
-
-function Sidebar() {
+function Sidebar({ className = '' }) {
   const navigate = useNavigate()
   const admin = isAdmin()
   const teacher = isTeacher()
@@ -58,18 +36,8 @@ function Sidebar() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [menuOpen])
 
-  async function handleLogout() {
-    const refreshToken = localStorage.getItem('refresh_token')
-    try {
-      await api.post('/auth/logout', { refresh_token: refreshToken })
-    } catch {
-      // best-effort: still clear local session and redirect below
-    }
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('user_id')
-    localStorage.removeItem('role')
-    navigate('/auth')
+  function handleLogout() {
+    logout(navigate)
   }
 
   const navGroups = admin
@@ -77,7 +45,7 @@ function Sidebar() {
     : [{ label: null, items: APP_NAV_ITEMS.filter((item) => !item.studentOnly || !teacher) }]
 
   return (
-    <nav className="admin-sidebar" aria-label="Main">
+    <nav className={`admin-sidebar ${className}`.trim()} aria-label="Main">
       <div className="admin-sidebar-brand">
         <div className="admin-sidebar-logo">
           Show of Hands{' '}

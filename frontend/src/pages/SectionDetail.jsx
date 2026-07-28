@@ -1,8 +1,9 @@
 import { Link, useParams } from 'react-router-dom'
-import { useSection, useSectionResources } from '../queries'
+import { useSection, useSectionResources, useNotificationCountsByEntity } from '../queries'
 import { isTeacher } from '../utils/auth'
 import TeacherSectionDetail from '../components/section-detail/TeacherSectionDetail'
 import GradeSummary from '../components/section-detail/GradeSummary'
+import NotificationCountBadge from '../components/NotificationCountBadge'
 import '../styles/shared-ui.css'
 import './SectionDetail.css'
 
@@ -29,6 +30,7 @@ function StudentSectionDetail() {
   const { sectionId } = useParams()
   const { data: resources = null } = useSectionResources(sectionId)
   const { data: section = null, isError: notFound } = useSection(sectionId)
+  const notifCounts = useNotificationCountsByEntity()
 
   const loading = section === null && !notFound
 
@@ -50,7 +52,13 @@ function StudentSectionDetail() {
 
   return (
     <section className="section-detail">
-      <h1 className="admin-page-h1">{section.class_name}</h1>
+      <h1 className="admin-page-h1">
+        {section.class_name}
+        <NotificationCountBadge
+          count={notifCounts[`section:${sectionId}`]}
+          className="notification-count-badge-inline"
+        />
+      </h1>
       <div className="section-detail-meta">
         <span>{section.teacher_name || 'Unassigned teacher'}</span>
         <span>{section.period}</span>
@@ -62,6 +70,10 @@ function StudentSectionDetail() {
         </span>
         <span>Created {new Date(section.created_at).toLocaleDateString()}</span>
       </div>
+
+      {section.status === 'archived' && (
+        <p className="admin-empty-card">This section has been archived by your school.</p>
+      )}
 
       <div className="section-detail-columns">
         <div>
@@ -77,6 +89,7 @@ function StudentSectionDetail() {
             <div className="section-detail-list">
               {section.assignments.slice(0, 3).map((a) => (
                 <div className="section-detail-row" key={a.assignment_id}>
+                  <NotificationCountBadge count={notifCounts[`assignment:${a.assignment_id}`]} />
                   <span>{a.title}</span>
                   <span className="section-detail-row-sub">
                     {new Date(a.due_date).toLocaleDateString()}
@@ -100,6 +113,7 @@ function StudentSectionDetail() {
             <div className="section-detail-list">
               {section.quests.slice(0, 3).map((q) => (
                 <div className="section-detail-row" key={q.quest_id}>
+                  <NotificationCountBadge count={notifCounts[`quest:${q.quest_id}`]} />
                   <span>{q.title}</span>
                   <span className="section-detail-row-sub">{q.category}</span>
                 </div>

@@ -9,9 +9,10 @@ from db.pool import get_db
 from dependencies import get_current_user, require_role
 from models.assignment_model import Assignment
 from models.enrollment_model import Enrollment
-from models.notification_model import Notification, NotificationTypeEnum
+from models.notification_model import NotificationTypeEnum
 from models.section_model import Section
 from models.user_model import User, RoleEnum
+from notifications import notify
 from schemas.assignment import (
     AssignmentCreate,
     AssignmentUpdate,
@@ -122,12 +123,14 @@ def create_assignment(
         Enrollment.is_archived == False,
     ).all()
 
-    for enrollment in enrolled_students:
-        db.add(Notification(
-            user_id=enrollment.student_id,
-            type=NotificationTypeEnum.new_assignment,
-            message=f"New assignment posted: {body.title}",
-        ))
+    notify(
+        db,
+        [enrollment.student_id for enrollment in enrolled_students],
+        NotificationTypeEnum.new_assignment,
+        f"New assignment posted: {body.title}",
+        entity_type="assignment",
+        entity_id=assignment.assignment_id,
+    )
 
     emit_data_event(
         db, "assignments", "created", section.school_id,

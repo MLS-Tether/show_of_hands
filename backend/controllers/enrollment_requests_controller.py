@@ -9,7 +9,8 @@ from dependencies import get_current_user, require_role
 from models.user_model import User
 from models.section_model import Section
 from models.enrollment_model import Enrollment, EnrollmentRequest, EnrollmentStatusEnum
-from models.notification_model import Notification
+from models.notification_model import NotificationTypeEnum
+from notifications import notify
 from schemas.enrollment import (
     EnrollmentRequestCreateResponse,
     EnrollmentRequestListItem,
@@ -19,6 +20,14 @@ from schemas.enrollment import (
 )
 
 router = APIRouter(tags=["enrollment-requests"])
+
+
+def archive_enrollment(enrollment: Enrollment) -> None:
+    """Soft-deletes an Enrollment row. Shared by the direct admin-drop
+    endpoint below and the teacher-request approval flow in
+    unenroll_requests_controller.py — caller still owns the commit."""
+    enrollment.is_archived = True
+    enrollment.deleted_at = datetime.now(timezone.utc)
 
 @router.post(
     "/sections/{section_id}/enrollment-requests",
@@ -32,7 +41,11 @@ def create_enrollment_request(
 ):
     section = (
         db.query(Section)
-        .filter(Section.section_id == section_id, Section.is_archived == False)  # noqa: E712
+        .filter(
+            Section.section_id == section_id,
+            Section.school_id == current_user.school_id,
+            Section.is_archived == False,  # noqa: E712
+        )
         .first()
     )
     if not section:
@@ -89,7 +102,11 @@ def get_enrollment_requests(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["teacher", "admin"])),
 ):
-    section = db.query(Section).filter(Section.section_id == section_id).first()
+    section = (
+        db.query(Section)
+        .filter(Section.section_id == section_id, Section.school_id == current_user.school_id)
+        .first()
+    )
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
 
@@ -138,25 +155,36 @@ def update_enrollment_request(
     if not section or section.teacher_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not the section owner")
 
+    if body.status == EnrollmentStatusEnum.accepted:
+        enrolled_count = (
+            db.query(Enrollment)
+            .filter(Enrollment.section_id == section.section_id, Enrollment.is_archived == False)  # noqa: E712
+            .count()
+        )
+        if enrolled_count >= section.capacity:
+            raise HTTPException(status_code=409, detail="Section is at capacity.")
+
     request.status = body.status
     request.updated_at = datetime.now(timezone.utc)
 
     if body.status == EnrollmentStatusEnum.accepted:
         db.add(Enrollment(section_id=request.section_id, student_id=request.student_id))
-        db.add(
-            Notification(
-                user_id=request.student_id,
-                type="enrollment_approved",
-                message=f"Your request to join {section.period} was approved.",
-            )
+        notify(
+            db,
+            request.student_id,
+            NotificationTypeEnum.enrollment_approved,
+            f"Your request to join {section.period} was approved.",
+            entity_type="section",
+            entity_id=request.section_id,
         )
     elif body.status == EnrollmentStatusEnum.rejected:
-        db.add(
-            Notification(
-                user_id=request.student_id,
-                type="enrollment_rejected",
-                message=f"Your request to join {section.period} was rejected.",
-            )
+        notify(
+            db,
+            request.student_id,
+            NotificationTypeEnum.enrollment_rejected,
+            f"Your request to join {section.period} was rejected.",
+            entity_type="section",
+            entity_id=request.section_id,
         )
 
     emit_data_event(
@@ -193,21 +221,27 @@ def drop_student_from_section(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
+    section = (
+        db.query(Section)
+        .filter(Section.section_id == section_id, Section.school_id == current_user.school_id)
+        .first()
+    )
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found")
+
     enrollment = (
         db.query(Enrollment)
         .filter(
             Enrollment.section_id == section_id,
             Enrollment.student_id == student_id,
-            Enrollment.is_archived == False,  
+            Enrollment.is_archived == False,
         )
         .first()
     )
     if not enrollment:
         raise HTTPException(status_code=404, detail="Enrollment not found")
 
-    enrollment.is_archived = True
-    enrollment.deleted_at = datetime.now(timezone.utc)
-    section = enrollment.section
+    archive_enrollment(enrollment)
     audience = resolve_section_audience(db, section)
     audience.append(student_id)
     emit_data_event(

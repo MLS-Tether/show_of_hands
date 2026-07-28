@@ -1,0 +1,40 @@
+.ask-button {
+  display: none;
+  position: fixed;
+  right: 16px;
+  bottom: 84px;
+  z-index: 70;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 28px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 768px) {
+  .ask-button {
+    display: flex;
+  }
+}
+
+.ask-button-icon {
+  font-size: 17px;
+  line-height: 1;
+}
+
+@media (max-width: 380px) {
+  .ask-button {
+    right: 12px;
+    bottom: 78px;
+    padding: 10px 16px;
+    gap: 5px;
+    font-size: 13px;
+  }
+}

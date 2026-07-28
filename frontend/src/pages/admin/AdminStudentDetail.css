@@ -32,3 +32,17 @@
   color: var(--text-muted);
   background: var(--surface-1);
 }
+
+@media (max-width: 768px) {
+  /* The 2fr/1fr/1fr/1fr columns get too tight to read on a phone —
+     scroll horizontally instead of squeezing/clipping (the wrapper's
+     overflow: hidden above was clipping, not scrolling, so nothing
+     over that width was even reachable). */
+  .admin-student-grades-table {
+    overflow-x: auto;
+  }
+
+  .admin-student-grades-row {
+    min-width: 480px;
+  }
+}

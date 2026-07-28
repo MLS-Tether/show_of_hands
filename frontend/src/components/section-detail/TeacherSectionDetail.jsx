@@ -2,8 +2,15 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
-import { keys, useSection, useSectionAnalytics, useSectionEnrollmentRequests } from '../../queries'
+import {
+  keys,
+  useSection,
+  useSectionAnalytics,
+  useSectionEnrollmentRequests,
+  useNotificationCountsByEntity,
+} from '../../queries'
 import { useEscapeBack } from '../../utils/useEscapeBack'
+import NotificationCountBadge from '../NotificationCountBadge'
 import RosterPanel from './RosterPanel'
 import StudentGradeDetail from './StudentGradeDetail'
 import EnrollmentRequestsPanel from './EnrollmentRequestsPanel'
@@ -21,6 +28,12 @@ const STATUS_BADGE_CLASS = {
   pending_reassignment: 'status-pending',
   archived: 'status-archived',
 }
+
+// These panels let the teacher create/accept/reject against the section —
+// if an admin archives it while the teacher has one open, kick them back to
+// the read-only grid instead of leaving those forms live (see the
+// `isArchived` effect below).
+const MUTATING_CARD_KEYS = ['roster', 'enrollment-requests', 'assignments', 'quests']
 
 const CARDS = [
   { key: 'roster', label: 'Roster' },
@@ -96,16 +109,42 @@ function TeacherSectionDetail() {
   const { data: section = null, isError: notFound } = useSection(sectionId)
   const { data: enrollmentRequests } = useSectionEnrollmentRequests(sectionId)
   const { data: analytics } = useSectionAnalytics(sectionId)
+  const notifCounts = useNotificationCountsByEntity()
 
   const pendingRequests = enrollmentRequests?.length ?? 0
   const ungraded = analytics
     ? analytics.assignments.reduce((sum, a) => sum + (a.submitted_count - a.graded_count), 0)
     : 0
+  // grade_finalization_reminder is the only notification type scoped to a
+  // section that targets the section's own teacher — surface it on the
+  // "Assignments" tile, since that's what the reminder is actually about.
+  const sectionNotifCount = notifCounts[`section:${sectionId}`] || 0
+  const isArchived = section?.status === 'archived'
 
-  useEscapeBack(() => {
+  // An admin can archive this section while the teacher has a mutating panel
+  // (accept/reject requests, create assignments/quests) open — the realtime
+  // `sections` event refetches `section` in the background, but nothing else
+  // reacted to that change. Kick back to the read-only grid immediately
+  // instead of leaving those forms live against an archived section.
+  //
+  // Adjusted during render (React's documented pattern for resetting state
+  // in response to a prop change) rather than in an effect, since setting
+  // state directly inside an effect body causes an extra cascading render.
+  const [prevIsArchived, setPrevIsArchived] = useState(isArchived)
+  if (isArchived !== prevIsArchived) {
+    setPrevIsArchived(isArchived)
+    if (isArchived && MUTATING_CARD_KEYS.includes(activeCard)) {
+      setActiveCard(null)
+      setEditing(false)
+    }
+  }
+
+  function handleBack() {
     if (viewingStudent) setViewingStudent(null)
     else setActiveCard(null)
-  }, Boolean(activeCard))
+  }
+
+  useEscapeBack(handleBack, Boolean(activeCard))
 
   const loading = section === null && !notFound
 
@@ -137,12 +176,18 @@ function TeacherSectionDetail() {
           {section.status}
         </span>
         <span>Created {new Date(section.created_at).toLocaleDateString()}</span>
-        {!editing && !activeCard && (
+        {!isArchived && !editing && !activeCard && (
           <button type="button" className="teacher-panel-button" onClick={() => setEditing(true)}>
             Edit
           </button>
         )}
       </div>
+
+      {isArchived && (
+        <p className="admin-empty-card">
+          This section has been archived. Enrollment requests, assignments, and quests are now read-only.
+        </p>
+      )}
 
       {editing && (
         <EditSectionForm
@@ -157,12 +202,16 @@ function TeacherSectionDetail() {
 
       {activeCard ? (
         <div>
-          {!viewingStudent && <p className="teacher-section-back">Press ESC to go back</p>}
+          {!viewingStudent && (
+            <button type="button" className="teacher-section-back" onClick={handleBack}>
+              ← Back
+            </button>
+          )}
           {activeCard === 'roster' &&
             (viewingStudent ? (
-              <StudentGradeDetail sectionId={sectionId} student={viewingStudent} />
+              <StudentGradeDetail sectionId={sectionId} student={viewingStudent} onBack={handleBack} />
             ) : (
-              <RosterPanel section={section} onSelectStudent={setViewingStudent} />
+              <RosterPanel section={section} sectionId={sectionId} onSelectStudent={setViewingStudent} />
             ))}
           {activeCard === 'enrollment-requests' && <EnrollmentRequestsPanel sectionId={sectionId} />}
           {activeCard === 'assignments' && (
@@ -177,15 +226,21 @@ function TeacherSectionDetail() {
         <div className="teacher-section-grid">
           {CARDS.map((c) => {
             const badgeCount =
-              c.key === 'enrollment-requests' ? pendingRequests : c.key === 'assignments' ? ungraded : 0
+              c.key === 'enrollment-requests'
+                ? pendingRequests
+                : c.key === 'assignments'
+                  ? ungraded + sectionNotifCount
+                  : 0
+            const disabled = isArchived && MUTATING_CARD_KEYS.includes(c.key)
             return (
               <button
                 type="button"
                 className="teacher-section-card-tile"
                 key={c.key}
+                disabled={disabled}
                 onClick={() => setActiveCard(c.key)}
               >
-                {badgeCount > 0 && <span className="teacher-section-card-badge">{badgeCount}</span>}
+                <NotificationCountBadge count={badgeCount} className="teacher-section-card-badge" />
                 {c.label}
               </button>
             )

@@ -160,11 +160,14 @@ def test_route_data_event_prunes_dead_sockets():
     assert ws_live in registry[1]
 
 
-def test_route_data_event_broadcast_school_reaches_all_connections():
+def test_route_data_event_broadcast_school_reaches_all_connections(world):
+    # The broadcast_school path resolves target user ids with a real DB query
+    # (see route_data_event's docstring), so the registry must be keyed by
+    # actual users in the event's school for this to exercise anything.
     ws_a = FakeWebSocket()
     ws_b = FakeWebSocket()
-    registry = {1: [ws_a], 2: [ws_b]}
-    event = {"entity": "school", "action": "updated", "broadcast_school": True}
+    registry = {world.student_id: [ws_a], world.teacher_id: [ws_b]}
+    event = {"entity": "school", "action": "updated", "broadcast_school": True, "school_id": world.school_id}
 
     asyncio.run(route_data_event(event, registry))
 

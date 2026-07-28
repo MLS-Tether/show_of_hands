@@ -1,8 +1,37 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAssignments, useQuestsForSections } from '../../queries'
+import SectionCard from './SectionCard'
 import './SectionsSummary.css'
 
 function SectionsSummary({ sections }) {
   const loading = sections === null
+  const sectionIds = (sections ?? []).map((s) => s.section_id)
+
+  const { data: rawAssignments = null } = useAssignments()
+  const { data: rawQuests, isLoading: questsLoading } = useQuestsForSections(sectionIds)
+  // Lazy-initialized once at mount rather than recomputed on every render,
+  // which would call the impure Date.now() during render.
+  const [now] = useState(() => Date.now())
+
+  const dataLoading = rawAssignments === null || (sectionIds.length > 0 && questsLoading)
+
+  function assignmentsForSection(sectionId) {
+    const all = (rawAssignments ?? []).filter((a) => a.section_id === sectionId)
+    const upcoming = all
+      .filter((a) => new Date(a.due_date).getTime() >= now)
+      .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
+    if (upcoming.length > 0) return upcoming
+    // No upcoming assignments for this section — fall back to past-due ones
+    // (most recent first) so there's still something to click through to.
+    return all
+      .filter((a) => new Date(a.due_date).getTime() < now)
+      .sort((a, b) => new Date(b.due_date) - new Date(a.due_date))
+  }
+
+  function questsForSection(sectionId) {
+    return (rawQuests ?? []).filter((q) => q.section_id === sectionId && !q.completed)
+  }
 
   return (
     <section className="sections-summary">
@@ -14,10 +43,13 @@ function SectionsSummary({ sections }) {
         )}
         {!loading &&
           sections.map((s) => (
-            <Link to={`/sections/${s.section_id}`} className="section-card" key={s.section_id}>
-              <div className="section-card-title">{s.class_name}</div>
-              <div className="section-card-sub">{s.period}</div>
-            </Link>
+            <SectionCard
+              key={s.section_id}
+              section={s}
+              assignments={assignmentsForSection(s.section_id)}
+              quests={questsForSection(s.section_id)}
+              dataLoading={dataLoading}
+            />
           ))}
         <Link to="/sections" className="join-section-card">
           + join section

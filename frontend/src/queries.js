@@ -1,5 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from './api'
+import { rememberHelpRequestId } from './utils/roomTracking'
 
 // Single source of truth for query keys, shared between the components that
 // read data and realtime/invalidations.js, which maps push events to these
@@ -10,10 +12,12 @@ export const keys = {
   section: (sectionId) => ['section', sectionId],
   sectionQuests: (sectionId) => ['section', sectionId, 'quests'],
   quests: (sectionIds) => ['quests', [...sectionIds].sort((a, b) => a - b)],
+  questCompletions: (questId) => ['quest', questId, 'completions'],
   sectionResources: (sectionId) => ['section', sectionId, 'resources'],
   sectionHelpRequests: (sectionId) => ['section', sectionId, 'help-requests'],
   sectionAnalytics: (sectionId) => ['section', sectionId, 'analytics'],
   sectionEnrollmentRequests: (sectionId) => ['section', sectionId, 'enrollment-requests'],
+  sectionUnenrollRequests: (sectionId) => ['section', sectionId, 'unenroll-requests'],
   sectionGrades: (sectionId, who = 'me') => ['section', sectionId, 'grades', who],
   assignments: () => ['assignments'],
   assignment: (assignmentId) => ['assignment', assignmentId],
@@ -29,6 +33,7 @@ export const keys = {
   user: (userId) => ['user', userId],
   userGrades: (userId) => ['user', userId, 'grades'],
   classRequests: () => ['class-requests'],
+  unenrollRequests: () => ['unenroll-requests'],
   classes: () => ['classes'],
   room: (roomId) => ['room', roomId],
   shopItems: (itemType) => ['shop-items', itemType ?? 'all'],
@@ -76,6 +81,15 @@ export function useQuestsForSections(sectionIds, options = {}) {
   })
 }
 
+export function useQuestCompletions(questId, options = {}) {
+  return useQuery({
+    queryKey: keys.questCompletions(questId),
+    queryFn: () => unwrap(api.get(`/quests/${questId}/completions`)),
+    enabled: !!questId,
+    ...options,
+  })
+}
+
 export function useSectionResources(sectionId, options = {}) {
   return useQuery({
     queryKey: keys.sectionResources(sectionId),
@@ -107,6 +121,15 @@ export function useSectionEnrollmentRequests(sectionId, options = {}) {
   return useQuery({
     queryKey: keys.sectionEnrollmentRequests(sectionId),
     queryFn: () => unwrap(api.get(`/sections/${sectionId}/enrollment-requests`)),
+    enabled: !!sectionId,
+    ...options,
+  })
+}
+
+export function useSectionUnenrollRequests(sectionId, options = {}) {
+  return useQuery({
+    queryKey: keys.sectionUnenrollRequests(sectionId),
+    queryFn: () => unwrap(api.get(`/sections/${sectionId}/unenroll-requests`)),
     enabled: !!sectionId,
     ...options,
   })
@@ -169,12 +192,48 @@ export function useHelpRequestsBoard(options = {}) {
   })
 }
 
+// Shared by the Bulletin board's own create form and the mobile floating
+// Ask button, so the post + cache-prepend sequence only lives in one place.
+export function useCreateHelpRequest(sections) {
+  const queryClient = useQueryClient()
+
+  return async function createHelpRequest({ sectionId, topic, description, groupSize, durationMinutes }) {
+    const { data } = await api.post(`/sections/${sectionId}/help-requests`, {
+      topic,
+      description: description || null,
+      group_size: Number(groupSize),
+      duration_minutes: Number(durationMinutes),
+    })
+    rememberHelpRequestId(data.help_request_id)
+    const section = (sections ?? []).find((s) => s.section_id === Number(sectionId))
+    const hr = { ...data, section_id: Number(sectionId), section_name: section?.class_name }
+    queryClient.setQueryData(keys.helpRequests(), (prev) => [hr, ...(prev || [])])
+    return hr
+  }
+}
+
 export function useNotifications(options = {}) {
   return useQuery({
     queryKey: keys.notifications(),
     queryFn: () => unwrap(api.get('/notifications')),
     ...options,
   })
+}
+
+// Single source of truth for "how many unread notifications point at this
+// card" — every card badge must read from this instead of computing its own
+// count, so the bell's unread count and every card badge always agree.
+export function useNotificationCountsByEntity() {
+  const { data: notifications = null } = useNotifications()
+  return useMemo(() => {
+    const counts = {}
+    ;(notifications || []).forEach((n) => {
+      if (n.is_read || n.entity_type == null || n.entity_id == null) return
+      const key = `${n.entity_type}:${n.entity_id}`
+      counts[key] = (counts[key] || 0) + 1
+    })
+    return counts
+  }, [notifications])
 }
 
 export function usePoints(userId, page = 1, pageSize = 20, options = {}) {
@@ -240,6 +299,14 @@ export function useClassRequests(options = {}) {
   return useQuery({
     queryKey: keys.classRequests(),
     queryFn: () => unwrap(api.get('/class-requests')),
+    ...options,
+  })
+}
+
+export function useUnenrollRequests(options = {}) {
+  return useQuery({
+    queryKey: keys.unenrollRequests(),
+    queryFn: () => unwrap(api.get('/unenroll-requests')),
     ...options,
   })
 }

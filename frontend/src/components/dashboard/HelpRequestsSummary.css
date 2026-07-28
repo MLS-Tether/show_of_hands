@@ -16,7 +16,14 @@
   gap: 10px;
 }
 
+@media (max-width: 768px) {
+  .help-requests-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .help-request-card {
+  position: relative;
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: 8px;
