@@ -1,0 +1,16 @@
+/* Equippable shop themes recolor the app's accent color by overriding the
+   same custom properties every page already reads from index.css. Declared
+   after index.css so these win over the light/dark defaults regardless of
+   which mode is active — a purchased theme should look the same in either. */
+
+:root[data-shop-theme='ocean'] {
+  --accent: #3f8ed6;
+  --accent-bg: rgba(63, 142, 214, 0.12);
+  --accent-border: rgba(63, 142, 214, 0.4);
+}
+
+:root[data-shop-theme='sunset'] {
+  --accent: #e8663f;
+  --accent-bg: rgba(232, 102, 63, 0.12);
+  --accent-border: rgba(232, 102, 63, 0.4);
+}

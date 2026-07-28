@@ -4,9 +4,10 @@ import TopBar from './TopBar'
 import Sidebar from './Sidebar'
 import { RealtimeProvider } from '../realtime/RealtimeProvider'
 import { TutorialProvider } from './tutorial/TutorialProvider'
+import { useInventory } from '../queries'
 import { getAdminParentPath, getParentPath } from '../utils/escNavigation'
 import { isEscapeClaimed } from '../utils/escapeClaim'
-import { isTeacher } from '../utils/auth'
+import { getUserId, isStudent, isTeacher } from '../utils/auth'
 import './Layout.css'
 
 function Layout() {
@@ -15,6 +16,23 @@ function Layout() {
   const [sidebarHidden, setSidebarHidden] = useState(
     () => localStorage.getItem('sidebar_hidden') === '1'
   )
+
+  // Shop themes are a student-only cosmetic; teachers/admins never own
+  // inventory, so skip the request for them entirely.
+  const { data: inventory = [] } = useInventory(getUserId(), { enabled: isStudent() })
+  const equippedThemeKey = inventory.find(
+    (row) => row.item.item_type === 'theme' && row.is_equipped
+  )?.item.theme_key
+
+  // Lives here (rather than on Profile) because Layout wraps every
+  // authenticated route via <Outlet> — a theme equipped from the character
+  // customizer should recolor the whole app, not just the profile page.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-shop-theme', equippedThemeKey || '')
+    return () => {
+      document.documentElement.removeAttribute('data-shop-theme')
+    }
+  }, [equippedThemeKey])
 
   function toggleSidebar() {
     setSidebarHidden((hidden) => {
