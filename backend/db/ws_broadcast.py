@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import select
 import threading
 from typing import Optional
@@ -8,6 +9,8 @@ import psycopg2
 from sqlalchemy import text
 
 from db.pool import DATABASE_URL
+
+logger = logging.getLogger(__name__)
 
 CHANNEL_NAME = "room_chat_channel"
 NOTIFICATION_CHANNEL_NAME = "user_notifications_channel"
@@ -103,6 +106,10 @@ async def deliver_loop(room_registry: dict, room_messages: dict):
             try:
                 await other_ws.send_json(data)
             except Exception:
+                # Expected if that client already disconnected — debug-level
+                # so it doesn't spam logs, but still traceable if something
+                # else is actually wrong here.
+                logger.debug("Failed to deliver room %s message to user %s", room_id, other_user_id, exc_info=True)
                 dead_connections.append(other_user_id)
 
         for dead_id in dead_connections:

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
-import { keys, useSectionQuests } from '../../queries'
+import { keys, useQuestCompletions, useSectionQuests } from '../../queries'
 import { useDialog } from '../DialogContext'
 import '../../styles/shared-ui.css'
 import '../../pages/Quests.css'
@@ -9,6 +9,32 @@ import '../../pages/Quests.css'
 const CATEGORY_LABELS = { academic: 'Academic', social: 'Non-academic' }
 const QUEST_TYPE_LABELS = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' }
 const SOCIAL_MULTIPLIER = 1.5
+
+function QuestCompletionsList({ questId }) {
+  const { data: completions = null } = useQuestCompletions(questId)
+
+  if (completions === null) {
+    return <p className="admin-empty-card">Loading completions…</p>
+  }
+  if (completions.length === 0) {
+    return <p className="admin-empty-card">No students have completed this quest yet.</p>
+  }
+  return (
+    <ul className="quest-completions-list">
+      {completions.map((c) => (
+        <li key={c.quest_completion_id} className="quest-completions-list-item">
+          <span className="quest-completions-list-username">{c.username}</span>
+          {c.description && <p className="quest-completions-list-description">{c.description}</p>}
+          {c.file_url && (
+            <a href={c.file_url} target="_blank" rel="noreferrer" className="quest-completions-list-file">
+              View attachment
+            </a>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 function QuestsPanel({ sectionId }) {
   const { alert } = useDialog()
@@ -23,6 +49,7 @@ function QuestsPanel({ sectionId }) {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [expandedId, setExpandedId] = useState(null)
 
   const { data: quests = null } = useSectionQuests(sectionId)
 
@@ -176,14 +203,24 @@ function QuestsPanel({ sectionId }) {
                 <span className="quest-card-type">{QUEST_TYPE_LABELS[q.quest_type] || q.quest_type}</span>
                 <span className="quest-card-points">{q.point_value} pts</span>
               </div>
-              <button
-                type="button"
-                className="admin-btn-danger quest-card-complete"
-                disabled={deletingId === q.quest_id}
-                onClick={() => handleDelete(q)}
-              >
-                {deletingId === q.quest_id ? 'Deleting…' : 'Delete'}
-              </button>
+              <div className="quest-card-meta">
+                <button
+                  type="button"
+                  className="admin-btn-text"
+                  onClick={() => setExpandedId(expandedId === q.quest_id ? null : q.quest_id)}
+                >
+                  {expandedId === q.quest_id ? 'Hide completions' : 'View completions'}
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn-danger quest-card-complete"
+                  disabled={deletingId === q.quest_id}
+                  onClick={() => handleDelete(q)}
+                >
+                  {deletingId === q.quest_id ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
+              {expandedId === q.quest_id && <QuestCompletionsList questId={q.quest_id} />}
             </div>
           ))}
         </div>

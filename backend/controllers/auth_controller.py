@@ -145,6 +145,7 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(
         User.user_id == user_id,
         User.is_archived == False,
+        User.is_active == True,
     ).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found.")

@@ -13,12 +13,20 @@ function clamp(value, lo, hi) {
 function computeGeometry(rect, containerWidth, containerHeight) {
   const cw = containerWidth
   const ch = containerHeight
+  // The card's CSS caps it at `calc(100vw - 32px)` so it never overflows a
+  // narrow phone screen; mirror that same cap here so the positioning math
+  // reasons about the width the card will actually render at, instead of
+  // always assuming the full 344px (which used to leave the card off-center
+  // or its arrow missing the card edge on anything narrower than ~375px).
+  const cardWidth = Math.min(CARD_WIDTH, Math.max(240, cw - MARGIN * 2))
+  const cardHeight = CARD_HEIGHT
 
   if (!rect) {
     return {
       hasTarget: false,
-      cardLeft: (cw - CARD_WIDTH) / 2,
-      cardTop: (ch - CARD_HEIGHT) / 2 - 8,
+      cardWidth,
+      cardLeft: (cw - cardWidth) / 2,
+      cardTop: (ch - cardHeight) / 2 - 8,
     }
   }
 
@@ -29,27 +37,27 @@ function computeGeometry(rect, containerWidth, containerHeight) {
 
   const targetBox = { x0: cx - rx - MARGIN, y0: cy - ry - MARGIN, x1: cx + rx + MARGIN, y1: cy + ry + MARGIN }
   const overlapsTarget = (l, t) =>
-    !(l + CARD_WIDTH < targetBox.x0 || l > targetBox.x1 || t + CARD_HEIGHT < targetBox.y0 || t > targetBox.y1)
+    !(l + cardWidth < targetBox.x0 || l > targetBox.x1 || t + cardHeight < targetBox.y0 || t > targetBox.y1)
   const inBounds = (l, t) =>
-    l >= MARGIN && t >= MARGIN && l + CARD_WIDTH <= cw - MARGIN && t + CARD_HEIGHT <= ch - MARGIN
+    l >= MARGIN && t >= MARGIN && l + cardWidth <= cw - MARGIN && t + cardHeight <= ch - MARGIN
 
-  const vMid = clamp(cy - CARD_HEIGHT / 2, MARGIN, ch - CARD_HEIGHT - MARGIN)
-  const hMid = clamp(cx - CARD_WIDTH / 2, MARGIN, cw - CARD_WIDTH - MARGIN)
+  const vMid = clamp(cy - cardHeight / 2, MARGIN, ch - cardHeight - MARGIN)
+  const hMid = clamp(cx - cardWidth / 2, MARGIN, cw - cardWidth - MARGIN)
 
   let candidates
   if (cx < cw * 0.5) {
     candidates = [
-      [Math.min(cx + rx + 42, cw - CARD_WIDTH - MARGIN), vMid],
+      [Math.min(cx + rx + 42, cw - cardWidth - MARGIN), vMid],
       [hMid, cy + ry + 28],
-      [cw - CARD_WIDTH - 18, vMid],
-      [hMid, clamp(cy - ry - 28 - CARD_HEIGHT, MARGIN, ch - CARD_HEIGHT - MARGIN)],
+      [cw - cardWidth - 18, vMid],
+      [hMid, clamp(cy - ry - 28 - cardHeight, MARGIN, ch - cardHeight - MARGIN)],
     ]
   } else {
     candidates = [
-      [clamp(cx - rx - 42 - CARD_WIDTH, MARGIN, cw - CARD_WIDTH - MARGIN), vMid],
+      [clamp(cx - rx - 42 - cardWidth, MARGIN, cw - cardWidth - MARGIN), vMid],
       [hMid, cy + ry + 28],
       [18, vMid],
-      [hMid, clamp(cy - ry - 28 - CARD_HEIGHT, MARGIN, ch - CARD_HEIGHT - MARGIN)],
+      [hMid, clamp(cy - ry - 28 - cardHeight, MARGIN, ch - cardHeight - MARGIN)],
     ]
   }
 
@@ -60,13 +68,13 @@ function computeGeometry(rect, containerWidth, containerHeight) {
     candidates[0]
   const [cardLeft, cardTop] = pick
 
-  const ccx = cardLeft + CARD_WIDTH / 2
-  const ccy = cardTop + CARD_HEIGHT / 2
+  const ccx = cardLeft + cardWidth / 2
+  const ccy = cardTop + cardHeight / 2
   const angle = Math.atan2(cy - ccy, cx - ccx)
   const cos = Math.cos(angle)
   const sin = Math.sin(angle)
-  const tx = Math.abs(cos) > 1e-3 ? CARD_WIDTH / 2 / Math.abs(cos) : 1e9
-  const ty = Math.abs(sin) > 1e-3 ? CARD_HEIGHT / 2 / Math.abs(sin) : 1e9
+  const tx = Math.abs(cos) > 1e-3 ? cardWidth / 2 / Math.abs(cos) : 1e9
+  const ty = Math.abs(sin) > 1e-3 ? cardHeight / 2 / Math.abs(sin) : 1e9
   const reach = Math.min(tx, ty)
   const sx = ccx + cos * reach + cos * 6
   const sy = ccy + sin * reach + sin * 6
@@ -86,7 +94,7 @@ function computeGeometry(rect, containerWidth, containerHeight) {
   const p2y = ey - headSize * Math.sin(headAngle + 0.5)
   const arrowHead = `${ex.toFixed(1)},${ey.toFixed(1)} ${p1x.toFixed(1)},${p1y.toFixed(1)} ${p2x.toFixed(1)},${p2y.toFixed(1)}`
 
-  return { hasTarget: true, cx, cy, rx, ry, cardLeft, cardTop, arrowPath, arrowHead }
+  return { hasTarget: true, cx, cy, rx, ry, cardWidth, cardLeft, cardTop, arrowPath, arrowHead }
 }
 
 function TutorialOverlay({ step, stepIndex, stepCount, onNext, onPrev, onSkip }) {
@@ -98,17 +106,34 @@ function TutorialOverlay({ step, stepIndex, stepCount, onNext, onPrev, onSkip })
   }, [])
 
   useEffect(() => {
+    function rectFor(shell, shellRect, tourName) {
+      // The same data-tour value can exist on both the desktop sidebar link
+      // and its mobile tab-bar counterpart at once — querySelectorAll and
+      // pick whichever copy is actually visible right now, since the
+      // hidden one (display:none at the current breakpoint) still matches
+      // the selector but collapses to an all-zero rect.
+      const els = shell.querySelectorAll(`[data-tour="${tourName}"]`)
+      for (const el of els) {
+        const r = el.getBoundingClientRect()
+        if (r.width === 0 && r.height === 0) continue
+        return { top: r.top - shellRect.top, left: r.left - shellRect.left, width: r.width, height: r.height }
+      }
+      return null
+    }
+
     function measure() {
       const shell = shellRef.current
       if (!shell) return
       const shellRect = shell.getBoundingClientRect()
       let rect = null
       if (step.target) {
-        const el = shell.querySelector(`[data-tour="${step.target}"]`)
-        if (el) {
-          const r = el.getBoundingClientRect()
-          rect = { top: r.top - shellRect.top, left: r.left - shellRect.left, width: r.width, height: r.height }
-        }
+        // On mobile the sidebar (and every nav-* target it holds) is hidden
+        // in favor of the bottom tab bar, so fall back to whichever of the
+        // step's real target or the tab bar's own copy of it is actually
+        // visible right now, and finally to the tab bar's "More" button for
+        // items tucked inside that sheet on mobile (e.g. every admin nav
+        // item, or "My sections" for students/teachers).
+        rect = rectFor(shell, shellRect, step.target) || rectFor(shell, shellRect, 'mobile-more')
       }
       setBox({ width: shellRect.width, height: shellRect.height, rect })
     }
@@ -148,7 +173,7 @@ function TutorialOverlay({ step, stepIndex, stepCount, onNext, onPrev, onSkip })
           <polygon className="tutorial-arrow-head" points={geo.arrowHead} />
         </svg>
       )}
-      <div className="tutorial-card" style={{ left: geo.cardLeft, top: geo.cardTop }}>
+      <div className="tutorial-card" style={{ left: geo.cardLeft, top: geo.cardTop, width: geo.cardWidth }}>
         <div className="tutorial-card-header">
           <div className="tutorial-icon">✋</div>
           <div className="tutorial-header-text">

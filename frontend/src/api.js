@@ -95,7 +95,13 @@ export async function getValidAccessToken() {
   try {
     return await refreshAccessToken()
   } catch {
-    return token
+    // The stored token is already expired/expiring and refresh just failed
+    // (refresh token itself expired/invalid, network error, etc.) — return
+    // null rather than the known-dead token, so callers treat this as
+    // "not authenticated" instead of attaching a token that's guaranteed to
+    // 401, which otherwise surfaces as a confusing downstream failure
+    // instead of a clean re-login prompt.
+    return null
   }
 }
 

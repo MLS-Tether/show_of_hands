@@ -1,0 +1,158 @@
+.ask-sheet-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .ask-sheet-backdrop {
+    display: block;
+  }
+}
+
+.ask-sheet-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.ask-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--bg);
+  border-top: 1px solid var(--border-strong);
+  border-radius: 20px 20px 0 0;
+  box-shadow: var(--shadow);
+  padding: 10px 18px 26px;
+  transform: translateY(100%);
+  transition: transform 0.25s ease;
+}
+
+.ask-sheet-backdrop.open .ask-sheet {
+  transform: translateY(0);
+}
+
+.ask-sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  margin: 0 auto 14px;
+}
+
+.ask-sheet-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.ask-sheet-close:hover {
+  background: var(--surface-1);
+  color: var(--text-h);
+}
+
+.ask-sheet-header h2 {
+  margin: 0 0 14px;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.ask-sheet-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ask-sheet-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.ask-sheet-field select,
+.ask-sheet-field input {
+  font-size: 13px;
+  color: var(--text-h);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 11px 12px;
+  background: var(--surface-2);
+  font: inherit;
+}
+
+.ask-sheet-chip-row {
+  display: flex;
+  gap: 8px;
+}
+
+.ask-sheet-chip {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  padding: 11px 0;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.ask-sheet-chip.selected {
+  background: var(--text-h);
+  border-color: var(--text-h);
+  color: var(--bg);
+}
+
+.ask-sheet-error {
+  font-size: 12.5px;
+  color: #dc2626;
+  margin: 0;
+}
+
+.ask-sheet-success {
+  font-size: 14px;
+  color: var(--text-h);
+  text-align: center;
+  padding: 24px 0;
+  margin: 0;
+}
+
+.ask-sheet-submit {
+  font-size: 14px;
+  padding: 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ask-sheet-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

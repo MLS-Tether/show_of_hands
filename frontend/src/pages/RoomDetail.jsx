@@ -4,9 +4,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
 import { useDialog } from '../components/DialogContext'
-import { keys, useRoom } from '../queries'
+import { keys, useRoom, useNotificationCountsByEntity } from '../queries'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
 import { wsConnectParams } from '../utils/ws'
+import NotificationCountBadge from '../components/NotificationCountBadge'
 import '../styles/shared-ui.css'
 import './RoomDetail.css'
 
@@ -28,6 +29,7 @@ function RoomDetail() {
   const { roomId } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const notifCounts = useNotificationCountsByEntity()
   const { confirm, alert } = useDialog()
   const currentUserId = Number(localStorage.getItem('user_id'))
 
@@ -261,6 +263,11 @@ function RoomDetail() {
       })
       setConfirmPending(false)
       setConfirmResult(data.points_awarded)
+      forgetRoom(Number(roomId))
+      // Give the requester a moment to read the points-awarded message, then
+      // send them back to their room list — otherwise they're left stranded
+      // on this now-defunct room page with nothing left to do.
+      setTimeout(() => navigate('/study-rooms'), 1500)
     } catch (err) {
       await alert(err.response?.data?.message || 'Could not confirm the session.')
     }
@@ -276,9 +283,15 @@ function RoomDetail() {
 
   const awaitingConfirmation = confirmPending || confirmResult != null
 
-  // Deleting the room removes it server-side, so the next refetch 404s and
-  // `room` goes null — but the requester still needs to see this prompt.
-  if (!room && awaitingConfirmation) {
+  // A close/kick/leave can flip the room to closed (or delete it outright)
+  // server-side while the requester is still looking at the live page — the
+  // `session_confirmation_required` push sets confirmPending immediately, so
+  // switch to this standalone prompt right away instead of leaving them
+  // staring at now-stale chat/video/member controls until the next 20s poll
+  // or a manual reload catches up. Checked ahead of the `!room` case too,
+  // since deleting the room (rather than closing it) nulls `room` out on the
+  // next failed refetch, but the requester still needs to see this prompt.
+  if (awaitingConfirmation) {
     return (
       <section className="room-detail">
         <h1 className="admin-page-h1">Study room</h1>
@@ -306,7 +319,7 @@ function RoomDetail() {
     )
   }
 
-  if (loadFailed && !awaitingConfirmation) {
+  if (loadFailed) {
     return (
       <section className="room-detail">
         <p className="admin-empty-card">Room not found, or you're not a member.</p>
@@ -319,7 +332,13 @@ function RoomDetail() {
 
   return (
     <section className="room-detail">
-      <h1 className="admin-page-h1">Study room #{room.room_id}</h1>
+      <h1 className="admin-page-h1">
+        Study room #{room.room_id}
+        <NotificationCountBadge
+          count={notifCounts[`room:${roomId}`]}
+          className="notification-count-badge-inline"
+        />
+      </h1>
       <div className="room-detail-meta">
         <span className={`admin-status-badge ${STATUS_BADGE_CLASS[room.status] || ''}`}>
           {room.status}
@@ -408,6 +427,11 @@ function RoomDetail() {
             className="room-detail-video"
             style={{ display: videoJoined || videoLoading ? 'block' : 'none' }}
           />
+          {videoJoined && (
+            <p className="room-detail-video-hint">
+              Drag the bottom-right corner to resize the video window — handy when someone's sharing their screen.
+            </p>
+          )}
         </>
       )}
 

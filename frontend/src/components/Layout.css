@@ -24,3 +24,12 @@
   max-width: 900px;
   margin: 0 auto;
 }
+
+@media (max-width: 768px) {
+  .admin-content {
+    /* Bottom padding clears both the fixed MobileNav tab bar and the
+       floating AskButton sitting above it, so page content never sits
+       underneath either. */
+    padding: 18px 16px 140px;
+  }
+}

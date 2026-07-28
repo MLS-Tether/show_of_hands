@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
-import { keys, useHelpRequestsBoard } from '../../queries'
+import { keys, useHelpRequestsBoard, useNotificationCountsByEntity } from '../../queries'
 import { useDialog } from '../DialogContext'
 import { getMyHelpRequestIds, rememberRoom } from '../../utils/roomTracking'
+import NotificationCountBadge from '../NotificationCountBadge'
 import './HelpRequestsSummary.css'
 
 function HelpRequestsSummary() {
@@ -12,6 +13,7 @@ function HelpRequestsSummary() {
   const queryClient = useQueryClient()
   const { alert } = useDialog()
   const [joiningId, setJoiningId] = useState(null)
+  const notifCounts = useNotificationCountsByEntity()
 
   const { data: rawRequests = null } = useHelpRequestsBoard()
   const requests = rawRequests === null ? null : rawRequests.filter((h) => h.status === 'open')
@@ -52,6 +54,7 @@ function HelpRequestsSummary() {
             const canJoin = !isMine && h.current_size < h.group_size
             return (
               <div className="help-request-card" key={h.help_request_id}>
+                <NotificationCountBadge count={notifCounts[`section:${h.section_id}`]} />
                 <div className="help-request-topic">{h.topic}</div>
                 <div className="help-request-meta">
                   {h.current_size}/{h.group_size} · {h.duration_minutes} min

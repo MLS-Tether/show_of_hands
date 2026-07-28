@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api, { mediaUrl } from '../api'
 import CharacterAvatar from '../components/CharacterAvatar'
 import Modal from '../components/Modal'
+import { useDialog } from '../components/DialogContext'
 import { useToast } from '../components/ToastContext'
 import { keys, useInventory, useSchool, useUser } from '../queries'
 import { getUserId } from '../utils/auth'
@@ -160,6 +162,8 @@ function CustomizeModal({ inventory, userId, onClose }) {
 
 function Profile() {
   const { showToast } = useToast()
+  const { confirm } = useDialog()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const userId = getUserId()
   const [editing, setEditing] = useState(false)
@@ -168,6 +172,7 @@ function Profile() {
   const [uploadingPicture, setUploadingPicture] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showCustomizeModal, setShowCustomizeModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const fileInputRef = useRef(null)
 
   const { data: user = null, isError: failed } = useUser(userId)
@@ -198,6 +203,48 @@ function Profile() {
       showToast(err.response?.data?.message || 'Could not update profile.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleResetPasswordClick() {
+    const ok = await confirm(
+      user.role === 'student'
+        ? "Are you sure you want to request a password reset? Your school admin will be notified."
+        : 'Are you sure you want to reset your password?'
+    )
+    if (!ok) return
+
+    if (user.role === 'student') {
+      try {
+        await api.post('/users/me/request-password-reset')
+        showToast('Your admin has been notified.')
+      } catch (err) {
+        showToast(err.response?.data?.message || 'Could not send request.')
+      }
+    } else {
+      setShowPasswordModal(true)
+    }
+  }
+
+  async function handleDeleteAccountClick() {
+    const ok1 = await confirm('Are you sure you want to delete your account?')
+    if (!ok1) return
+    const ok2 = await confirm(
+      'This cannot be undone. Are you really sure you want to permanently delete your account?'
+    )
+    if (!ok2) return
+
+    setDeleting(true)
+    try {
+      await api.delete('/users/me')
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user_id')
+      localStorage.removeItem('role')
+      navigate('/auth')
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Could not delete account.')
+      setDeleting(false)
     }
   }
 
@@ -399,6 +446,17 @@ function Profile() {
                   </button>
                   <button type="button" className="admin-btn-text" onClick={() => setEditing(false)}>
                     Cancel
+                  </button>
+                  <button type="button" className="admin-btn-danger" onClick={handleResetPasswordClick}>
+                    Reset password
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn-danger"
+                    disabled={deleting}
+                    onClick={handleDeleteAccountClick}
+                  >
+                    {deleting ? 'Deleting…' : 'Delete account'}
                   </button>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -14,9 +15,11 @@ from models.enrollment_model import Enrollment
 from models.notification_model import Notification, NotificationTypeEnum
 from models.section_model import Section
 from models.user_model import User
+from notifications import notify
 from schemas.notification import NotificationResponse, NotificationReadResponse
 
 router = APIRouter(tags=["notifications"])
+logger = logging.getLogger(__name__)
 
 # In-memory registry — never persisted to DB.
 # Structure: { user_id: [WebSocket, ...] } — a list since a user may have
@@ -95,12 +98,14 @@ def notify_section(
         Enrollment.is_archived == False,
     ).all()
 
-    for e in enrolled:
-        db.add(Notification(
-            user_id=e.student_id,
-            type=NotificationTypeEnum.section_status,
-            message=body.message,
-        ))
+    notify(
+        db,
+        [e.student_id for e in enrolled],
+        NotificationTypeEnum.section_status,
+        body.message,
+        entity_type="section",
+        entity_id=section_id,
+    )
 
     db.commit()
     return {"message": f"Notification sent to {len(enrolled)} student(s)."}
@@ -112,7 +117,15 @@ async def notifications_stream(websocket: WebSocket):
         token = ws_token_from_subprotocol(websocket)
         payload = decode_token(token)
         user_id: int = payload["user_id"]
+    except (ValueError, HTTPException):
+        # Expected/benign: no token, or an expired/invalid one.
+        await websocket.close(code=4001)
+        return
     except Exception:
+        # Anything else (e.g. a malformed payload missing "user_id") is a
+        # real bug, not just a stale token — log it so it doesn't disappear
+        # into the same silent close as the expected case above.
+        logger.exception("Unexpected error during notifications WS auth")
         await websocket.close(code=4001)
         return
 
@@ -176,6 +189,8 @@ async def deliver_notifications():
                 "type": notification.type.value,
                 "message": notification.message,
                 "is_read": notification.is_read,
+                "entity_type": notification.entity_type,
+                "entity_id": notification.entity_id,
                 "created_at": notification.created_at.isoformat(),
             },
         }
@@ -185,9 +200,16 @@ async def deliver_notifications():
             try:
                 await ws.send_json(message)
             except Exception:
+                # Expected if that client already disconnected.
+                logger.debug("Failed to deliver notification to user %s", user_id, exc_info=True)
                 dead_connections.append(ws)
         for ws in dead_connections:
-            connections.remove(ws)
+            # This same connection can already have been removed by the
+            # socket's own disconnect handler while the send above was
+            # in flight — an unguarded .remove() would raise ValueError and
+            # kill this whole delivery loop for the rest of the process.
+            if ws in connections:
+                connections.remove(ws)
 
 
 async def route_data_event(data: dict, registry: dict):
@@ -195,7 +217,21 @@ async def route_data_event(data: dict, registry: dict):
     Separated from the queue loop so tests can call it directly."""
     message = {"type": "data_event", "event": data}
     if data.get("broadcast_school"):
-        target_ids = list(registry.keys())
+        # A large-audience event only carries school_id, not individual
+        # user_ids (see BROADCAST_AUDIENCE_THRESHOLD in db/data_events.py) —
+        # resolve which connected users actually belong to that school so
+        # this doesn't fan out to every tenant on the server.
+        school_id = data.get("school_id")
+        db = SessionLocal()
+        try:
+            rows = db.query(User.user_id).filter(
+                User.school_id == school_id,
+                User.is_archived == False,
+            ).all()
+        finally:
+            db.close()
+        school_user_ids = {r[0] for r in rows}
+        target_ids = [uid for uid in registry.keys() if uid in school_user_ids]
     else:
         target_ids = data.get("user_ids") or []
 
@@ -208,9 +244,12 @@ async def route_data_event(data: dict, registry: dict):
             try:
                 await ws.send_json(message)
             except Exception:
+                # Expected if that client already disconnected.
+                logger.debug("Failed to deliver data event to user %s", user_id, exc_info=True)
                 dead_connections.append(ws)
         for ws in dead_connections:
-            connections.remove(ws)
+            if ws in connections:
+                connections.remove(ws)
 
 
 async def deliver_data_events():
