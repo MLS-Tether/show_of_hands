@@ -244,6 +244,11 @@ def finalize_submission(
     if original_txn:
         student.total_points -= original_txn.amount
         db.delete(original_txn)
+        # Without an explicit flush here, the unit of work would insert the
+        # replacement PointTransaction below before this delete, tripping
+        # uq_point_transaction_user_source since both rows share the same
+        # (user_id, source, source_id).
+        db.flush()
 
     if new_total > 0:
         db.add(PointTransaction(

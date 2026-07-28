@@ -16,6 +16,7 @@ export const keys = {
   sectionHelpRequests: (sectionId) => ['section', sectionId, 'help-requests'],
   sectionAnalytics: (sectionId) => ['section', sectionId, 'analytics'],
   sectionEnrollmentRequests: (sectionId) => ['section', sectionId, 'enrollment-requests'],
+  sectionUnenrollRequests: (sectionId) => ['section', sectionId, 'unenroll-requests'],
   sectionGrades: (sectionId, who = 'me') => ['section', sectionId, 'grades', who],
   assignments: () => ['assignments'],
   assignment: (assignmentId) => ['assignment', assignmentId],
@@ -31,6 +32,7 @@ export const keys = {
   user: (userId) => ['user', userId],
   userGrades: (userId) => ['user', userId, 'grades'],
   classRequests: () => ['class-requests'],
+  unenrollRequests: () => ['unenroll-requests'],
   classes: () => ['classes'],
   room: (roomId) => ['room', roomId],
 }
@@ -107,6 +109,15 @@ export function useSectionEnrollmentRequests(sectionId, options = {}) {
   return useQuery({
     queryKey: keys.sectionEnrollmentRequests(sectionId),
     queryFn: () => unwrap(api.get(`/sections/${sectionId}/enrollment-requests`)),
+    enabled: !!sectionId,
+    ...options,
+  })
+}
+
+export function useSectionUnenrollRequests(sectionId, options = {}) {
+  return useQuery({
+    queryKey: keys.sectionUnenrollRequests(sectionId),
+    queryFn: () => unwrap(api.get(`/sections/${sectionId}/unenroll-requests`)),
     enabled: !!sectionId,
     ...options,
   })
@@ -276,6 +287,14 @@ export function useClassRequests(options = {}) {
   return useQuery({
     queryKey: keys.classRequests(),
     queryFn: () => unwrap(api.get('/class-requests')),
+    ...options,
+  })
+}
+
+export function useUnenrollRequests(options = {}) {
+  return useQuery({
+    queryKey: keys.unenrollRequests(),
+    queryFn: () => unwrap(api.get('/unenroll-requests')),
     ...options,
   })
 }

@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
 import { useDialog } from '../../components/DialogContext'
 import { useToast } from '../../components/ToastContext'
-import { keys, useClassRequests, useUsers } from '../../queries'
+import { keys, useClassRequests, useUnenrollRequests, useUsers } from '../../queries'
 import '../../styles/shared-ui.css'
 import './AdminInbox.css'
 
@@ -13,12 +13,14 @@ const FILTERS = [
   { key: 'teacher', label: 'Teachers' },
   { key: 'admin', label: 'Admins' },
   { key: 'class', label: 'Class requests' },
+  { key: 'unenroll', label: 'Unenroll requests' },
 ]
 
 const KIND_BADGE = {
   teacher: { label: 'Teacher signup', className: 'kind-teacher' },
   admin: { label: 'Admin signup', className: 'kind-admin' },
   class: { label: 'Class request', className: 'kind-class' },
+  unenroll: { label: 'Unenroll request', className: 'kind-unenroll' },
 }
 
 function formatDate(dateStr) {
@@ -43,9 +45,10 @@ function AdminInbox() {
 
   const { data: rawUsers = null } = useUsers()
   const { data: rawClassRequests = null } = useClassRequests()
+  const { data: rawUnenrollRequests = null } = useUnenrollRequests()
 
   const items = useMemo(() => {
-    if (rawUsers === null || rawClassRequests === null) return null
+    if (rawUsers === null || rawClassRequests === null || rawUnenrollRequests === null) return null
     const usersById = new Map(rawUsers.map((u) => [u.user_id, u.username]))
 
     const signupItems = rawUsers
@@ -75,8 +78,21 @@ function AdminInbox() {
         similarClasses: r.similar_classes || [],
       }))
 
-    return [...signupItems, ...classItems]
-  }, [rawUsers, rawClassRequests])
+    const unenrollItems = rawUnenrollRequests
+      .filter((r) => r.status === 'pending')
+      .map((r) => ({
+        id: `unenroll-${r.unenroll_request_id}`,
+        entityId: r.unenroll_request_id,
+        kind: 'unenroll',
+        title: r.student_username,
+        createdAt: r.created_at,
+        requestedBy: r.requester_username,
+        reason: r.reason,
+        sectionId: r.section_id,
+      }))
+
+    return [...signupItems, ...classItems, ...unenrollItems]
+  }, [rawUsers, rawClassRequests, rawUnenrollRequests])
 
   const counts = useMemo(() => {
     const list = items || []
@@ -85,6 +101,7 @@ function AdminInbox() {
       teacher: list.filter((i) => i.kind === 'teacher').length,
       admin: list.filter((i) => i.kind === 'admin').length,
       class: list.filter((i) => i.kind === 'class').length,
+      unenroll: list.filter((i) => i.kind === 'unenroll').length,
     }
   }, [items])
 
@@ -107,6 +124,12 @@ function AdminInbox() {
   function patchClassRequest(classRequestId, patch) {
     queryClient.setQueryData(keys.classRequests(), (prev) =>
       (prev || []).map((r) => (r.class_request_id === classRequestId ? { ...r, ...patch } : r))
+    )
+  }
+
+  function patchUnenrollRequest(unenrollRequestId, patch) {
+    queryClient.setQueryData(keys.unenrollRequests(), (prev) =>
+      (prev || []).map((r) => (r.unenroll_request_id === unenrollRequestId ? { ...r, ...patch } : r))
     )
   }
 
@@ -184,6 +207,38 @@ function AdminInbox() {
     }
   }
 
+  async function approveUnenrollRequest(item) {
+    const ok = await confirm(`Remove ${item.title} from this section?`)
+    if (!ok) return
+    setBusy(true)
+    try {
+      await api.patch(`/unenroll-requests/${item.entityId}`, { status: 'approved' })
+      patchUnenrollRequest(item.entityId, { status: 'approved' })
+      dismissItems([item.id])
+      showToast(`Removed ${item.title} from the section`)
+    } catch {
+      showToast(`Couldn't approve this request`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function declineUnenrollRequest(item) {
+    const ok = await confirm(`Decline the request to remove ${item.title}?`)
+    if (!ok) return
+    setBusy(true)
+    try {
+      await api.patch(`/unenroll-requests/${item.entityId}`, { status: 'rejected' })
+      patchUnenrollRequest(item.entityId, { status: 'rejected' })
+      dismissItems([item.id])
+      showToast(`Declined the request`)
+    } catch {
+      showToast(`Couldn't decline this request`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function bulkApprove() {
     const targets = (items || []).filter((i) => selected.includes(i.id))
     if (targets.length === 0) return
@@ -202,15 +257,19 @@ function AdminInbox() {
         targets.map((item) =>
           item.kind === 'class'
             ? api.patch(`/class-requests/${item.entityId}`, { status: 'approved' })
-            : api.patch(`/users/${item.entityId}/verify`, {
-                confirm_role: item.kind === 'admin' ? 'admin' : undefined,
-              })
+            : item.kind === 'unenroll'
+              ? api.patch(`/unenroll-requests/${item.entityId}`, { status: 'approved' })
+              : api.patch(`/users/${item.entityId}/verify`, {
+                  confirm_role: item.kind === 'admin' ? 'admin' : undefined,
+                })
         )
       )
       targets.forEach((item) =>
         item.kind === 'class'
           ? patchClassRequest(item.entityId, { status: 'approved' })
-          : patchUser(item.entityId, { is_verified: true })
+          : item.kind === 'unenroll'
+            ? patchUnenrollRequest(item.entityId, { status: 'approved' })
+            : patchUser(item.entityId, { is_verified: true })
       )
       dismissItems(targets.map((i) => i.id))
       showToast(`${targets.length} item${targets.length === 1 ? '' : 's'} approved`)
@@ -218,6 +277,7 @@ function AdminInbox() {
       showToast('Some items could not be approved')
       queryClient.invalidateQueries({ queryKey: ['users'] })
       queryClient.invalidateQueries({ queryKey: keys.classRequests() })
+      queryClient.invalidateQueries({ queryKey: keys.unenrollRequests() })
     } finally {
       setBusy(false)
     }
@@ -234,13 +294,17 @@ function AdminInbox() {
         targets.map((item) =>
           item.kind === 'class'
             ? api.patch(`/class-requests/${item.entityId}`, { status: 'rejected' })
-            : api.patch(`/users/${item.entityId}/reject`, {})
+            : item.kind === 'unenroll'
+              ? api.patch(`/unenroll-requests/${item.entityId}`, { status: 'rejected' })
+              : api.patch(`/users/${item.entityId}/reject`, {})
         )
       )
       targets.forEach((item) =>
         item.kind === 'class'
           ? patchClassRequest(item.entityId, { status: 'rejected' })
-          : patchUser(item.entityId, { rejection_reason: 'Rejected by admin' })
+          : item.kind === 'unenroll'
+            ? patchUnenrollRequest(item.entityId, { status: 'rejected' })
+            : patchUser(item.entityId, { rejection_reason: 'Rejected by admin' })
       )
       dismissItems(targets.map((i) => i.id))
       showToast(`${targets.length} item${targets.length === 1 ? '' : 's'} rejected`)
@@ -248,6 +312,7 @@ function AdminInbox() {
       showToast('Some items could not be rejected')
       queryClient.invalidateQueries({ queryKey: ['users'] })
       queryClient.invalidateQueries({ queryKey: keys.classRequests() })
+      queryClient.invalidateQueries({ queryKey: keys.unenrollRequests() })
     } finally {
       setBusy(false)
     }
@@ -326,7 +391,7 @@ function AdminInbox() {
                     <span className="admin-inbox-title">{item.title}</span>
                   </div>
                   <div className="admin-inbox-subtitle">
-                    {item.kind === 'class'
+                    {item.kind === 'class' || item.kind === 'unenroll'
                       ? `Requested by ${item.requestedBy}`
                       : `Requested role: ${item.role}`}
                   </div>
@@ -386,6 +451,39 @@ function AdminInbox() {
                           className="admin-btn-secondary"
                           disabled={busy}
                           onClick={() => declineClassRequest(item)}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </>
+                  ) : item.kind === 'unenroll' ? (
+                    <>
+                      <div className="admin-detail-row">
+                        <span className="admin-detail-label">Requesting teacher</span>
+                        <span>{item.requestedBy}</span>
+                      </div>
+                      <div className="admin-detail-row">
+                        <span className="admin-detail-label">Reason</span>
+                        <span>{item.reason}</span>
+                      </div>
+                      <div className="admin-detail-row">
+                        <span className="admin-detail-label">Submitted</span>
+                        <span>{formatDate(item.createdAt)}</span>
+                      </div>
+                      <div className="admin-inbox-actions">
+                        <button
+                          type="button"
+                          className="admin-btn-primary"
+                          disabled={busy}
+                          onClick={() => approveUnenrollRequest(item)}
+                        >
+                          Remove student
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-btn-secondary"
+                          disabled={busy}
+                          onClick={() => declineUnenrollRequest(item)}
                         >
                           Decline
                         </button>
