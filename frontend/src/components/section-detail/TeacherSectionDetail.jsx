@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
@@ -121,24 +121,30 @@ function TeacherSectionDetail() {
   const sectionNotifCount = notifCounts[`section:${sectionId}`] || 0
   const isArchived = section?.status === 'archived'
 
+  // An admin can archive this section while the teacher has a mutating panel
+  // (accept/reject requests, create assignments/quests) open — the realtime
+  // `sections` event refetches `section` in the background, but nothing else
+  // reacted to that change. Kick back to the read-only grid immediately
+  // instead of leaving those forms live against an archived section.
+  //
+  // Adjusted during render (React's documented pattern for resetting state
+  // in response to a prop change) rather than in an effect, since setting
+  // state directly inside an effect body causes an extra cascading render.
+  const [prevIsArchived, setPrevIsArchived] = useState(isArchived)
+  if (isArchived !== prevIsArchived) {
+    setPrevIsArchived(isArchived)
+    if (isArchived && MUTATING_CARD_KEYS.includes(activeCard)) {
+      setActiveCard(null)
+      setEditing(false)
+    }
+  }
+
   function handleBack() {
     if (viewingStudent) setViewingStudent(null)
     else setActiveCard(null)
   }
 
   useEscapeBack(handleBack, Boolean(activeCard))
-
-  // An admin can archive this section while the teacher has a mutating panel
-  // (accept/reject requests, create assignments/quests) open — the realtime
-  // `sections` event refetches `section` in the background, but nothing else
-  // reacted to that change. Kick back to the read-only grid immediately
-  // instead of leaving those forms live against an archived section.
-  useEffect(() => {
-    if (isArchived && MUTATING_CARD_KEYS.includes(activeCard)) {
-      setActiveCard(null)
-      setEditing(false)
-    }
-  }, [isArchived, activeCard])
 
   const loading = section === null && !notFound
 
