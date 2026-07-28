@@ -36,6 +36,7 @@ export const keys = {
   unenrollRequests: () => ['unenroll-requests'],
   classes: () => ['classes'],
   room: (roomId) => ['room', roomId],
+  shopItems: (itemType) => ['shop-items', itemType ?? 'all'],
 }
 
 function unwrap(promise) {
@@ -315,6 +316,14 @@ export function useClasses(options = {}) {
     queryFn: () => unwrap(api.get('/classes')),
     staleTime: 60 * 60 * 1000,
     refetchInterval: false,
+    ...options,
+  })
+}
+
+export function useShopItems(itemType, options = {}) {
+  return useQuery({
+    queryKey: keys.shopItems(itemType),
+    queryFn: () => unwrap(api.get('/shop/items', { params: itemType ? { item_type: itemType } : {} })),
     ...options,
   })
 }

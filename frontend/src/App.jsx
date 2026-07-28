@@ -10,6 +10,7 @@ import BulletinBoard from './pages/BulletinBoard'
 import StudyRooms from './pages/StudyRooms'
 import RoomDetail from './pages/RoomDetail'
 import Points from './pages/Points'
+import Shop from './pages/Shop'
 import Profile from './pages/Profile'
 import Auth from './pages/Auth'
 import AdminOverview from './pages/admin/AdminOverview'
@@ -56,6 +57,7 @@ function App() {
         <Route path="/study-rooms" element={<StudyRooms />} />
         <Route path="/rooms/:roomId" element={<RoomDetail />} />
         <Route path="/points" element={<Points />} />
+        <Route path="/shop" element={<Shop />} />
         <Route path="/profile" element={<Profile />} />
         <Route element={<RequireAdmin />}>
           <Route path="/admin/overview" element={<AdminOverview />} />
