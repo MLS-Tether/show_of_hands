@@ -10,6 +10,10 @@ export function isAdmin() {
   return getRole() === 'admin'
 }
 
+export function isStudent() {
+  return getRole() === 'student'
+}
+
 export function getUserId() {
   return Number(localStorage.getItem('user_id'))
 }
