@@ -65,6 +65,9 @@ export function invalidateForEvent(queryClient, event) {
       queryClient.invalidateQueries({ queryKey: ['points'] })
       queryClient.invalidateQueries({ queryKey: keys.schoolPoints() })
       break
+    case 'inventory':
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      break
     case 'users':
       queryClient.invalidateQueries({ queryKey: ['users'] })
       if (ids.user_id) queryClient.invalidateQueries({ queryKey: ['user', ids.user_id] })

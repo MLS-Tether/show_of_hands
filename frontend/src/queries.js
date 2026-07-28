@@ -37,6 +37,7 @@ export const keys = {
   classes: () => ['classes'],
   room: (roomId) => ['room', roomId],
   shopItems: (itemType) => ['shop-items', itemType ?? 'all'],
+  inventory: (userId) => ['inventory', userId],
 }
 
 function unwrap(promise) {
@@ -324,6 +325,15 @@ export function useShopItems(itemType, options = {}) {
   return useQuery({
     queryKey: keys.shopItems(itemType),
     queryFn: () => unwrap(api.get('/shop/items', { params: itemType ? { item_type: itemType } : {} })),
+    ...options,
+  })
+}
+
+export function useInventory(userId, options = {}) {
+  return useQuery({
+    queryKey: keys.inventory(userId),
+    queryFn: () => unwrap(api.get(`/users/${userId}/inventory`)),
+    enabled: !!userId,
     ...options,
   })
 }

@@ -2,16 +2,24 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api, { mediaUrl } from '../api'
+import CharacterAvatar from '../components/CharacterAvatar'
 import Modal from '../components/Modal'
 import { useDialog } from '../components/DialogContext'
 import { useToast } from '../components/ToastContext'
-import { keys, useSchool, useUser } from '../queries'
+import { keys, useInventory, useSchool, useUser } from '../queries'
 import { getUserId } from '../utils/auth'
 import { initials } from '../utils/format'
 import '../styles/shared-ui.css'
 import './Profile.css'
 
 const ALLOWED_PICTURE_TYPES = ['image/jpeg', 'image/png']
+
+const CUSTOMIZE_GROUPS = [
+  { key: 'avatar_base', label: 'Avatar' },
+  { key: 'avatar_accessory', label: 'Accessory' },
+  { key: 'badge', label: 'Badges' },
+  { key: 'theme', label: 'Theme' },
+]
 
 function formatDate(dateStr) {
   return new Intl.DateTimeFormat('en-US', {
@@ -100,6 +108,58 @@ function ChangePasswordModal({ onClose, onSuccess }) {
   )
 }
 
+function CustomizeModal({ inventory, userId, onClose }) {
+  const queryClient = useQueryClient()
+  const { showToast } = useToast()
+  const [pendingId, setPendingId] = useState(null)
+
+  async function handleToggle(row) {
+    setPendingId(row.inventory_id)
+    try {
+      await api.patch(`/inventory/${row.inventory_id}/equip`, { equipped: !row.is_equipped })
+      queryClient.invalidateQueries({ queryKey: keys.inventory(userId) })
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Could not update equipped items.')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  const groupsWithItems = CUSTOMIZE_GROUPS.map((group) => ({
+    ...group,
+    rows: inventory.filter((row) => row.item.item_type === group.key),
+  })).filter((group) => group.rows.length > 0)
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="admin-settings-card-title">Customize character</div>
+      {groupsWithItems.length === 0 && (
+        <p className="admin-empty-card">No items owned yet — visit the shop!</p>
+      )}
+      {groupsWithItems.map((group) => (
+        <div className="customize-group" key={group.key}>
+          <div className="widget-label">{group.label}</div>
+          <div className="customize-group-items">
+            {group.rows.map((row) => (
+              <button
+                type="button"
+                key={row.inventory_id}
+                className={`customize-item${row.is_equipped ? ' equipped' : ''}`}
+                disabled={pendingId === row.inventory_id}
+                onClick={() => handleToggle(row)}
+              >
+                <img src={row.item.image_url} alt="" />
+                <span>{row.item.name}</span>
+                {row.is_equipped && <span className="customize-item-badge">Equipped</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </Modal>
+  )
+}
+
 function Profile() {
   const { showToast } = useToast()
   const { confirm } = useDialog()
@@ -111,11 +171,19 @@ function Profile() {
   const [saving, setSaving] = useState(false)
   const [uploadingPicture, setUploadingPicture] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [showCustomizeModal, setShowCustomizeModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const fileInputRef = useRef(null)
 
   const { data: user = null, isError: failed } = useUser(userId)
   const { data: school = null } = useSchool()
+  const { data: inventory = [] } = useInventory(userId, { enabled: user?.role === 'student' })
+
+  const equippedAvatarBase = inventory.find((row) => row.item.item_type === 'avatar_base' && row.is_equipped)?.item
+  const equippedAccessory = inventory.find((row) => row.item.item_type === 'avatar_accessory' && row.is_equipped)?.item
+  const equippedBadges = inventory
+    .filter((row) => row.item.item_type === 'badge' && row.is_equipped)
+    .map((row) => row.item)
 
   function startEditing() {
     setForm({ username: user.username })
@@ -247,6 +315,28 @@ function Profile() {
       <h1 className="admin-page-h1">My profile</h1>
 
       <div className="profile-sections">
+        {user.role === 'student' && (
+          <div>
+            <div className="profile-section-label-row">
+              <div className="widget-label">my character</div>
+              <button
+                type="button"
+                className="admin-btn-text"
+                onClick={() => setShowCustomizeModal(true)}
+              >
+                Customize
+              </button>
+            </div>
+            <div className="profile-card profile-character-card">
+              <CharacterAvatar
+                avatarBase={equippedAvatarBase}
+                avatarAccessory={equippedAccessory}
+                badges={equippedBadges}
+              />
+            </div>
+          </div>
+        )}
+
         <div>
           <div className="widget-label">profile picture</div>
           <div className="profile-card profile-picture-card">
@@ -400,6 +490,14 @@ function Profile() {
             setShowPasswordModal(false)
             showToast('Password changed')
           }}
+        />
+      )}
+
+      {showCustomizeModal && (
+        <CustomizeModal
+          inventory={inventory}
+          userId={userId}
+          onClose={() => setShowCustomizeModal(false)}
         />
       )}
     </section>
