@@ -12,6 +12,7 @@ export const keys = {
   section: (sectionId) => ['section', sectionId],
   sectionQuests: (sectionId) => ['section', sectionId, 'quests'],
   quests: (sectionIds) => ['quests', [...sectionIds].sort((a, b) => a - b)],
+  questCompletions: (questId) => ['quest', questId, 'completions'],
   sectionResources: (sectionId) => ['section', sectionId, 'resources'],
   sectionHelpRequests: (sectionId) => ['section', sectionId, 'help-requests'],
   sectionAnalytics: (sectionId) => ['section', sectionId, 'analytics'],
@@ -74,6 +75,15 @@ export function useQuestsForSections(sectionIds, options = {}) {
     queryKey: keys.quests(ids),
     queryFn: () => unwrap(api.get('/quests', { params: { section_ids: ids } })),
     enabled: ids.length > 0,
+    ...options,
+  })
+}
+
+export function useQuestCompletions(questId, options = {}) {
+  return useQuery({
+    queryKey: keys.questCompletions(questId),
+    queryFn: () => unwrap(api.get(`/quests/${questId}/completions`)),
+    enabled: !!questId,
     ...options,
   })
 }

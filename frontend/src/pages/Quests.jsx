@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
@@ -18,6 +18,76 @@ const QUEST_TYPE_LABELS = {
   monthly: 'Monthly',
 }
 
+const ALLOWED_SUBMISSION_FILE_TYPES = ['image/jpeg', 'application/pdf']
+const DESCRIPTION_MAX_LENGTH = 280
+
+function QuestCompletionForm({ quest, onCancel, onSubmit, submitting }) {
+  const { alert } = useDialog()
+  const [description, setDescription] = useState('')
+  const [file, setFile] = useState(null)
+  const fileInputRef = useRef(null)
+
+  function handleFileSelected(e) {
+    const selected = e.target.files?.[0]
+    e.target.value = ''
+    if (!selected) return
+
+    // A fast client-side check for a quicker error — the backend re-validates
+    // the actual file bytes regardless, since a content-type/extension is
+    // trivial to spoof.
+    if (!ALLOWED_SUBMISSION_FILE_TYPES.includes(selected.type)) {
+      alert('Only JPEG images and PDFs are allowed.')
+      return
+    }
+    setFile(selected)
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    await onSubmit(quest, { description, file })
+  }
+
+  return (
+    <form className="quest-completion-form" onSubmit={handleSubmit}>
+      <label>
+        What did you do? (optional, keep it short)
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          maxLength={DESCRIPTION_MAX_LENGTH}
+          rows={2}
+          placeholder="e.g. Read chapter 4 and took notes"
+        />
+      </label>
+      <div className="quest-completion-form-file">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,application/pdf"
+          className="quest-completion-file-input"
+          onChange={handleFileSelected}
+        />
+        <button type="button" className="admin-btn-secondary" onClick={() => fileInputRef.current?.click()}>
+          {file ? file.name : 'Attach photo or PDF (optional)'}
+        </button>
+        {file && (
+          <button type="button" className="admin-btn-text" onClick={() => setFile(null)}>
+            Remove
+          </button>
+        )}
+      </div>
+      <div className="quest-completion-form-actions">
+        <button type="button" className="admin-btn-secondary" onClick={onCancel} disabled={submitting}>
+          Cancel
+        </button>
+        <button type="submit" className="admin-btn-secondary" disabled={submitting}>
+          {submitting ? 'Completing…' : 'Complete quest'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
 function Quests() {
   const { alert } = useDialog()
   const queryClient = useQueryClient()
@@ -26,6 +96,7 @@ function Quests() {
   const { data: sections = null } = useSections()
   const [category, setCategory] = useState('all')
   const [completingId, setCompletingId] = useState(null)
+  const [openFormId, setOpenFormId] = useState(null)
 
   const highlightId = location.hash.startsWith('#quest-')
     ? location.hash.slice('#quest-'.length)
@@ -54,16 +125,20 @@ function Quests() {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [quests, highlightId])
 
-  async function handleComplete(quest) {
+  async function handleComplete(quest, { description, file } = {}) {
     setCompletingId(quest.quest_id)
     try {
-      await api.post(`/quests/${quest.quest_id}/complete`)
+      const body = new FormData()
+      if (description?.trim()) body.append('description', description.trim())
+      if (file) body.append('file', file)
+      await api.post(`/quests/${quest.quest_id}/complete`, body)
       queryClient.setQueryData(keys.quests(sectionIds), (prev) =>
         (prev || []).map((q) => (q.quest_id === quest.quest_id ? { ...q, completed: true } : q))
       )
       queryClient.invalidateQueries({ queryKey: ['points'] })
+      setOpenFormId(null)
     } catch (err) {
-      await alert(err.response?.data?.message || 'Could not complete this quest.')
+      await alert(err.response?.data?.detail || 'Could not complete this quest.')
     } finally {
       setCompletingId(null)
     }
@@ -133,15 +208,22 @@ function Quests() {
               {q.completed === true && (
                 <span className="quest-card-status quest-card-status-done">Completed</span>
               )}
-              {q.completed === false && (
+              {q.completed === false && openFormId !== q.quest_id && (
                 <button
                   type="button"
                   className="admin-btn-secondary quest-card-complete"
-                  disabled={completingId === q.quest_id}
-                  onClick={() => handleComplete(q)}
+                  onClick={() => setOpenFormId(q.quest_id)}
                 >
-                  {completingId === q.quest_id ? 'Completing…' : 'Mark complete'}
+                  Complete quest
                 </button>
+              )}
+              {q.completed === false && openFormId === q.quest_id && (
+                <QuestCompletionForm
+                  quest={q}
+                  onCancel={() => setOpenFormId(null)}
+                  onSubmit={handleComplete}
+                  submitting={completingId === q.quest_id}
+                />
               )}
             </div>
           ))}
