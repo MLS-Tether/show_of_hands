@@ -41,3 +41,26 @@
   width: 32px;
   height: 32px;
 }
+
+.character-avatar-sm {
+  flex-direction: row;
+  gap: 6px;
+}
+
+.character-avatar-sm .character-avatar-stage {
+  width: 32px;
+  height: 32px;
+}
+
+.character-avatar-sm .character-avatar-placeholder {
+  font-size: 14px;
+}
+
+.character-avatar-sm .character-avatar-badges {
+  gap: 2px;
+}
+
+.character-avatar-sm .character-avatar-badge {
+  width: 16px;
+  height: 16px;
+}

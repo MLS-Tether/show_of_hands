@@ -1,8 +1,10 @@
 import './CharacterAvatar.css'
 
-function CharacterAvatar({ avatarBase, avatarAccessory, badges = [] }) {
+function CharacterAvatar({ avatarBase, avatarAccessory, badges = [], size }) {
+  const rootClassName = size === 'sm' ? 'character-avatar character-avatar-sm' : 'character-avatar'
+
   return (
-    <div className="character-avatar">
+    <div className={rootClassName}>
       <div className="character-avatar-stage">
         {avatarBase ? (
           <img
