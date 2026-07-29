@@ -1,9 +1,11 @@
 # tests/test_rooms.py
 from db.pool import SessionLocal
 from models.help_request_model import HelpRequest, HelpRequestAcceptance
+from models.inventory_model import InventoryItem
 from models.study_room_model import StudyRoom, RoomMember
 from tests.conftest import auth_header
 from tests.test_help_requests import _enroll_new_student
+from tests.test_shop import _give_points, _make_shop_item, _purchase
 
 
 def _new_room(client, world, cleanup, group_size=3):
@@ -145,3 +147,46 @@ def test_delete_room_allowed_while_active(client, world, cleanup):
 
     resp = client.delete(f"/api/rooms/{room_id}", headers=auth_header(world.student_token))
     assert resp.status_code == 200, resp.text
+
+
+def test_room_members_include_equipped_cosmetics(client, world, cleanup, db):
+    hr_id, room_id, classmate_id, classmate_token = _new_room(client, world, cleanup)
+
+    avatar_id = _make_shop_item(client, world, cleanup, item_type="avatar_base")
+    badge_id = _make_shop_item(client, world, cleanup, item_type="badge")
+    _give_points(db, classmate_id, 100)
+
+    resp = _purchase(client, classmate_token, avatar_id)
+    assert resp.status_code == 200, resp.text
+    avatar_inv_id = resp.json()["inventory_id"]
+    cleanup(InventoryItem, avatar_inv_id)
+
+    resp = _purchase(client, classmate_token, badge_id)
+    assert resp.status_code == 200, resp.text
+    badge_inv_id = resp.json()["inventory_id"]
+    cleanup(InventoryItem, badge_inv_id)
+
+    resp = client.patch(
+        f"/api/inventory/{avatar_inv_id}/equip",
+        json={"equipped": True},
+        headers=auth_header(classmate_token),
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = client.patch(
+        f"/api/inventory/{badge_inv_id}/equip",
+        json={"equipped": True},
+        headers=auth_header(classmate_token),
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = client.get(f"/api/rooms/{room_id}", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+    members_by_id = {m["user_id"]: m for m in resp.json()["members"]}
+
+    classmate_cosmetics = members_by_id[classmate_id]["cosmetics"]
+    assert classmate_cosmetics["avatar_base"]["item_id"] == avatar_id
+    assert classmate_cosmetics["avatar_accessory"] is None
+    assert [b["item_id"] for b in classmate_cosmetics["badges"]] == [badge_id]
+
+    assert members_by_id[world.student_id]["cosmetics"] is None

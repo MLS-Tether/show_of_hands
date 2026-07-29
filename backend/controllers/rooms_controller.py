@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 import daily_client
 from auth_utils import decode_token
 from ws_auth import ws_token_from_subprotocol
+from cosmetics_utils import get_equipped_cosmetics_for_users
 from db.data_events import emit_data_event, resolve_section_audience
 from db.pool import get_db, SessionLocal
 from db.ws_broadcast import notify_room_message
@@ -63,13 +64,18 @@ def _emit_room_events(db: Session, room: StudyRoom, room_action: str, hr_action:
         )
 
 
-def _build_room_response(room: StudyRoom) -> dict:
+def _build_room_response(db: Session, room: StudyRoom) -> dict:
+    cosmetics_by_user = get_equipped_cosmetics_for_users(db, [m.user_id for m in room.members])
     return {
         "room_id": room.room_id,
         "help_request_id": room.help_request_id,
         "requester_id": room.help_request.requester_id,
         "members": [
-            {"user_id": m.user_id, "username": m.user.username}
+            {
+                "user_id": m.user_id,
+                "username": m.user.username,
+                "cosmetics": cosmetics_by_user.get(m.user_id),
+            }
             for m in room.members
         ],
         "timer_ends_at": room.timer_ends_at,
@@ -146,7 +152,7 @@ def get_room(
         if section.school_id != current_user.school_id:
             raise HTTPException(status_code=403, detail="Access denied.")
 
-    return _build_room_response(room)
+    return _build_room_response(db, room)
 
 
 @router.post("/{room_id}/video-token", response_model=VideoTokenResponse)

@@ -11,6 +11,7 @@ import StudyRooms from './pages/StudyRooms'
 import RoomDetail from './pages/RoomDetail'
 import Points from './pages/Points'
 import Shop from './pages/Shop'
+import Inventory from './pages/Inventory'
 import Profile from './pages/Profile'
 import Auth from './pages/Auth'
 import AdminOverview from './pages/admin/AdminOverview'
@@ -58,6 +59,7 @@ function App() {
         <Route path="/rooms/:roomId" element={<RoomDetail />} />
         <Route path="/points" element={<Points />} />
         <Route path="/shop" element={<Shop />} />
+        <Route path="/inventory" element={<Inventory />} />
         <Route path="/profile" element={<Profile />} />
         <Route element={<RequireAdmin />}>
           <Route path="/admin/overview" element={<AdminOverview />} />

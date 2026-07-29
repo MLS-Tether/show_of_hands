@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
+import CharacterAvatar from '../components/CharacterAvatar'
 import { useDialog } from '../components/DialogContext'
 import { keys, useRoom, useNotificationCountsByEntity } from '../queries'
 import { forgetRoom, rememberRoom } from '../utils/roomTracking'
@@ -396,10 +397,20 @@ function RoomDetail() {
       <div className="room-detail-members">
         {room.members.map((m) => (
           <div className="room-detail-member" key={m.user_id}>
-            <span>
-              {m.username}
-              {m.user_id === room.requester_id ? ' (requester)' : ''}
-            </span>
+            <div className="room-detail-member-identity">
+              {m.cosmetics && (
+                <CharacterAvatar
+                  size="sm"
+                  avatarBase={m.cosmetics.avatar_base}
+                  avatarAccessory={m.cosmetics.avatar_accessory}
+                  badges={m.cosmetics.badges}
+                />
+              )}
+              <span>
+                {m.username}
+                {m.user_id === room.requester_id ? ' (requester)' : ''}
+              </span>
+            </div>
             {isRequester && m.user_id !== currentUserId && (
               <button type="button" className="admin-btn-text" onClick={() => handleKick(m.user_id)}>
                 Kick

@@ -95,6 +95,12 @@
   border-bottom: none;
 }
 
+.room-detail-member-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .room-detail-video-join-btn {
   margin-bottom: 24px;
 }

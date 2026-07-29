@@ -9,11 +9,24 @@ class StudyRoomStatusEnum(str, enum.Enum):
     closed = "closed"
 
 
+class EquippedCosmeticBrief(BaseModel):
+    item_id: int
+    name: str
+    image_url: str
+
+
+class MemberCosmetics(BaseModel):
+    avatar_base: Optional[EquippedCosmeticBrief] = None
+    avatar_accessory: Optional[EquippedCosmeticBrief] = None
+    badges: List[EquippedCosmeticBrief] = []
+
+
 class RoomMemberBrief(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     user_id: int
     username: str
+    cosmetics: Optional[MemberCosmetics] = None
 
 
 class StudyRoomResponse(BaseModel):

@@ -20,4 +20,5 @@ export const APP_NAV_ITEMS = [
   { label: 'Study rooms', to: '/study-rooms', studentOnly: true, tour: 'nav-rooms' },
   { label: 'Points', to: '/points', studentOnly: true },
   { label: 'Shop', to: '/shop', studentOnly: true },
+  { label: 'Inventory', to: '/inventory', studentOnly: true },
 ]
