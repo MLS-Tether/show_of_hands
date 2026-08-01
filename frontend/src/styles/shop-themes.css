@@ -14,3 +14,39 @@
   --accent-bg: rgba(232, 102, 63, 0.12);
   --accent-border: rgba(232, 102, 63, 0.4);
 }
+
+:root[data-shop-theme='forest'] {
+  --accent: #3f9d5c;
+  --accent-bg: rgba(63, 157, 92, 0.12);
+  --accent-border: rgba(63, 157, 92, 0.4);
+}
+
+:root[data-shop-theme='galaxy'] {
+  --accent: #5b6cff;
+  --accent-bg: rgba(91, 108, 255, 0.12);
+  --accent-border: rgba(91, 108, 255, 0.4);
+}
+
+:root[data-shop-theme='candy'] {
+  --accent: #ff6fae;
+  --accent-bg: rgba(255, 111, 174, 0.12);
+  --accent-border: rgba(255, 111, 174, 0.4);
+}
+
+:root[data-shop-theme='retro'] {
+  --accent: #ff3d9a;
+  --accent-bg: rgba(255, 61, 154, 0.12);
+  --accent-border: rgba(255, 61, 154, 0.4);
+}
+
+:root[data-shop-theme='slate'] {
+  --accent: #6b7280;
+  --accent-bg: rgba(107, 114, 128, 0.12);
+  --accent-border: rgba(107, 114, 128, 0.4);
+}
+
+:root[data-shop-theme='autumn'] {
+  --accent: #c9752f;
+  --accent-bg: rgba(201, 117, 47, 0.12);
+  --accent-border: rgba(201, 117, 47, 0.4);
+}
