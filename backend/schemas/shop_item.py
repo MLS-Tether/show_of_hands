@@ -28,6 +28,12 @@ class ShopItemUpdate(BaseModel):
     theme_key: Optional[str] = None
 
 
+class BadgeProgressResponse(BaseModel):
+    current: float
+    target: float
+    unit: str
+
+
 class ShopItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -41,3 +47,4 @@ class ShopItemResponse(BaseModel):
     created_at: datetime
     owned: Optional[bool] = None
     equipped: Optional[bool] = None
+    progress: Optional[BadgeProgressResponse] = None

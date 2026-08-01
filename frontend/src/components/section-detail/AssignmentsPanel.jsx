@@ -44,7 +44,7 @@ function AssignmentsPanel({ sectionId, assignments }) {
       setFitResult(null)
       queryClient.invalidateQueries({ queryKey: ['assignments'] })
       queryClient.invalidateQueries({ queryKey: keys.section(sectionId) })
-      queryClient.invalidateQueries({ queryKey: keys.sectionAnalytics(sectionId) })
+      queryClient.invalidateQueries({ queryKey: ['section', sectionId, 'analytics'] })
     } catch (err) {
       setError(err.response?.data?.message || 'Could not create assignment.')
     } finally {

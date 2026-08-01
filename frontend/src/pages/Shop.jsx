@@ -12,14 +12,12 @@ const TABS = [
   { key: 'all', label: 'All' },
   { key: 'avatar_base', label: 'Avatars' },
   { key: 'avatar_accessory', label: 'Accessories' },
-  { key: 'badge', label: 'Badges' },
   { key: 'theme', label: 'Themes' },
 ]
 
 const ITEM_TYPE_LABELS = {
   avatar_base: 'Avatar',
   avatar_accessory: 'Accessory',
-  badge: 'Badge',
   theme: 'Theme',
 }
 
@@ -58,7 +56,9 @@ function Shop() {
   }
 
   const loading = isLoading || items === null
-  const rows = loading ? [] : items.filter((i) => itemType === 'all' || i.item_type === itemType)
+  const rows = loading
+    ? []
+    : items.filter((i) => i.item_type !== 'badge' && (itemType === 'all' || i.item_type === itemType))
   const balance = user?.total_points ?? 0
 
   return (

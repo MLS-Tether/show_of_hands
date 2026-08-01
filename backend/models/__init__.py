@@ -15,3 +15,4 @@ from models.notification_model import Notification
 from models.resource_model import Resource
 from models.shop_item_model import ShopItem
 from models.inventory_model import InventoryItem
+from models.badge_rule_model import BadgeRule

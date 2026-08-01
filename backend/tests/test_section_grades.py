@@ -69,6 +69,54 @@ def test_no_graded_submissions_returns_nulls(client, world, cleanup):
     assert body["letter_grade"] is None
 
 
+def test_overdue_unsubmitted_assignment_counts_as_zero(client, world, cleanup):
+    graded_hw = _new_assignment(client, world, cleanup, "homework")
+    sub = _submit(client, world, cleanup, graded_hw)
+    _grade_and_finalize(client, world, sub, 90)
+
+    # Never submitted, and already past due -- should count as a 0 in the
+    # homework category average: (90 + 0) / 2 = 45.
+    _new_assignment(client, world, cleanup, "homework", due_date="2020-01-01T00:00:00Z")
+
+    resp = client.get(f"/api/sections/{world.section_id}/grades/me", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["percentage"] == 45.0
+    assert body["letter_grade"] == "F"
+
+
+def test_not_yet_due_unsubmitted_assignment_is_excluded(client, world, cleanup):
+    graded_hw = _new_assignment(client, world, cleanup, "homework")
+    sub = _submit(client, world, cleanup, graded_hw)
+    _grade_and_finalize(client, world, sub, 90)
+
+    # Not due yet -- must stay excluded, not zeroed.
+    _new_assignment(client, world, cleanup, "homework", due_date="2027-06-01T00:00:00Z")
+
+    resp = client.get(f"/api/sections/{world.section_id}/grades/me", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["percentage"] == 90.0
+    assert body["letter_grade"] == "A"
+
+
+def test_overdue_but_pending_submission_is_not_zeroed(client, world, cleanup):
+    graded_hw = _new_assignment(client, world, cleanup, "homework")
+    sub = _submit(client, world, cleanup, graded_hw)
+    _grade_and_finalize(client, world, sub, 90)
+
+    # Submitted (past due), but not yet graded -- must stay excluded, not
+    # zeroed, since the student did submit.
+    pending_hw = _new_assignment(client, world, cleanup, "homework", due_date="2020-01-01T00:00:00Z")
+    _submit(client, world, cleanup, pending_hw)
+
+    resp = client.get(f"/api/sections/{world.section_id}/grades/me", headers=auth_header(world.student_token))
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["percentage"] == 90.0
+    assert body["letter_grade"] == "A"
+
+
 def test_owning_teacher_can_view_student_grade(client, world, cleanup):
     hw = _new_assignment(client, world, cleanup, "homework")
     sub = _submit(client, world, cleanup, hw)

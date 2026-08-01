@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useSectionAnalytics } from '../../queries'
 import { formatPercent } from '../../utils/format'
 
 function AnalyticsPanel({ sectionId }) {
-  const { data: analytics = null, isError: failed } = useSectionAnalytics(sectionId)
+  const [attentionPage, setAttentionPage] = useState(1)
+  const { data: analytics = null, isError: failed } = useSectionAnalytics(sectionId, attentionPage)
 
   if (failed) {
     return <p className="teacher-panel-placeholder">Could not load analytics.</p>
@@ -12,7 +14,13 @@ function AnalyticsPanel({ sectionId }) {
     return <p className="teacher-panel-placeholder">Loading analytics…</p>
   }
 
-  const { average_grade, assignments, points_distribution, students_needing_attention } = analytics
+  const {
+    average_grade,
+    assignments,
+    points_distribution,
+    students_needing_attention,
+    attention_total_pages,
+  } = analytics
 
   return (
     <div>
@@ -53,16 +61,44 @@ function AnalyticsPanel({ sectionId }) {
         <p className="teacher-panel-placeholder">No flagged students.</p>
       ) : (
         <div className="teacher-panel-list">
-          {students_needing_attention.map((s, i) => (
-            <div className="teacher-panel-row" key={`${s.user_id}-${s.assignment_id}-${i}`}>
-              <span>{s.username}</span>
-              <span className="teacher-panel-row-sub">
-                {s.reason === 'no_submission'
-                  ? `No submission for "${s.assignment_title}"`
-                  : `Low grade (${formatPercent(s.grade)}) on "${s.assignment_title}"`}
-              </span>
+          {students_needing_attention.map((student) => (
+            <div className="teacher-panel-group" key={student.user_id}>
+              <div className="teacher-panel-row-heading">{student.username}</div>
+              {student.issues.map((issue, i) => (
+                <div className="teacher-panel-row teacher-panel-row-nested" key={`${issue.assignment_id}-${i}`}>
+                  <span className="teacher-panel-row-sub">
+                    {issue.reason === 'no_submission'
+                      ? `No submission for "${issue.assignment_title}"`
+                      : `Low grade (${formatPercent(issue.grade)}) on "${issue.assignment_title}"`}
+                  </span>
+                </div>
+              ))}
             </div>
           ))}
+        </div>
+      )}
+
+      {attention_total_pages > 1 && (
+        <div className="teacher-panel-pagination">
+          <button
+            type="button"
+            className="admin-btn-text"
+            disabled={attentionPage <= 1}
+            onClick={() => setAttentionPage((p) => p - 1)}
+          >
+            Previous
+          </button>
+          <span className="teacher-panel-pagination-label">
+            Page {attentionPage} of {attention_total_pages}
+          </span>
+          <button
+            type="button"
+            className="admin-btn-text"
+            disabled={attentionPage >= attention_total_pages}
+            onClick={() => setAttentionPage((p) => p + 1)}
+          >
+            Next
+          </button>
         </div>
       )}
     </div>

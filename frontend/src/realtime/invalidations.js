@@ -30,7 +30,9 @@ export function invalidateForEvent(queryClient, event) {
       if (ids.assignment_id) queryClient.invalidateQueries({ queryKey: keys.assignment(ids.assignment_id) })
       if (sectionId) {
         queryClient.invalidateQueries({ queryKey: keys.section(sectionId) })
-        queryClient.invalidateQueries({ queryKey: keys.sectionAnalytics(sectionId) })
+        // Prefix-only (no page number) so every cached analytics page for
+        // this section is invalidated, not just page 1.
+        queryClient.invalidateQueries({ queryKey: ['section', sectionId, 'analytics'] })
       }
       break
     case 'submissions':
@@ -40,7 +42,9 @@ export function invalidateForEvent(queryClient, event) {
         queryClient.invalidateQueries({ queryKey: keys.assignmentMySubmission(ids.assignment_id) })
       }
       if (sectionId) {
-        queryClient.invalidateQueries({ queryKey: keys.sectionAnalytics(sectionId) })
+        // Prefix-only (no page number) so every cached analytics page for
+        // this section is invalidated, not just page 1.
+        queryClient.invalidateQueries({ queryKey: ['section', sectionId, 'analytics'] })
         queryClient.invalidateQueries({ queryKey: ['section', sectionId, 'grades'] })
       }
       // Grading/finalizing a submission changes the student's overall

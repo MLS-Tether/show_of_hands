@@ -26,7 +26,6 @@ from schemas.section import (
 )
 
 LOW_GRADE_THRESHOLD = 70
-MAX_STUDENTS_NEEDING_ATTENTION = 50
 
 router = APIRouter(prefix="/sections", tags=["sections"])
 
@@ -193,9 +192,15 @@ def get_section(
 @router.get("/{section_id}/analytics", response_model=SectionAnalyticsResponse)
 def get_section_analytics(
     section_id: int,
+    attention_page: int = 1,
+    attention_page_size: int = 50,
     current_user: User = Depends(require_role(["teacher", "admin"])),
     db: Session = Depends(get_db),
 ):
+    if attention_page < 1:
+        raise HTTPException(status_code=400, detail="attention_page must be 1 or greater.")
+    if attention_page_size < 1:
+        raise HTTPException(status_code=400, detail="attention_page_size must be 1 or greater.")
     section = db.query(Section).options(
         selectinload(Section.enrollments),
         selectinload(Section.assignments),
@@ -218,7 +223,11 @@ def get_section_analytics(
     all_graded_grades = []
     per_student_points = {}
     assignment_analytics = []
-    students_needing_attention = []
+    attention_by_student = {}
+
+    def _flag_student(user_id, username, issue):
+        entry = attention_by_student.setdefault(user_id, {"user_id": user_id, "username": username, "issues": []})
+        entry["issues"].append(issue)
 
     for assignment in assignments:
         submissions = [s for s in assignment.submissions if not s.is_archived]
@@ -241,9 +250,7 @@ def get_section_analytics(
 
         for s in graded:
             if s.grade is not None and s.grade < LOW_GRADE_THRESHOLD:
-                students_needing_attention.append({
-                    "user_id": s.student_id,
-                    "username": s.student.username,
+                _flag_student(s.student_id, s.student.username, {
                     "reason": "low_grade",
                     "assignment_id": assignment.assignment_id,
                     "assignment_title": assignment.title,
@@ -254,15 +261,17 @@ def get_section_analytics(
             submitted_student_ids = {s.student_id for s in submissions}
             for enrollment in approved_enrollments:
                 if enrollment.student_id not in submitted_student_ids:
-                    students_needing_attention.append({
-                        "user_id": enrollment.student_id,
-                        "username": enrollment.student.username,
+                    _flag_student(enrollment.student_id, enrollment.student.username, {
                         "reason": "no_submission",
                         "assignment_id": assignment.assignment_id,
                         "assignment_title": assignment.title,
                     })
 
-    students_needing_attention = students_needing_attention[:MAX_STUDENTS_NEEDING_ATTENTION]
+    all_flagged_students = sorted(attention_by_student.values(), key=lambda s: s["username"])
+    attention_total_students = len(all_flagged_students)
+    attention_total_pages = max(1, (attention_total_students + attention_page_size - 1) // attention_page_size)
+    start = (attention_page - 1) * attention_page_size
+    students_needing_attention = all_flagged_students[start:start + attention_page_size]
 
     points_totals = list(per_student_points.values())
     points_distribution = {
@@ -279,6 +288,10 @@ def get_section_analytics(
         "assignments": assignment_analytics,
         "points_distribution": points_distribution,
         "students_needing_attention": students_needing_attention,
+        "attention_page": attention_page,
+        "attention_page_size": attention_page_size,
+        "attention_total_students": attention_total_students,
+        "attention_total_pages": attention_total_pages,
     }
 
 

@@ -5,7 +5,7 @@ from models.inventory_model import InventoryItem
 from models.study_room_model import StudyRoom, RoomMember
 from tests.conftest import auth_header
 from tests.test_help_requests import _enroll_new_student
-from tests.test_shop import _give_points, _make_shop_item, _purchase
+from tests.test_shop import _give_item_directly, _give_points, _make_shop_item, _purchase
 
 
 def _new_room(client, world, cleanup, group_size=3):
@@ -161,10 +161,7 @@ def test_room_members_include_equipped_cosmetics(client, world, cleanup, db):
     avatar_inv_id = resp.json()["inventory_id"]
     cleanup(InventoryItem, avatar_inv_id)
 
-    resp = _purchase(client, classmate_token, badge_id)
-    assert resp.status_code == 200, resp.text
-    badge_inv_id = resp.json()["inventory_id"]
-    cleanup(InventoryItem, badge_inv_id)
+    badge_inv_id = _give_item_directly(db, cleanup, classmate_id, badge_id)
 
     resp = client.patch(
         f"/api/inventory/{avatar_inv_id}/equip",

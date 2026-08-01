@@ -6,12 +6,14 @@ from sqlalchemy.orm import Session
 from db.data_events import emit_data_event
 from db.pool import get_db
 from dependencies import get_current_user, require_role
+from models.badge_rule_model import BadgeRule
 from models.inventory_model import InventoryItem
 from models.point_transaction_model import PointTransaction, TransactionSourceEnum
 from models.shop_item_model import ShopItem, ShopItemTypeEnum
 from models.user_model import User, RoleEnum
 from schemas.inventory import InventoryItemResponse, PurchaseResponse, EquipRequest
 from schemas.shop_item import ShopItemCreate, ShopItemUpdate, ShopItemResponse
+from services.badge_rules import get_badge_progress
 
 router = APIRouter(tags=["shop"])
 
@@ -42,10 +44,22 @@ def list_shop_items(
                 InventoryItem.item_id.in_([i.item_id for i in items]),
             ).all()
         }
+        badge_item_ids = [i.item_id for i in items if i.item_type == ShopItemTypeEnum.badge]
+        rules_by_item_id = {
+            r.item_id: r
+            for r in db.query(BadgeRule).filter(
+                BadgeRule.is_archived == False,
+                BadgeRule.item_id.in_(badge_item_ids),
+            ).all()
+        } if badge_item_ids else {}
+
         for item in items:
             owned_row = owned_by_item_id.get(item.item_id)
             item.owned = owned_row is not None
             item.equipped = owned_row.is_equipped if owned_row else False
+
+            rule = rules_by_item_id.get(item.item_id)
+            item.progress = get_badge_progress(db, current_user.user_id, rule) if rule else None
 
     return items
 
@@ -115,6 +129,9 @@ def purchase_shop_item(
     ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Shop item not found.")
+
+    if item.item_type == ShopItemTypeEnum.badge:
+        raise HTTPException(status_code=403, detail="Badges are earned automatically and cannot be purchased.")
 
     existing = db.query(InventoryItem).filter(
         InventoryItem.student_id == current_user.user_id,

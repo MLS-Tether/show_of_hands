@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../../api'
 import Modal from '../../components/Modal'
+import ReportCard from '../../components/ReportCard'
 import { useToast } from '../../components/ToastContext'
-import { useUser, useUserGrades, useNotificationCountsByEntity } from '../../queries'
-import { formatPercent } from '../../utils/format'
+import { useUser, useUserReportCard, useNotificationCountsByEntity } from '../../queries'
 import { downloadReportCard, printReportCard } from '../../utils/reportCard'
 import NotificationCountBadge from '../../components/NotificationCountBadge'
 import '../../styles/shared-ui.css'
@@ -84,9 +84,9 @@ function AdminStudentDetail() {
   const { showToast } = useToast()
   const [showResetModal, setShowResetModal] = useState(false)
   const { data: student = null, isError: studentFailed } = useUser(studentId)
-  const { data: grades = null, isError: gradesFailed } = useUserGrades(studentId)
+  const { data: reportCard = null, isError: reportCardFailed } = useUserReportCard(studentId)
   const notifCounts = useNotificationCountsByEntity()
-  const notFound = studentFailed || gradesFailed
+  const notFound = studentFailed || reportCardFailed
 
   if (notFound) {
     return (
@@ -96,7 +96,7 @@ function AdminStudentDetail() {
     )
   }
 
-  if (!student || !grades) {
+  if (!student || !reportCard) {
     return (
       <div className="admin-student-detail">
         <p className="admin-empty-card">Loading…</p>
@@ -107,26 +107,26 @@ function AdminStudentDetail() {
   return (
     <div className="admin-student-detail">
       <h1 className="admin-page-h1">
-        {student.username}
+        {student.full_name}
         <NotificationCountBadge
           count={notifCounts[`student:${studentId}`]}
           className="notification-count-badge-inline"
         />
       </h1>
-      <p className="admin-page-subtitle">Cumulative grades across all enrolled sections</p>
+      <p className="admin-page-subtitle">Sections, assignments, and quests for this student</p>
 
       <div className="admin-student-actions">
         <button
           type="button"
           className="admin-btn-secondary"
-          onClick={() => downloadReportCard(student, grades)}
+          onClick={() => downloadReportCard(student, reportCard)}
         >
           Download PDF
         </button>
         <button
           type="button"
           className="admin-btn-secondary"
-          onClick={() => printReportCard(student, grades)}
+          onClick={() => printReportCard(student, reportCard)}
         >
           Print
         </button>
@@ -135,26 +135,7 @@ function AdminStudentDetail() {
         </button>
       </div>
 
-      {grades.length === 0 ? (
-        <p className="admin-empty-card">Not enrolled in any sections.</p>
-      ) : (
-        <div className="admin-student-grades-table">
-          <div className="admin-student-grades-row admin-student-grades-header">
-            <span>Section</span>
-            <span>Period</span>
-            <span>Grade</span>
-            <span>Letter</span>
-          </div>
-          {grades.map((g) => (
-            <div className="admin-student-grades-row" key={g.section_id}>
-              <span>{g.class_name}</span>
-              <span>{g.period}</span>
-              <span>{g.percentage != null ? formatPercent(g.percentage) : '—'}</span>
-              <span>{g.letter_grade || '—'}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <ReportCard reportCard={reportCard} />
 
       {showResetModal && (
         <ResetPasswordModal
