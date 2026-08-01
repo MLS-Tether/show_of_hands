@@ -119,7 +119,9 @@ function Profile() {
 
   const { data: user = null, isError: failed } = useUser(userId)
   const { data: school = null } = useSchool()
-  const { data: inventory = [] } = useInventory(userId, { enabled: user?.role === 'student' })
+  // Every role now has cosmetics: students via purchase/badge-award,
+  // teachers/admins via the auto-unlock grant (backend/services/staff_inventory.py).
+  const { data: inventory = [] } = useInventory(userId, { enabled: !!user })
   const { data: badges = [] } = useShopItems('badge', { enabled: user?.role === 'student' })
 
   const equippedAvatarBase = inventory.find((row) => row.item.item_type === 'avatar_base' && row.is_equipped)?.item
@@ -278,27 +280,25 @@ function Profile() {
       </div>
 
       <div className="profile-sections">
-        {user.role === 'student' && (
-          <div>
-            <div className="profile-section-label-row">
-              <div className="widget-label">my character</div>
-              <button
-                type="button"
-                className="admin-btn-text"
-                onClick={() => navigate('/inventory')}
-              >
-                Customize
-              </button>
-            </div>
-            <div className="profile-card profile-character-card">
-              <CharacterAvatar
-                avatarBase={equippedAvatarBase}
-                avatarAccessory={equippedAccessory}
-                badges={equippedBadges}
-              />
-            </div>
+        <div>
+          <div className="profile-section-label-row">
+            <div className="widget-label">my character</div>
+            <button
+              type="button"
+              className="admin-btn-text"
+              onClick={() => navigate('/inventory')}
+            >
+              Customize
+            </button>
           </div>
-        )}
+          <div className="profile-card profile-character-card">
+            <CharacterAvatar
+              avatarBase={equippedAvatarBase}
+              avatarAccessory={equippedAccessory}
+              badges={equippedBadges}
+            />
+          </div>
+        </div>
 
         {user.role === 'student' && (
           <div>

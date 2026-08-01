@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import api from '../api'
 import { useDialog } from '../components/DialogContext'
 import { keys, useShopItems, useUser } from '../queries'
-import { getUserId, isTeacher } from '../utils/auth'
+import { getUserId, isAdmin, isTeacher } from '../utils/auth'
 import '../styles/shared-ui.css'
 import './Shop.css'
 
@@ -31,9 +31,10 @@ function Shop() {
   const { data: user = null } = useUser(userId)
   const { data: items = null, isLoading } = useShopItems()
 
-  // Teachers don't earn/spend points; keep them off this student-only page,
-  // same guard as Points.jsx.
-  if (isTeacher()) {
+  // Teachers/admins don't earn/spend points and already own every cosmetic
+  // via auto-unlock (backend/services/staff_inventory.py) -- nothing here
+  // for them to browse or buy.
+  if (isTeacher() || isAdmin()) {
     return <Navigate to="/dashboard" replace />
   }
 

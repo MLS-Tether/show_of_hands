@@ -10,6 +10,7 @@ from db.pool import get_db
 from dependencies import require_role
 from models.school_model import School
 from models.user_model import User, RoleEnum
+from services.staff_inventory import grant_cosmetics_to_staff_member
 from schemas.school import (
     SchoolResponse,
     SchoolCodeResponse,
@@ -59,6 +60,8 @@ def create_school(body: SchoolCreate, db: Session = Depends(get_db)):
         is_verified=True,
     )
     db.add(admin)
+    db.flush()
+    grant_cosmetics_to_staff_member(db, admin)
     db.commit()
     db.refresh(school)
     db.refresh(admin)

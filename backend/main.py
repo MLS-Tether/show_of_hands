@@ -20,6 +20,7 @@ from db.seed import (
     seed_badge_rules,
 )
 from db.ws_broadcast import start_listener, stop_listener, deliver_loop
+from services.staff_inventory import backfill_all_staff_inventories
 from models.assignment_model import Assignment
 from models.enrollment_model import Enrollment
 from models.submission_model import Submission, SubmissionStatusEnum
@@ -194,6 +195,7 @@ async def lifespan(app: FastAPI):
     seed_classes()
     seed_shop_items()
     seed_badge_rules()
+    backfill_all_staff_inventories()
     seed_dev_data()
     seed_second_teacher_data()
     seed_more_cs_students()

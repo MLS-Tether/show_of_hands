@@ -17,6 +17,7 @@ from dependencies import get_current_user, require_role
 from models.user_model import User, RoleEnum
 from models.school_model import School
 from schemas.user import UserResponse
+from services.staff_inventory import grant_cosmetics_to_staff_member
 from validators import validate_full_name, validate_new_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -89,6 +90,8 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
         signup_note=body.note,
     )
     db.add(user)
+    db.flush()
+    grant_cosmetics_to_staff_member(db, user)
     db.commit()
     db.refresh(user)
     return user

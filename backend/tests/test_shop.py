@@ -104,19 +104,32 @@ def test_list_shop_items_shows_owned_and_equipped_for_student(client, world, cle
     assert by_id[unowned_item_id]["equipped"] is False
 
 
-def test_list_shop_items_hides_owned_equipped_for_teacher_and_admin(client, world, cleanup):
-    item_id = _make_shop_item(client, world, cleanup)
+def test_new_cosmetic_item_is_auto_owned_by_teacher_and_admin(client, world, cleanup):
+    # Cosmetics auto-unlock for staff: creating one backfills it into every
+    # existing teacher/admin's inventory immediately (services/staff_inventory.py).
+    item_id = _make_shop_item(client, world, cleanup, item_type="avatar_accessory")
 
     resp = client.get("/api/shop/items", headers=auth_header(world.teacher_token))
     assert resp.status_code == 200, resp.text
     item = next(i for i in resp.json() if i["item_id"] == item_id)
-    assert item.get("owned") is None
-    assert item.get("equipped") is None
+    assert item["owned"] is True
+    assert item["equipped"] is False
+    assert item.get("progress") is None
 
     resp = client.get("/api/shop/items", headers=auth_header(world.admin_token))
     assert resp.status_code == 200, resp.text
     item = next(i for i in resp.json() if i["item_id"] == item_id)
-    assert item.get("owned") is None
+    assert item["owned"] is True
+    assert item.get("progress") is None
+
+
+def test_new_badge_is_not_auto_owned_by_teacher_and_admin(client, world, cleanup):
+    badge_id = _make_shop_item(client, world, cleanup, item_type="badge")
+
+    resp = client.get("/api/shop/items?item_type=badge", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 200, resp.text
+    item = next(i for i in resp.json() if i["item_id"] == badge_id)
+    assert item["owned"] is False
 
 
 def test_list_shop_items_filters_by_item_type(client, world, cleanup):
