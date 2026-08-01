@@ -2,11 +2,12 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api, { mediaUrl } from '../api'
+import BadgesSection from '../components/BadgesSection'
 import CharacterAvatar from '../components/CharacterAvatar'
 import Modal from '../components/Modal'
 import { useDialog } from '../components/DialogContext'
 import { useToast } from '../components/ToastContext'
-import { keys, useInventory, useSchool, useUser } from '../queries'
+import { keys, useInventory, useSchool, useShopItems, useUser } from '../queries'
 import { getUserId } from '../utils/auth'
 import { initials } from '../utils/format'
 import '../styles/shared-ui.css'
@@ -113,17 +114,33 @@ function Profile() {
   const [uploadingPicture, setUploadingPicture] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [featuredBadgePending, setFeaturedBadgePending] = useState(null)
   const fileInputRef = useRef(null)
 
   const { data: user = null, isError: failed } = useUser(userId)
   const { data: school = null } = useSchool()
-  const { data: inventory = [] } = useInventory(userId, { enabled: user?.role === 'student' })
+  // Every role now has cosmetics: students via purchase/badge-award,
+  // teachers/admins via the auto-unlock grant (backend/services/staff_inventory.py).
+  const { data: inventory = [] } = useInventory(userId, { enabled: !!user })
+  const { data: badges = [] } = useShopItems('badge', { enabled: user?.role === 'student' })
 
   const equippedAvatarBase = inventory.find((row) => row.item.item_type === 'avatar_base' && row.is_equipped)?.item
   const equippedAccessory = inventory.find((row) => row.item.item_type === 'avatar_accessory' && row.is_equipped)?.item
   const equippedBadges = inventory
     .filter((row) => row.item.item_type === 'badge' && row.is_equipped)
     .map((row) => row.item)
+
+  async function setFeaturedBadge(itemId) {
+    setFeaturedBadgePending(itemId)
+    try {
+      const { data } = await api.patch('/users/me/featured-badge', { item_id: itemId })
+      queryClient.setQueryData(keys.user(userId), data)
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Could not update featured badge.')
+    } finally {
+      setFeaturedBadgePending(null)
+    }
+  }
 
   function startEditing() {
     setForm({ username: user.username })
@@ -252,28 +269,47 @@ function Profile() {
 
   return (
     <section className="profile-page">
-      <h1 className="admin-page-h1">My profile</h1>
+      <div className="profile-page-header">
+        <h1 className="admin-page-h1">My profile</h1>
+        {user.featured_badge && (
+          <div className="profile-featured-badge">
+            <img src={user.featured_badge.image_url} alt="" />
+            <span>{user.featured_badge.name}</span>
+          </div>
+        )}
+      </div>
 
       <div className="profile-sections">
+        <div>
+          <div className="profile-section-label-row">
+            <div className="widget-label">my character</div>
+            <button
+              type="button"
+              className="admin-btn-text"
+              onClick={() => navigate('/inventory')}
+            >
+              Customize
+            </button>
+          </div>
+          <div className="profile-card profile-character-card">
+            <CharacterAvatar
+              avatarBase={equippedAvatarBase}
+              avatarAccessory={equippedAccessory}
+              badges={equippedBadges}
+            />
+          </div>
+        </div>
+
         {user.role === 'student' && (
           <div>
-            <div className="profile-section-label-row">
-              <div className="widget-label">my character</div>
-              <button
-                type="button"
-                className="admin-btn-text"
-                onClick={() => navigate('/inventory')}
-              >
-                Customize
-              </button>
-            </div>
-            <div className="profile-card profile-character-card">
-              <CharacterAvatar
-                avatarBase={equippedAvatarBase}
-                avatarAccessory={equippedAccessory}
-                badges={equippedBadges}
-              />
-            </div>
+            <div className="widget-label">badges</div>
+            <BadgesSection
+              badges={badges}
+              featuredItemId={user.featured_badge?.item_id ?? null}
+              pendingId={featuredBadgePending}
+              onSetFeatured={setFeaturedBadge}
+              onClearFeatured={() => setFeaturedBadge(null)}
+            />
           </div>
         )}
 

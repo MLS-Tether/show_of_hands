@@ -17,6 +17,7 @@ from models.help_request_model import HelpRequest
 from models.notification_model import Notification, NotificationTypeEnum
 from models.point_transaction_model import PointTransaction, TransactionSourceEnum
 from models.shop_item_model import ShopItem, ShopItemTypeEnum
+from models.badge_rule_model import BadgeRule, BadgeRuleCriteriaEnum
 
 DEFAULT_CLASSES = [
     "Algebra",
@@ -77,24 +78,45 @@ DEFAULT_SHOP_ITEMS = [
     },
     {
         "name": "First Steps",
-        "description": "Awarded for getting started.",
+        "description": "Awarded for completing your first quest.",
         "item_type": ShopItemTypeEnum.badge,
-        "cost": 20,
+        "cost": 0,
         "image_url": "/shop-placeholders/badge-1.svg",
     },
     {
         "name": "Study Streak",
-        "description": "Show off your consistency.",
+        "description": "Awarded for completing a quest 5 days in a row.",
         "item_type": ShopItemTypeEnum.badge,
-        "cost": 35,
+        "cost": 0,
         "image_url": "/shop-placeholders/badge-2.svg",
     },
     {
         "name": "Helping Hand",
-        "description": "For showing up for classmates.",
+        "description": "Awarded for showing up for 5 classmates' help sessions.",
         "item_type": ShopItemTypeEnum.badge,
-        "cost": 35,
+        "cost": 0,
         "image_url": "/shop-placeholders/badge-3.svg",
+    },
+    {
+        "name": "Point Collector",
+        "description": "Awarded for reaching 500 lifetime points.",
+        "item_type": ShopItemTypeEnum.badge,
+        "cost": 0,
+        "image_url": "/shop-placeholders/badge-4.svg",
+    },
+    {
+        "name": "Quest Master",
+        "description": "Awarded for completing 25 quests.",
+        "item_type": ShopItemTypeEnum.badge,
+        "cost": 0,
+        "image_url": "/shop-placeholders/badge-5.svg",
+    },
+    {
+        "name": "Honor Roll",
+        "description": "Awarded for reaching a 90%+ grade in any section.",
+        "item_type": ShopItemTypeEnum.badge,
+        "cost": 0,
+        "image_url": "/shop-placeholders/badge-6.svg",
     },
     {
         "name": "Ocean Breeze",
@@ -132,6 +154,37 @@ def seed_shop_items():
         if db.query(ShopItem).count() == 0:
             for item in DEFAULT_SHOP_ITEMS:
                 db.add(ShopItem(**item))
+            db.commit()
+    finally:
+        db.close()
+
+
+# Rule definitions for the badges seeded above, keyed by ShopItem.name so this
+# stays correct regardless of insertion order/ids.
+DEFAULT_BADGE_RULES = {
+    "First Steps": {"criteria_type": BadgeRuleCriteriaEnum.first_quest, "threshold": 1},
+    "Study Streak": {"criteria_type": BadgeRuleCriteriaEnum.quest_streak, "threshold": 5},
+    "Helping Hand": {
+        "criteria_type": BadgeRuleCriteriaEnum.event_count,
+        "threshold": 5,
+        "params": {"source": "help_request"},
+    },
+    "Point Collector": {"criteria_type": BadgeRuleCriteriaEnum.lifetime_points, "threshold": 500},
+    "Quest Master": {"criteria_type": BadgeRuleCriteriaEnum.quest_total_count, "threshold": 25},
+    "Honor Roll": {"criteria_type": BadgeRuleCriteriaEnum.section_grade_threshold, "threshold": 90},
+}
+
+
+def seed_badge_rules():
+    db = SessionLocal()
+    try:
+        if db.query(BadgeRule).count() == 0:
+            badges = db.query(ShopItem).filter(
+                ShopItem.item_type == ShopItemTypeEnum.badge,
+                ShopItem.name.in_(DEFAULT_BADGE_RULES.keys()),
+            ).all()
+            for badge in badges:
+                db.add(BadgeRule(item_id=badge.item_id, **DEFAULT_BADGE_RULES[badge.name]))
             db.commit()
     finally:
         db.close()

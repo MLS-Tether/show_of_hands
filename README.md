@@ -938,4 +938,8 @@ This project will make use of the following technologies, 3rd-Party APIs, and ne
 * SQLAlchemy
 * Pytest
 
+## Future Ideas
+
+**School milestone unlocks.** Beyond the per-student badge-rule engine (`backend/services/badge_rules.py`) and the teacher/admin cosmetics auto-unlock, a school-wide milestone system could unlock additional collectibles for a school's teachers/admins once the school crosses cumulative activity thresholds — e.g. total points ever earned school-wide, total quests completed, or total assignments graded. This would be a new concept (no school-scoped achievement tracking exists today) and is undesigned; scoping it — what counts as a milestone, how it's tracked, and what unlocks — is a future planning exercise.
+
 

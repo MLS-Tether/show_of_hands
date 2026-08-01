@@ -20,6 +20,7 @@ from models.point_transaction_model import PointTransaction
 from models.help_request_model import HelpRequestAcceptance
 from models.study_room_model import RoomMember
 from models.class_request_model import ClassRequest
+from models.inventory_model import InventoryItem
 
 
 def unique(prefix: str) -> str:
@@ -83,6 +84,11 @@ _USER_DEPENDENT_LEAF_TABLES = [
     (HelpRequestAcceptance, "user_id"),
     (RoomMember, "user_id"),
     (ClassRequest, "requested_by"),
+    # Teachers/admins now auto-own every cosmetic (services/staff_inventory.py),
+    # so a single user teardown can imply dozens of these rows with ids never
+    # surfaced in any response body -- sweep by student_id instead of relying
+    # on tests to track each inventory_id individually.
+    (InventoryItem, "student_id"),
 ]
 
 

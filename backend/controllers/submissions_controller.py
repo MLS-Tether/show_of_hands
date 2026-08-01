@@ -14,6 +14,7 @@ from models.point_transaction_model import PointTransaction, TransactionSourceEn
 from models.section_model import Section
 from models.submission_model import Submission, SubmissionStatusEnum
 from models.user_model import User, RoleEnum
+from services.badge_rules import evaluate_badges_for_student
 from schemas.submission import (
     SubmissionCreate,
     SubmissionGradeUpdate,
@@ -262,6 +263,8 @@ def finalize_submission(
     submission.points_awarded = new_total
     submission.status = SubmissionStatusEnum.graded
     submission.finalized_at = datetime.now(timezone.utc)
+
+    evaluate_badges_for_student(db, student.user_id, section_id=section.section_id)
 
     emit_data_event(
         db, "submissions", "updated", section.school_id,

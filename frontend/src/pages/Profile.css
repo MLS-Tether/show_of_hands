@@ -1,3 +1,26 @@
+.profile-page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.profile-featured-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-h);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  padding: 4px 12px 4px 6px;
+}
+
+.profile-featured-badge img {
+  width: 24px;
+  height: 24px;
+}
+
 .profile-sections {
   display: flex;
   flex-direction: column;

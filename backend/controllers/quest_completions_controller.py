@@ -15,6 +15,7 @@ from models.section_model import Section
 from models.user_model import User, RoleEnum
 from quest_submission_utils import save_quest_submission_file
 from schemas.quest_completion import QuestCompletionListResponse, QuestCompletionResponse
+from services.badge_rules import evaluate_badges_for_student
 
 router = APIRouter(prefix="/quests", tags=["quest-completions"])
 
@@ -119,6 +120,8 @@ async def complete_quest(
         source_id=quest_id,
     ))
     current_user.total_points += quest.point_value
+
+    evaluate_badges_for_student(db, current_user.user_id, section_id=section.section_id)
 
     emit_data_event(
         db, "quests", "updated", section.school_id,

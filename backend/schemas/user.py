@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
 
@@ -25,6 +25,18 @@ class UserBrief(BaseModel):
     username: str
 
 
+class FeaturedBadgeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    item_id: int
+    name: str
+    image_url: str
+
+
+class FeaturedBadgeUpdateRequest(BaseModel):
+    item_id: Optional[int] = None
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -35,6 +47,7 @@ class UserResponse(BaseModel):
     role: RoleEnum
     school_id: int
     total_points: int
+    featured_badge: Optional[FeaturedBadgeResponse] = None
     created_at: datetime
 
 
@@ -70,3 +83,29 @@ class StudentSectionGradeResponse(BaseModel):
     period: str
     percentage: Optional[float]
     letter_grade: Optional[str]
+
+
+class ReportCardItemResponse(BaseModel):
+    kind: str
+    item_id: int
+    name: str
+    category: str
+    assigned_at: datetime
+    grade: Optional[float] = None
+
+
+class ReportCardSectionResponse(BaseModel):
+    section_id: int
+    class_name: str
+    period: str
+    teacher_name: Optional[str]
+    percentage: Optional[float]
+    letter_grade: Optional[str]
+    items: List["ReportCardItemResponse"]
+
+
+class ReportCardResponse(BaseModel):
+    student_id: int
+    username: str
+    full_name: str
+    sections: List["ReportCardSectionResponse"]

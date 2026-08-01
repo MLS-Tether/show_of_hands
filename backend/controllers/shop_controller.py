@@ -6,12 +6,15 @@ from sqlalchemy.orm import Session
 from db.data_events import emit_data_event
 from db.pool import get_db
 from dependencies import get_current_user, require_role
+from models.badge_rule_model import BadgeRule
 from models.inventory_model import InventoryItem
 from models.point_transaction_model import PointTransaction, TransactionSourceEnum
 from models.shop_item_model import ShopItem, ShopItemTypeEnum
 from models.user_model import User, RoleEnum
 from schemas.inventory import InventoryItemResponse, PurchaseResponse, EquipRequest
 from schemas.shop_item import ShopItemCreate, ShopItemUpdate, ShopItemResponse
+from services.badge_rules import get_badge_progress
+from services.staff_inventory import grant_item_to_all_staff
 
 router = APIRouter(tags=["shop"])
 
@@ -34,18 +37,35 @@ def list_shop_items(
 
     items = query.order_by(ShopItem.created_at.asc()).all()
 
+    # Owned/equipped applies to every role now -- students via purchase or
+    # badge-award, teachers/admins via the cosmetics auto-unlock grant
+    # (services/staff_inventory.py). Badge progress stays student-only:
+    # badges are never granted to staff, so it wouldn't mean anything there.
+    owned_by_item_id = {
+        inv.item_id: inv
+        for inv in db.query(InventoryItem).filter(
+            InventoryItem.student_id == current_user.user_id,
+            InventoryItem.item_id.in_([i.item_id for i in items]),
+        ).all()
+    }
+    for item in items:
+        owned_row = owned_by_item_id.get(item.item_id)
+        item.owned = owned_row is not None
+        item.equipped = owned_row.is_equipped if owned_row else False
+
     if current_user.role == RoleEnum.student:
-        owned_by_item_id = {
-            inv.item_id: inv
-            for inv in db.query(InventoryItem).filter(
-                InventoryItem.student_id == current_user.user_id,
-                InventoryItem.item_id.in_([i.item_id for i in items]),
+        badge_item_ids = [i.item_id for i in items if i.item_type == ShopItemTypeEnum.badge]
+        rules_by_item_id = {
+            r.item_id: r
+            for r in db.query(BadgeRule).filter(
+                BadgeRule.is_archived == False,
+                BadgeRule.item_id.in_(badge_item_ids),
             ).all()
-        }
+        } if badge_item_ids else {}
+
         for item in items:
-            owned_row = owned_by_item_id.get(item.item_id)
-            item.owned = owned_row is not None
-            item.equipped = owned_row.is_equipped if owned_row else False
+            rule = rules_by_item_id.get(item.item_id)
+            item.progress = get_badge_progress(db, current_user.user_id, rule) if rule else None
 
     return items
 
@@ -58,6 +78,8 @@ def create_shop_item(
 ):
     item = ShopItem(**body.model_dump())
     db.add(item)
+    db.flush()
+    grant_item_to_all_staff(db, item)
     db.commit()
     db.refresh(item)
     return item
@@ -115,6 +137,9 @@ def purchase_shop_item(
     ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Shop item not found.")
+
+    if item.item_type == ShopItemTypeEnum.badge:
+        raise HTTPException(status_code=403, detail="Badges are earned automatically and cannot be purchased.")
 
     existing = db.query(InventoryItem).filter(
         InventoryItem.student_id == current_user.user_id,
@@ -182,7 +207,7 @@ def get_user_inventory(
 def equip_inventory_item(
     inventory_id: int,
     body: EquipRequest,
-    current_user: User = Depends(require_role(["student"])),
+    current_user: User = Depends(require_role(["student", "teacher", "admin"])),
     db: Session = Depends(get_db),
 ):
     inventory = db.query(InventoryItem).filter(InventoryItem.inventory_id == inventory_id).first()

@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -82,4 +83,33 @@ def compute_section_grade_for_student(db: Session, section_id: int, student_id: 
     )
 
     graded = [(grade, category.value if hasattr(category, "value") else category) for grade, category in submissions]
+
+    # An overdue assignment the student never submitted at all counts as a 0
+    # in its category's average -- a submission that exists but is still
+    # awaiting grading is left alone (excluded, same as before) since the
+    # student did submit; only a true non-submission is penalized.
+    submitted_assignment_ids = {
+        assignment_id
+        for (assignment_id,) in db.query(Submission.assignment_id).join(
+            Assignment, Submission.assignment_id == Assignment.assignment_id
+        ).filter(
+            Assignment.section_id == section_id,
+            Assignment.is_archived == False,
+            Submission.student_id == student_id,
+            Submission.is_archived.is_(False),
+        ).all()
+    }
+
+    now = datetime.now(timezone.utc)
+    overdue_assignments = db.query(Assignment.assignment_id, Assignment.category).filter(
+        Assignment.section_id == section_id,
+        Assignment.is_archived == False,
+        Assignment.due_date < now,
+    ).all()
+
+    for assignment_id, category in overdue_assignments:
+        if assignment_id in submitted_assignment_ids:
+            continue
+        graded.append((0, category.value if hasattr(category, "value") else category))
+
     return compute_cumulative_grade(graded)

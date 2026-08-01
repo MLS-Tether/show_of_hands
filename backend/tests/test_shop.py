@@ -6,7 +6,7 @@ from models.user_model import User
 from tests.conftest import unique, auth_header
 
 
-def _make_shop_item(client, world, cleanup, item_type="badge", cost=10, **overrides):
+def _make_shop_item(client, world, cleanup, item_type="avatar_accessory", cost=10, **overrides):
     body = {
         "name": unique("Item"),
         "description": "A test item",
@@ -63,6 +63,18 @@ def _give_points(db, user_id, amount):
     db.commit()
 
 
+def _give_item_directly(db, cleanup, student_id, item_id):
+    """Badges can no longer be purchased, so tests that need one in a
+    student's inventory (e.g. to test equip behavior) grant it directly,
+    the same way the badge rule engine does."""
+    inventory = InventoryItem(student_id=student_id, item_id=item_id, is_equipped=False)
+    db.add(inventory)
+    db.commit()
+    db.refresh(inventory)
+    cleanup(InventoryItem, inventory.inventory_id)
+    return inventory.inventory_id
+
+
 def _purchase(client, token, item_id):
     return client.post(f"/api/shop/items/{item_id}/purchase", headers=auth_header(token))
 
@@ -92,19 +104,32 @@ def test_list_shop_items_shows_owned_and_equipped_for_student(client, world, cle
     assert by_id[unowned_item_id]["equipped"] is False
 
 
-def test_list_shop_items_hides_owned_equipped_for_teacher_and_admin(client, world, cleanup):
-    item_id = _make_shop_item(client, world, cleanup)
+def test_new_cosmetic_item_is_auto_owned_by_teacher_and_admin(client, world, cleanup):
+    # Cosmetics auto-unlock for staff: creating one backfills it into every
+    # existing teacher/admin's inventory immediately (services/staff_inventory.py).
+    item_id = _make_shop_item(client, world, cleanup, item_type="avatar_accessory")
 
     resp = client.get("/api/shop/items", headers=auth_header(world.teacher_token))
     assert resp.status_code == 200, resp.text
     item = next(i for i in resp.json() if i["item_id"] == item_id)
-    assert item.get("owned") is None
-    assert item.get("equipped") is None
+    assert item["owned"] is True
+    assert item["equipped"] is False
+    assert item.get("progress") is None
 
     resp = client.get("/api/shop/items", headers=auth_header(world.admin_token))
     assert resp.status_code == 200, resp.text
     item = next(i for i in resp.json() if i["item_id"] == item_id)
-    assert item.get("owned") is None
+    assert item["owned"] is True
+    assert item.get("progress") is None
+
+
+def test_new_badge_is_not_auto_owned_by_teacher_and_admin(client, world, cleanup):
+    badge_id = _make_shop_item(client, world, cleanup, item_type="badge")
+
+    resp = client.get("/api/shop/items?item_type=badge", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 200, resp.text
+    item = next(i for i in resp.json() if i["item_id"] == badge_id)
+    assert item["owned"] is False
 
 
 def test_list_shop_items_filters_by_item_type(client, world, cleanup):
@@ -327,6 +352,19 @@ def test_purchase_archived_item_404(client, world, cleanup):
     assert resp.status_code == 404
 
 
+def test_purchase_badge_403(client, world, cleanup, db):
+    badge_id = _make_shop_item(client, world, cleanup, item_type="badge")
+    student_id, student_token = _enroll_new_student(client, world, cleanup)
+    _give_points(db, student_id, 100)
+
+    resp = _purchase(client, student_token, badge_id)
+    assert resp.status_code == 403
+
+    resp = client.get(f"/api/users/{student_id}/inventory", headers=auth_header(student_token))
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == []
+
+
 def test_teacher_cannot_purchase(client, world, cleanup):
     item_id = _make_shop_item(client, world, cleanup)
     resp = _purchase(client, world.teacher_token, item_id)
@@ -412,12 +450,8 @@ def test_view_inventory_nonexistent_user_404(client, world):
 def test_equip_and_unequip_owned_item(client, world, cleanup, db):
     item_id = _make_shop_item(client, world, cleanup, item_type="badge")
     student_id, student_token = _enroll_new_student(client, world, cleanup)
-    _give_points(db, student_id, 100)
 
-    resp = _purchase(client, student_token, item_id)
-    assert resp.status_code == 200, resp.text
-    inventory_id = resp.json()["inventory_id"]
-    cleanup(InventoryItem, inventory_id)
+    inventory_id = _give_item_directly(db, cleanup, student_id, item_id)
 
     resp = client.patch(
         f"/api/inventory/{inventory_id}/equip",
@@ -479,17 +513,9 @@ def test_badges_are_not_single_equip(client, world, cleanup, db):
     badge_1 = _make_shop_item(client, world, cleanup, item_type="badge")
     badge_2 = _make_shop_item(client, world, cleanup, item_type="badge")
     student_id, student_token = _enroll_new_student(client, world, cleanup)
-    _give_points(db, student_id, 100)
 
-    resp = _purchase(client, student_token, badge_1)
-    assert resp.status_code == 200, resp.text
-    inv_1 = resp.json()["inventory_id"]
-    cleanup(InventoryItem, inv_1)
-
-    resp = _purchase(client, student_token, badge_2)
-    assert resp.status_code == 200, resp.text
-    inv_2 = resp.json()["inventory_id"]
-    cleanup(InventoryItem, inv_2)
+    inv_1 = _give_item_directly(db, cleanup, student_id, badge_1)
+    inv_2 = _give_item_directly(db, cleanup, student_id, badge_2)
 
     for inv_id in (inv_1, inv_2):
         resp = client.patch(

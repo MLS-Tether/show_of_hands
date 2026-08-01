@@ -363,7 +363,7 @@ function TeacherAssignmentView({ assignmentId, assignment }) {
     queryClient.setQueryData(keys.assignmentSubmissions(assignmentId), (prev) =>
       (prev || []).map((s) => (s.submission_id === updated.submission_id ? updated : s))
     )
-    queryClient.invalidateQueries({ queryKey: keys.sectionAnalytics(assignment.section_id) })
+    queryClient.invalidateQueries({ queryKey: ['section', assignment.section_id, 'analytics'] })
     queryClient.invalidateQueries({ queryKey: ['section', assignment.section_id, 'grades'] })
   }
 

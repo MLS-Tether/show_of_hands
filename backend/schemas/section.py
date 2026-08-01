@@ -111,13 +111,17 @@ class PointsDistribution(BaseModel):
     median: Optional[float]
 
 
-class StudentNeedingAttention(BaseModel):
-    user_id: int
-    username: str
+class StudentAttentionIssue(BaseModel):
     reason: str
     assignment_id: int
     assignment_title: Optional[str] = None
     grade: Optional[float] = None
+
+
+class StudentNeedingAttention(BaseModel):
+    user_id: int
+    username: str
+    issues: List[StudentAttentionIssue]
 
 
 class SectionAnalyticsResponse(BaseModel):
@@ -128,6 +132,10 @@ class SectionAnalyticsResponse(BaseModel):
     assignments: List[AssignmentAnalytics]
     points_distribution: PointsDistribution
     students_needing_attention: List[StudentNeedingAttention]
+    attention_page: int
+    attention_page_size: int
+    attention_total_students: int
+    attention_total_pages: int
 
 
 class StudentGradeResponse(BaseModel):

@@ -252,6 +252,39 @@ button.teacher-panel-row:hover {
   color: var(--accent);
 }
 
+.teacher-panel-group {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.teacher-panel-group:last-child {
+  border-bottom: none;
+}
+
+.teacher-panel-row-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin-bottom: 4px;
+}
+
+.teacher-panel-row-nested {
+  border-bottom: none;
+  padding: 2px 0 2px 10px;
+}
+
+.teacher-panel-pagination {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.teacher-panel-pagination-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .fit-result {
   margin-top: 14px;
   border: 1px solid var(--border);

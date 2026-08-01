@@ -15,7 +15,7 @@ export const keys = {
   questCompletions: (questId) => ['quest', questId, 'completions'],
   sectionResources: (sectionId) => ['section', sectionId, 'resources'],
   sectionHelpRequests: (sectionId) => ['section', sectionId, 'help-requests'],
-  sectionAnalytics: (sectionId) => ['section', sectionId, 'analytics'],
+  sectionAnalytics: (sectionId, attentionPage = 1) => ['section', sectionId, 'analytics', attentionPage],
   sectionEnrollmentRequests: (sectionId) => ['section', sectionId, 'enrollment-requests'],
   sectionUnenrollRequests: (sectionId) => ['section', sectionId, 'unenroll-requests'],
   sectionGrades: (sectionId, who = 'me') => ['section', sectionId, 'grades', who],
@@ -32,6 +32,7 @@ export const keys = {
   users: (filters = {}) => ['users', filters],
   user: (userId) => ['user', userId],
   userGrades: (userId) => ['user', userId, 'grades'],
+  userReportCard: (userId) => ['user', userId, 'report-card'],
   classRequests: () => ['class-requests'],
   unenrollRequests: () => ['unenroll-requests'],
   classes: () => ['classes'],
@@ -108,10 +109,11 @@ export function useSectionHelpRequests(sectionId, options = {}) {
   })
 }
 
-export function useSectionAnalytics(sectionId, options = {}) {
+export function useSectionAnalytics(sectionId, attentionPage = 1, options = {}) {
   return useQuery({
-    queryKey: keys.sectionAnalytics(sectionId),
-    queryFn: () => unwrap(api.get(`/sections/${sectionId}/analytics`)),
+    queryKey: keys.sectionAnalytics(sectionId, attentionPage),
+    queryFn: () =>
+      unwrap(api.get(`/sections/${sectionId}/analytics`, { params: { attention_page: attentionPage } })),
     enabled: !!sectionId,
     ...options,
   })
@@ -290,6 +292,15 @@ export function useUserGrades(userId, options = {}) {
   return useQuery({
     queryKey: keys.userGrades(userId),
     queryFn: () => unwrap(api.get(`/users/${userId}/grades`)),
+    enabled: !!userId,
+    ...options,
+  })
+}
+
+export function useUserReportCard(userId, options = {}) {
+  return useQuery({
+    queryKey: keys.userReportCard(userId),
+    queryFn: () => unwrap(api.get(`/users/${userId}/report_card`)),
     enabled: !!userId,
     ...options,
   })

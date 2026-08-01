@@ -18,6 +18,7 @@ from models.section_model import Section
 from models.study_room_model import StudyRoom, RoomMember
 from models.user_model import User, RoleEnum
 from notifications import notify
+from services.badge_rules import evaluate_badges_for_student
 from schemas.help_request import (
     AcceptedByEntry,
     HelpRequestBoardResponse,
@@ -452,6 +453,9 @@ def confirm_session(
             # into a clean 409 instead of a 500.
             db.rollback()
             raise HTTPException(status_code=409, detail="Session already confirmed.")
+
+        for uid in participant_ids:
+            evaluate_badges_for_student(db, uid, section_id=help_request.section_id)
 
         section = help_request.section
         emit_data_event(

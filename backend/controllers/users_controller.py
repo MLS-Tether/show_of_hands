@@ -11,18 +11,26 @@ from db.pool import get_db
 from dependencies import get_current_user, require_role
 from grading import compute_section_grade_for_student
 from image_utils import delete_avatar_image, save_avatar_image
+from models.assignment_model import Assignment
 from models.enrollment_model import Enrollment
+from models.inventory_model import InventoryItem
 from models.notification_model import NotificationTypeEnum
+from models.quest_model import Quest
 from models.section_model import Section, SectionStatusEnum
+from models.shop_item_model import ShopItem, ShopItemTypeEnum
+from models.submission_model import Submission, SubmissionStatusEnum
 from models.user_model import User, RoleEnum
 from notifications import notify
 from schemas.user import (
     UserResponse,
     UserListResponse,
     StudentSectionGradeResponse,
+    ReportCardResponse,
     ProfileUpdateRequest,
     ProfilePictureResponse,
+    FeaturedBadgeUpdateRequest,
 )
+from sqlalchemy import or_
 
 
 class RejectSignupRequest(BaseModel):
@@ -109,6 +117,35 @@ def delete_profile_picture(
     return ProfilePictureResponse(profile_picture_url=None)
 
 
+@router.patch("/me/featured-badge", response_model=UserResponse)
+def set_my_featured_badge(
+    body: FeaturedBadgeUpdateRequest,
+    current_user: User = Depends(require_role(["student"])),
+    db: Session = Depends(get_db),
+):
+    if body.item_id is not None:
+        item = db.query(ShopItem).filter(
+            ShopItem.item_id == body.item_id,
+            ShopItem.is_archived == False,
+        ).first()
+        if not item:
+            raise HTTPException(status_code=404, detail="Badge not found.")
+        if item.item_type != ShopItemTypeEnum.badge:
+            raise HTTPException(status_code=400, detail="Only badges can be featured.")
+
+        owned = db.query(InventoryItem).filter(
+            InventoryItem.student_id == current_user.user_id,
+            InventoryItem.item_id == body.item_id,
+        ).first()
+        if not owned:
+            raise HTTPException(status_code=403, detail="You don't own this badge.")
+
+    current_user.featured_badge_item_id = body.item_id
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
 @router.get("", response_model=List[UserListResponse])
 def list_users(
     role: Optional[str] = None,
@@ -186,6 +223,102 @@ def get_student_grades(
             "letter_grade": grade["letter_grade"],
         })
     return results
+
+
+@router.get("/{user_id}/report_card", response_model=ReportCardResponse)
+def get_student_report_card(
+    user_id: int,
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db),
+):
+    student = db.query(User).filter(
+        User.user_id == user_id,
+        User.school_id == current_user.school_id,
+        User.is_archived == False,
+    ).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if student.role != RoleEnum.student:
+        raise HTTPException(status_code=400, detail="User is not a student.")
+
+    enrollments = db.query(Enrollment).filter(
+        Enrollment.student_id == user_id,
+        Enrollment.is_archived == False,
+    ).all()
+
+    sections_out = []
+    for enrollment in enrollments:
+        section = db.query(Section).filter(
+            Section.section_id == enrollment.section_id,
+            Section.is_archived == False,
+        ).first()
+        if not section:
+            continue
+
+        grade = compute_section_grade_for_student(db, section.section_id, user_id)
+
+        assignments = db.query(Assignment).filter(
+            Assignment.section_id == section.section_id,
+            Assignment.is_archived == False,
+        ).all()
+        submissions_by_assignment = {
+            s.assignment_id: s
+            for s in db.query(Submission).filter(
+                Submission.student_id == user_id,
+                Submission.assignment_id.in_([a.assignment_id for a in assignments]),
+                Submission.is_archived == False,
+            ).all()
+        } if assignments else {}
+
+        items = []
+        for a in assignments:
+            submission = submissions_by_assignment.get(a.assignment_id)
+            items.append({
+                "kind": "assignment",
+                "item_id": a.assignment_id,
+                "name": a.title,
+                "category": a.category.value,
+                "assigned_at": a.created_at,
+                "grade": (
+                    submission.grade
+                    if submission and submission.status == SubmissionStatusEnum.graded and submission.grade is not None
+                    else None
+                ),
+            })
+
+        quests = db.query(Quest).filter(
+            Quest.section_id == section.section_id,
+            Quest.is_archived == False,
+            or_(Quest.assigned_to.is_(None), Quest.assigned_to == user_id),
+        ).all()
+        for q in quests:
+            items.append({
+                "kind": "quest",
+                "item_id": q.quest_id,
+                "name": q.title,
+                "category": q.category.value,
+                "assigned_at": q.created_at,
+                "grade": None,
+            })
+
+        items.sort(key=lambda i: i["assigned_at"])
+
+        sections_out.append({
+            "section_id": section.section_id,
+            "class_name": section.class_.name,
+            "period": section.period,
+            "teacher_name": section.teacher.full_name if section.teacher else None,
+            "percentage": grade["percentage"],
+            "letter_grade": grade["letter_grade"],
+            "items": items,
+        })
+
+    return {
+        "student_id": student.user_id,
+        "username": student.username,
+        "full_name": student.full_name,
+        "sections": sections_out,
+    }
 
 
 @router.patch("/{user_id}/verify")

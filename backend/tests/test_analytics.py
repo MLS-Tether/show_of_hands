@@ -69,8 +69,9 @@ def test_analytics_computes_expected_numbers(client, world, cleanup):
 
     attention = body["students_needing_attention"]
     assert any(
-        s["assignment_id"] == a2 and s["reason"] == "no_submission" and s["user_id"] == world.student_id
-        for s in attention
+        student["user_id"] == world.student_id
+        and any(i["assignment_id"] == a2 and i["reason"] == "no_submission" for i in student["issues"])
+        for student in attention
     )
 
 
@@ -83,9 +84,35 @@ def test_analytics_flags_low_grade(client, world, cleanup):
     assert resp.status_code == 200, resp.text
     attention = resp.json()["students_needing_attention"]
     assert any(
-        s["assignment_id"] == a1 and s["reason"] == "low_grade" and s["grade"] == 50
-        for s in attention
+        any(i["assignment_id"] == a1 and i["reason"] == "low_grade" and i["grade"] == 50 for i in student["issues"])
+        for student in attention
     )
+
+
+def test_analytics_attention_paginated_by_student(client, world, cleanup):
+    # Two overdue assignments with no submissions -> the one enrolled student
+    # is flagged twice, but should appear once, grouped, with both issues.
+    a1 = _new_assignment(client, world, cleanup, point_value=50, due_date="2020-01-01T00:00:00Z")
+    a2 = _new_assignment(client, world, cleanup, point_value=50, due_date="2020-01-01T00:00:00Z")
+
+    resp = client.get(
+        f"/api/sections/{world.section_id}/analytics",
+        params={"attention_page": 1, "attention_page_size": 1},
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+
+    assert body["attention_page"] == 1
+    assert body["attention_page_size"] == 1
+    assert body["attention_total_students"] == 1
+    assert body["attention_total_pages"] == 1
+    assert len(body["students_needing_attention"]) == 1
+
+    student = body["students_needing_attention"][0]
+    assert student["user_id"] == world.student_id
+    flagged_assignment_ids = {i["assignment_id"] for i in student["issues"]}
+    assert flagged_assignment_ids == {a1, a2}
 
 
 def test_analytics_forbidden_for_student(client, world):

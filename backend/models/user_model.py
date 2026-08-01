@@ -28,6 +28,7 @@ class User(Base):
     last_active_at = Column(DateTime(timezone=True), nullable=True)
     signup_note = Column(Text, nullable=True)
     total_points = Column(Integer, nullable=False, default=0)
+    featured_badge_item_id = Column(Integer, ForeignKey("shop_items.item_id", ondelete="SET NULL"), nullable=True)
     is_archived = Column(Boolean, nullable=False, default=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
@@ -45,3 +46,4 @@ class User(Base):
     help_request_acceptances = relationship("HelpRequestAcceptance", back_populates="user", foreign_keys="HelpRequestAcceptance.user_id")
     room_memberships = relationship("RoomMember", back_populates="user", foreign_keys="RoomMember.user_id")
     inventory_items = relationship("InventoryItem", back_populates="student")
+    featured_badge = relationship("ShopItem", foreign_keys=[featured_badge_item_id])

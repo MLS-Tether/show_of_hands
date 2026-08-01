@@ -1,0 +1,103 @@
+.badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.badges-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.badges-card-locked {
+  opacity: 0.55;
+}
+
+.badges-card-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 72px;
+  margin-bottom: 10px;
+}
+
+.badges-card-image img {
+  max-width: 72px;
+  max-height: 72px;
+}
+
+.badges-card-locked .badges-card-image img {
+  filter: grayscale(100%);
+}
+
+.badges-card-tooltip-wrapper {
+  position: relative;
+  cursor: default;
+}
+
+.badges-card-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  padding: 4px 9px;
+  background: var(--surface-2);
+  color: var(--text-h);
+  font-size: 11px;
+  white-space: nowrap;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.badges-card-tooltip-wrapper:hover .badges-card-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.badges-card-title {
+  font-size: 13px;
+  color: var(--text-h);
+}
+
+.badges-card-description {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 6px 0 0;
+  flex-grow: 1;
+}
+
+.badges-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.badges-card-status {
+  font-size: 11px;
+  border-radius: 10px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+
+.badges-card-status-locked {
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+}
+
+.badges-card-status-featured {
+  color: var(--success);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+}
