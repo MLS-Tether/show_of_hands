@@ -52,3 +52,18 @@
   font-size: 10px;
   color: var(--accent);
 }
+
+@media (max-width: 380px) {
+  .customize-group-items {
+    gap: 6px;
+  }
+
+  .customize-item {
+    width: 72px;
+  }
+
+  .customize-item img {
+    width: 34px;
+    height: 34px;
+  }
+}

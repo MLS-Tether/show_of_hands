@@ -105,3 +105,32 @@
   background: var(--success-bg);
   border: 1px solid var(--success-border);
 }
+
+@media (max-width: 768px) {
+  .shop-balance-value {
+    font-size: 26px;
+  }
+
+  .shop-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+
+  .shop-card {
+    padding: 12px;
+  }
+
+  .shop-card-image {
+    height: 76px;
+  }
+
+  .shop-card-image img {
+    max-width: 76px;
+    max-height: 76px;
+  }
+}
+
+@media (max-width: 380px) {
+  .shop-grid {
+    grid-template-columns: 1fr;
+  }
+}
