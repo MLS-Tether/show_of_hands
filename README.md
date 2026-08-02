@@ -15,10 +15,54 @@ Examples:
 * Read a book for 1 hour  
 * Take a picture, write a short summary about what you find most interesting
 
+## Technology Stack
+
+### Frontend
+
+* **React 19 + Vite 8** — component UI and dev server/bundler. Chosen for fast HMR and a large ecosystem; alternatives considered: Next.js (unneeded for a pure SPA with no SSR/SEO requirement) or Vue.
+* **react-router-dom 7** — client-side routing for the SPA. Alternative: TanStack Router.
+* **TanStack Query 5** — the app's server-state/cache layer (queries, mutations, cache invalidation) rather than a general client-state store. Paired with a custom `RealtimeProvider` that listens on a notifications WebSocket and invalidates matching query keys as events arrive, with a 7-minute background refetch as a rare fallback for missed events (`queryClient.js`) — a push-driven model instead of polling. Alternatives: Redux/Zustand/MobX (would require hand-building the caching/dedup/refetch logic TanStack Query already provides) or SWR.
+* **axios** — HTTP client for REST calls. Alternative: the native `fetch` API.
+* **Plain CSS per component** (no CSS framework) — one `.css` file per component, no Tailwind/CSS Modules/styled-components. Keeps styling dependency-free at the cost of manual scoping discipline; alternative: Tailwind CSS for utility-first styling and smaller bespoke stylesheets.
+* **@daily-co/daily-js** — embeds Daily.co's video/voice call UI into study rooms.
+* **jsPDF** — generates report-card PDFs client-side, avoiding a server-side PDF rendering dependency.
+
+### Backend
+
+* **FastAPI + Uvicorn** — the API framework and ASGI server. Chosen for native async support (needed for the WebSocket chat/notification streams) and automatic request validation via Pydantic. Alternatives: Django (heavier, batteries-included but less natural for a WebSocket-heavy API) or Flask (would need separate async/WebSocket tooling).
+* **Pydantic + pydantic-settings** — request/response schema validation and typed environment config.
+* **SQLAlchemy + Alembic** — ORM and schema migrations. Alternatives: Django ORM (tied to Django) or Prisma (less mature Python support).
+* **psycopg2-binary** — PostgreSQL driver underneath SQLAlchemy.
+* **python-jose + passlib/bcrypt** — hand-rolled JWT auth (access + refresh tokens, hashed refresh-token storage, single-use rotation) rather than a managed auth provider. Alternatives: Auth0, Clerk, or Supabase Auth — any of which would offload token management but add an external dependency and cost for what is currently a small, self-contained auth flow.
+* **APScheduler** — runs in-process background jobs (e.g. the stale-grade reminder check in `main.py`) without standing up a separate task queue.
+* **httpx** — used for hand-rolled wrapper calls to the Gemini and Daily.co REST APIs (`gemini_advisor.py`, `daily_client.py`) instead of their official SDKs, each behind an `is_configured()` check so those features degrade gracefully when a key isn't set — a Gemini or Daily outage never blocks the chat/room's core functionality.
+* **Pillow** — re-encodes and validates uploaded avatar images server-side so a malicious file can't be smuggled past the extension/content-type check.
+
+### Database & Realtime
+
+* **PostgreSQL, hosted on Supabase** — used purely as a managed Postgres instance plus a Storage bucket for avatars; Supabase Auth/RLS/Realtime are intentionally not used. The connection pooling is split across two Supavisor modes for the same reason: a permanent session-mode connection (port 5432) is reserved solely for `LISTEN/NOTIFY`, while the app's SQLAlchemy engine uses a small transaction-mode pool (port 6543, `pool_size=5, max_overflow=3`) — Supabase's free tier caps session-mode connections at 15 shared across every developer, so ordinary dev/test traffic on session mode alone was exhausting it (`db/pool.py`).
+* **Homegrown realtime layer** — Postgres `LISTEN/NOTIFY` bridged into asyncio queues and fanned out over WebSockets (chat, notifications), rather than a separate broker. Alternatives: Redis pub/sub, Supabase Realtime, or a hosted service like Pusher/Ably — any of which would add infrastructure this single small Postgres instance doesn't otherwise need.
+
+### Third-Party APIs
+
+* **Google Gemini (`gemini-3.1-flash-lite`)** — powers an "assignment-fit" advisor that judges whether a class is ready for a draft assignment against real grade/help-request data, with explicit prompt-injection defenses around teacher-authored free text.
+* **Daily.co** — provisions private, token-gated, auto-expiring video/voice rooms for study sessions.
+* **Supabase Storage** — hosts uploaded avatar images.
+
+### Hosting & Deployment
+
+* **Render** (backend, free tier) — alternatives: Railway, Fly.io.
+* **Vercel** (frontend, static SPA) — alternatives: Netlify, Cloudflare Pages.
+* No Docker/containerization and no CI/CD (no GitHub Actions or equivalent) are currently configured — tests and linting run locally/manually only.
+
+### Testing
+
+* **pytest + pytest-asyncio** — backend test suite (30+ files covering nearly every controller). The frontend has no test framework configured yet (no Jest/Vitest/Playwright/Testing Library).
+
 ## User Personas/Audience
 
 **The Problem**  
-Modern K-12 education has drifted toward standardized testing and rigid, one-size-fits-all instruction. This creates a few compounding issues:
+Modern high school and higher education has drifted toward standardized testing and rigid, one-size-fits-all instruction. This creates a few compounding issues:
 
 * Students memorize for tests rather than build genuine understanding.  
 * Individual learning styles are ignored, so students who don't fit the "standard" pace fall behind or disengage.  
@@ -52,16 +96,16 @@ Modern K-12 education has drifted toward standardized testing and rigid, one-siz
 * **Background:** Maya is bright but bored. She does fine on tests through last-minute cramming but doesn't feel like she *understands* half of what she's tested on. She's constantly on her phone during class, and when she gets stuck on homework, she defaults to searching the answer online rather than asking a classmate. For her, it feels faster and less embarrassing.  
 * **Goals:** Wants school to feel less like a chore and more like something she's actually invested in. Wants recognition for effort, not just grades.  
 * **Frustrations:** Standardized pacing that doesn't match how she learns; feels anonymous in a large class; doesn't see the point of "office hours" since no one goes.  
-* **How Show of Hands helps:** The anonymous bulletin board lets her post a help request without the social risk of asking in class out loud. Quests and points make small wins visible and rewarding, giving her a reason to engage.
+* **How Show of Hands helps:** The bulletin board keeps a help request's poster hidden from other students until someone actually joins it, so she can post without the social risk of asking in class out loud — and can't be cherry-picked or avoided by classmates who'd recognize her name. Quests and points make small wins visible and rewarding, giving her a reason to engage.
 
 #### **2\. Jordan Reyes — The Quiet Struggler**
 
-* **Age/Grade:** 13, 8th grade  
+* **Age/Grade:** 18, college freshman  
 * **Role:** Student  
-* **Background:** Jordan is falling behind in math but is too self-conscious to raise his hand or admit confusion in front of the class. He doesn't reach out to classmates because he doesn't want to seem "behind," and he doesn't read or study outside of school. Virtual learning days make it worse, with no opportunity for hallway conversations. No casual "Hey, did you get \#7 on the test?"  
+* **Background:** Jordan is falling behind in his intro math course but is too self-conscious to raise his hand or admit confusion in a 200-person lecture hall. He doesn't reach out to classmates because he doesn't want to seem "behind," and he doesn't know anyone in the class yet. Online/hybrid sections make it worse, with no opportunity for hallway conversations. No casual "Hey, did you get \#7 on the problem set?"  
 * **Goals:** Wants to catch up without feeling singled out. Wants low-stakes ways to get help.  
 * **Frustrations:** Fear of judgment from peers; teachers can't always tell he's struggling until a bad grade shows up.  
-* **How Show of Hands helps:** Anonymous help requests remove the social risk. Being rewarded (points) for reaching out reframes asking for help as a positive, active behavior rather than an admission of weakness. Teacher-side visibility into help-request topics also flags struggling areas before a graded assignment does.
+* **How Show of Hands helps:** Help requests hide the requester's identity from other students until a classmate joins, which removes the social risk of asking and — just as importantly — forces students into a random classmate's study room instead of always defaulting to their existing friend group. Being rewarded (points) for reaching out reframes asking for help as a positive, active behavior rather than an admission of weakness. Teacher-side visibility into help-request topics also flags struggling areas before a graded assignment does.
 
 #### **3\. Ms. Patel — The Overloaded, Data-Hungry Teacher**
 
@@ -76,15 +120,14 @@ Modern K-12 education has drifted toward standardized testing and rigid, one-siz
 **MVP (Without these features, the application will not be useful)**
 
 1. As a teacher, I can assign “quests” for students to complete (Quests can be academic or non academic). I can set “quest” difficulty, topic, completion conditions, duration, and points gained. I am able to check if a student met the completion requirements and approve point gains.  
-2. As a student, I can send out an anonymous “party request” (anonymous to ensure the same people are not teaming up all the time.) for help or study time for a particular class or topic. I can specify my desired group size, session duration (When the session ends, the student who requested help can extend the duration of the meeting. Group members can decide whether to stay or leave.) and gain points for working together.  
-3. Students can complete quests (teacher assigned or default) which enables them to engage socially with other classmates by teaming up to complete the task \+ gain “XP points/currency”.  
-   (Ex: Form a party of 4, go to the library, check out a book, and read for 1 hour. Take a picture with your party at the library and write a short summary of what you found most interesting.)
+2. As a student, I can send out an anonymous “party request” (anonymous to ensure the same people are not teaming up all the time — the requester's identity is hidden from other students until one of them joins) for help or study time for a particular class or topic. I can specify my desired group size and session duration; the requester can extend the duration once the session starts, and group members can decide whether to stay or leave. **[Built]** — implemented as help requests + study rooms, including live text chat and a Daily.co video/voice call in the room.  
+3. As a student, I can complete quests (teacher assigned or default) individually to gain “XP points/currency”. **[Built, single-student only]** — the original vision below describes teaming up with classmates on a quest ("form a party of 4"); that group-completion mechanic isn't implemented. Quest completion today is one student, one quest, one completion record.  
+   (Original vision, not yet built: Form a party of 4, go to the library, check out a book, and read for 1 hour. Take a picture with your party at the library and write a short summary of what you found most interesting.)
 
 **Stretch Features (When time is running short, these features will get cut)**
 
-1. As a User, I can video chat with my fellow users that are enrolled in the same class  
-2. As a student, I can “challenge a friend” and compete to see how quickly and accurately we can complete tests/quizzes based on learning  
-3. As a User, I can join an “Accountability Party” which is a party of people who consistently holds each other accountable in submitting assignments and completing quests
+1. As a student, I can “challenge a friend” and compete to see how quickly and accurately we can complete tests/quizzes based on learning  
+2. As a User, I can join an “Accountability Party” which is a party of people who consistently holds each other accountable in submitting assignments and completing quests
 
 ---
 
@@ -104,839 +147,505 @@ Modern K-12 education has drifted toward standardized testing and rigid, one-siz
 
 Document the tables required for your project. For each table, include the name of the table, the field names, and any relevant constraints. Below is an example of a simple todo application's schema.
 
-**Schools table**
+**Schools** (`schools`)
 
 | Column | Type | Constraints |
 | :---- | :---- | :---- |
-| school\_id | INTEGER | PK |
-| name | VARCHAR | NOT NULL |
-| school\_code | VARCHAR | UNIQUE, NOT NULL |
-| created\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| school_id | INTEGER | PK |
+| name | VARCHAR | UNIQUE, NOT NULL |
+| school_code | VARCHAR | UNIQUE, NOT NULL |
+| district | VARCHAR | NULL |
+| grades | VARCHAR | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 
-## 
-
-**Users table**
+**Users** (`users`)
 
 | Column | Type | Constraints |
 | :---- | :---- | :---- |
-| user\_id | INTEGER | PK |
-| school\_id | INTEGER | FK → schools.school\_id, NOT NULL |
+| user_id | INTEGER | PK |
+| school_id | INTEGER | FK → schools.school_id, NOT NULL |
 | username | VARCHAR | NOT NULL |
-| password\_hash | VARCHAR | NOT NULL |
+| full_name | VARCHAR | NOT NULL |
+| profile_picture_url | VARCHAR | NULL |
+| password_hash | VARCHAR | NOT NULL |
 | email | VARCHAR | NULL |
 | role | ENUM(student, teacher, admin) | NOT NULL |
-| is\_verified | BOOLEAN | NOT NULL, DEFAULT false |
-| total\_points | INTEGER | NOT NULL, DEFAULT 0 |
-| is\_archived | BOOLEAN | NOT NULL, DEFAULT false |
-| deleted\_at | TIMESTAMPTZ | NULL |
-| created\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
-| updated\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
+| is_verified | BOOLEAN | NOT NULL, DEFAULT false |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true |
+| rejection_reason | TEXT | NULL |
+| last_active_at | TIMESTAMPTZ | NULL |
+| signup_note | TEXT | NULL |
+| total_points | INTEGER | NOT NULL, DEFAULT 0 |
+| featured_badge_item_id | INTEGER | FK → shop_items.item_id, ON DELETE SET NULL, NULL |
+| is_archived | BOOLEAN | NOT NULL, DEFAULT false |
+| deleted_at | TIMESTAMPTZ | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
 
-## 
-
-**Classes**
+**Classes** (`classes`) — a global catalog of class names, not school-scoped
 
 | Column | Type | Constraints |
 | :---- | :---- | :---- |
-| class\_id | INTEGER | PK |
+| class_id | INTEGER | PK |
 | name | VARCHAR | UNIQUE, NOT NULL |
-| created\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 
-## 
-
-**Quests**
+**Class Requests** (`class_requests`) — a teacher's request to add a new class to the catalog
 
 | Column | Type | Constraints |
 | :---- | :---- | :---- |
-| quest\_id | INTEGER | PK |
-| section\_id | INTEGER | FK → sections.section\_id, NOT NULL |
+| class_request_id | INTEGER | PK |
+| class_name | VARCHAR | NOT NULL |
+| subject | VARCHAR | NULL |
+| description | TEXT | NULL |
+| requested_by | INTEGER | FK → users.user_id, NOT NULL |
+| school_id | INTEGER | FK → schools.school_id, NOT NULL |
+| status | ENUM(pending, approved, rejected) | NOT NULL, DEFAULT pending |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+
+**Sections** (`sections`) — one teacher's roster for one class/period
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| section_id | INTEGER | PK |
+| class_id | INTEGER | FK → classes.class_id, NOT NULL |
+| school_id | INTEGER | FK → schools.school_id, NOT NULL |
+| teacher_id | INTEGER | FK → users.user_id, ON DELETE SET NULL, NULL |
+| period | VARCHAR | NOT NULL |
+| capacity | INTEGER | NOT NULL |
+| status | ENUM(active, archived, pending_reassignment) | NOT NULL, DEFAULT active |
+| is_archived | BOOLEAN | NOT NULL, DEFAULT false |
+| deleted_at | TIMESTAMPTZ | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
+
+**Enrollments** (`enrollments`) — a student's confirmed seat in a section
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| enrollment_id | INTEGER | PK |
+| section_id | INTEGER | FK → sections.section_id, ON DELETE CASCADE, NOT NULL |
+| student_id | INTEGER | FK → users.user_id, ON DELETE CASCADE, NOT NULL |
+| is_archived | BOOLEAN | NOT NULL, DEFAULT false |
+| deleted_at | TIMESTAMPTZ | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+
+UNIQUE (section_id, student_id)
+
+**Enrollment Requests** (`enrollment_requests`) — a student's pending ask to join a section
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| enrollment_request_id | INTEGER | PK |
+| section_id | INTEGER | FK → sections.section_id, ON DELETE CASCADE, NOT NULL |
+| student_id | INTEGER | FK → users.user_id, ON DELETE CASCADE, NOT NULL |
+| status | ENUM(pending, accepted, rejected, archived) | NOT NULL, DEFAULT pending |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
+
+UNIQUE (section_id, student_id)
+
+**Unenroll Requests** (`unenroll_requests`) — a teacher's request to remove a student from their section, subject to admin approval
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| unenroll_request_id | INTEGER | PK |
+| section_id | INTEGER | FK → sections.section_id, ON DELETE CASCADE, NOT NULL |
+| student_id | INTEGER | FK → users.user_id, ON DELETE CASCADE, NOT NULL |
+| requested_by | INTEGER | FK → users.user_id, NOT NULL |
+| reason | TEXT | NOT NULL |
+| status | ENUM(pending, approved, rejected, cancelled) | NOT NULL, DEFAULT pending |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
+
+**Assignments** (`assignments`)
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| assignment_id | INTEGER | PK |
+| section_id | INTEGER | FK → sections.section_id, NOT NULL |
+| title | VARCHAR | NOT NULL |
+| description | TEXT | NULL |
+| url | VARCHAR | NULL |
+| due_date | TIMESTAMPTZ | NOT NULL |
+| point_value | INTEGER | NOT NULL |
+| category | ENUM(homework, quizzes, tests) | NOT NULL, DEFAULT homework |
+| is_archived | BOOLEAN | NOT NULL, DEFAULT false |
+| deleted_at | TIMESTAMPTZ | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
+
+**Submissions** (`submissions`) — a student's turned-in work for an assignment
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| submission_id | INTEGER | PK |
+| assignment_id | INTEGER | FK → assignments.assignment_id, NOT NULL |
+| student_id | INTEGER | FK → users.user_id, NOT NULL |
+| content | TEXT | NULL |
+| file_url | VARCHAR | NULL |
+| status | ENUM(submitted, pending, graded) | NOT NULL, DEFAULT submitted |
+| grade | FLOAT | NULL |
+| points_awarded | INTEGER | NOT NULL, DEFAULT 0 |
+| finalized_at | TIMESTAMPTZ | NULL |
+| reminder_sent_at | TIMESTAMPTZ | NULL |
+| is_archived | BOOLEAN | NOT NULL, DEFAULT false |
+| deleted_at | TIMESTAMPTZ | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
+
+UNIQUE (assignment_id, student_id)
+
+**Quests** (`quests`)
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| quest_id | INTEGER | PK |
+| section_id | INTEGER | FK → sections.section_id, NOT NULL |
 | title | VARCHAR | NOT NULL |
 | description | TEXT | NOT NULL |
 | category | ENUM(academic, social) | NOT NULL |
-| point\_value | INTEGER | NOT NULL |
-| quest\_type | ENUM(daily, weekly, monthly) | NOT NULL |
+| point_value | INTEGER | NOT NULL |
+| quest_type | ENUM(daily, weekly, monthly) | NOT NULL |
 | source | ENUM(teacher, system) | NOT NULL |
-| assigned\_to | INTEGER | FK → users.user\_id, NULL |
-| is\_archived | BOOLEAN | NOT NULL, DEFAULT false |
-| deleted\_at | TIMESTAMPTZ | NULL |
-| created\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
-| updated\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
+| assigned_to | INTEGER | FK → users.user_id, NULL |
+| is_archived | BOOLEAN | NOT NULL, DEFAULT false |
+| deleted_at | TIMESTAMPTZ | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
 
-## 
-
-**Help Requests**
+**Quest Completions** (`quest_completions`) — single-student only; there is no group/party completion mechanic (see [User Stories](#user-stories))
 
 | Column | Type | Constraints |
 | :---- | :---- | :---- |
-| help\_request\_id | INTEGER | PK |
-| section\_id | INTEGER | FK → sections.section\_id, NOT NULL |
-| requester\_id | INTEGER | FK → users.user\_id, NOT NULL |
+| quest_completion_id | INTEGER | PK |
+| quest_id | INTEGER | FK → quests.quest_id, NOT NULL |
+| student_id | INTEGER | FK → users.user_id, NOT NULL |
+| points_awarded | INTEGER | NOT NULL |
+| description | TEXT | NULL |
+| file_url | VARCHAR | NULL |
+| completed_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+
+UNIQUE (quest_id, student_id)
+
+**Point Transactions** (`point_transactions`) — ledger of every point award/spend, keyed to its originating source
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| transaction_id | INTEGER | PK |
+| user_id | INTEGER | FK → users.user_id, NOT NULL |
+| amount | INTEGER | NOT NULL |
+| source | ENUM(assignment, quest, help_request, shop_purchase) | NOT NULL |
+| source_id | INTEGER | NOT NULL |
+| awarded_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+
+UNIQUE (user_id, source, source_id) — the idempotency guard that prevents double-awarding points for the same event
+
+**Help Requests** (`help_requests`)
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| help_request_id | INTEGER | PK |
+| section_id | INTEGER | FK → sections.section_id, NOT NULL |
+| requester_id | INTEGER | FK → users.user_id, NOT NULL |
 | topic | VARCHAR | NOT NULL |
 | description | TEXT | NULL |
-| group\_size | INTEGER | NOT NULL |
-| current\_size | INTEGER | NOT NULL, DEFAULT 1 |
-| duration\_minutes | INTEGER | NOT NULL |
+| group_size | INTEGER | NOT NULL |
+| current_size | INTEGER | NOT NULL, DEFAULT 1 |
+| duration_minutes | INTEGER | NOT NULL |
 | status | ENUM(open, active, closed, expired) | NOT NULL, DEFAULT open |
-| is\_archived | BOOLEAN | NOT NULL, DEFAULT false |
-| deleted\_at | TIMESTAMPTZ | NULL |
-| created\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
-| updated\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
+| is_archived | BOOLEAN | NOT NULL, DEFAULT false |
+| deleted_at | TIMESTAMPTZ | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
 
-## 
+> **Note:** `requester_id`/`requester_username` are only ever returned to teachers/admins, or to students in the room after they've joined via `room_members` — never in the student-facing bulletin-board listing. This is what makes a help request "anonymous until joined."
 
-**Study Rooms**
+**Help Request Acceptances** (`help_request_acceptances`) — who joined which help request, and when
 
 | Column | Type | Constraints |
 | :---- | :---- | :---- |
-| room\_id | INTEGER | PK |
-| help\_request\_id | INTEGER | FK → help\_requests.help\_request\_id, UNIQUE, NOT NULL |
-| timer\_ends\_at | TIMESTAMPTZ | NOT NULL |
+| help_request_id | INTEGER | PK (composite), FK → help_requests.help_request_id |
+| user_id | INTEGER | PK (composite), FK → users.user_id |
+| accepted_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+
+**Study Rooms** (`study_rooms`)
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| room_id | INTEGER | PK |
+| help_request_id | INTEGER | FK → help_requests.help_request_id, UNIQUE, NOT NULL |
+| timer_ends_at | TIMESTAMPTZ | NOT NULL |
 | status | ENUM(active, closed) | NOT NULL, DEFAULT active |
-| created\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| daily_room_name | VARCHAR | NULL |
+| daily_room_url | VARCHAR | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 
-## 
-
-**Assignments**
+**Room Members** (`room_members`) — who is currently in a study room; this is where a joined student first sees the requester's identity
 
 | Column | Type | Constraints |
 | :---- | :---- | :---- |
-| assignment\_id | INTEGER | PK |
-| section\_id | INTEGER | FK → sections.section\_id, NOT NULL |
+| room_id | INTEGER | PK (composite), FK → study_rooms.room_id |
+| user_id | INTEGER | PK (composite), FK → users.user_id |
+| joined_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+
+**Notifications** (`notifications`)
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| notification_id | INTEGER | PK |
+| user_id | INTEGER | FK → users.user_id, NOT NULL |
+| type | ENUM(enrollment_approved, enrollment_rejected, new_assignment, new_quest, new_help_request, help_request_accepted, section_status, new_class_request, class_request_approved, class_request_rejected, grade_finalization_reminder, assignment_overdue, password_reset_requested, new_unenroll_request, unenroll_request_approved, unenroll_request_rejected, removed_from_section) | NOT NULL |
+| message | TEXT | NOT NULL |
+| is_read | BOOLEAN | NOT NULL, DEFAULT false |
+| assignment_id | INTEGER | FK → assignments.assignment_id, NULL |
+| entity_type | VARCHAR | NULL |
+| entity_id | INTEGER | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+
+**Resources** (`resources`) — teacher-posted links for a section
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| resource_id | INTEGER | PK |
+| section_id | INTEGER | FK → sections.section_id, NOT NULL |
+| teacher_id | INTEGER | FK → users.user_id, NOT NULL |
 | title | VARCHAR | NOT NULL |
+| url | VARCHAR | NOT NULL |
 | description | TEXT | NULL |
-| submission\_type | ENUM(file\_upload, text\_response, url\_link, completion) | NOT NULL |
-| point\_value | INTEGER | NOT NULL |
-| due\_date | TIMESTAMPTZ | NOT NULL |
-| is\_archived | BOOLEAN | NOT NULL, DEFAULT false |
-| deleted\_at | TIMESTAMPTZ | NULL |
-| created\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
-| updated\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
+| is_archived | BOOLEAN | NOT NULL, DEFAULT false |
+| deleted_at | TIMESTAMPTZ | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
 
-## 
-
-**Enrollments**
+**Shop Items** (`shop_items`) — cosmetics/badges purchasable (or earned) with points
 
 | Column | Type | Constraints |
 | :---- | :---- | :---- |
-| enrollment\_id | INTEGER | PK |
-| section\_id | INTEGER | FK → sections.section\_id, NOT NULL |
-| student\_id | INTEGER | FK → users.user\_id, NOT NULL |
-| status | ENUM(pending, approved, rejected) | NOT NULL, DEFAULT pending |
-| is\_archived | BOOLEAN | NOT NULL, DEFAULT false |
-| deleted\_at | TIMESTAMPTZ | NULL |
-| created\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
-| updated\_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), ON UPDATE now() |
+| item_id | INTEGER | PK |
+| name | VARCHAR | NOT NULL |
+| description | TEXT | NULL |
+| item_type | ENUM(avatar_base, avatar_accessory, badge, theme) | NOT NULL |
+| cost | INTEGER | NOT NULL |
+| image_url | VARCHAR | NOT NULL |
+| theme_key | VARCHAR | NULL |
+| is_archived | BOOLEAN | NOT NULL, DEFAULT false |
+| deleted_at | TIMESTAMPTZ | NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 
-## 
+> **Note:** `owned`, `equipped`, and badge `progress` are not columns — the shop endpoints compute and attach them to each item at request time, per requesting user.
+
+**Student Inventory** (`student_inventory`) — items a student has purchased or been granted
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| inventory_id | INTEGER | PK |
+| student_id | INTEGER | FK → users.user_id, NOT NULL |
+| item_id | INTEGER | FK → shop_items.item_id, NOT NULL |
+| is_equipped | BOOLEAN | NOT NULL, DEFAULT false |
+| purchased_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+
+UNIQUE (student_id, item_id)
+
+**Badge Rules** (`badge_rules`) — defines the criteria that auto-unlock a badge-type shop item
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| badge_rule_id | INTEGER | PK |
+| item_id | INTEGER | FK → shop_items.item_id, UNIQUE, NOT NULL |
+| criteria_type | ENUM(first_quest, quest_streak, event_count, lifetime_points, quest_total_count, section_grade_threshold) | NOT NULL |
+| threshold | INTEGER | NOT NULL |
+| params | JSON | NULL |
+| is_archived | BOOLEAN | NOT NULL, DEFAULT false |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+
+**Refresh Tokens** (`refresh_tokens`) — see the [Authentication](#authentication) section; the only hard-deleted table in the schema
+
+| Column | Type | Constraints |
+| :---- | :---- | :---- |
+| id | INTEGER | PK |
+| user_id | INTEGER | FK → users.user_id, NOT NULL |
+| jti | VARCHAR | UNIQUE |
+| token_hash | VARCHAR | UNIQUE (SHA-256 of the token) |
+| expires_at | TIMESTAMPTZ | NOT NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 
 ## API Contract
 
-Document each available endpoint for your application including
-
-* The method type and endpoint path (include path parameters)  
-* A brief description  
-* Request information including the body structure and any optional query strings. Provide default values for optional request body fields.  
-* Response information including success/error response structures and status codes
-
-Below is an example of a simple todo application's API contract with three endpoints:
-
-**`# Show of Hands — API Contract (As Built)`**
-
-**`---`**
-
-**`## Table of Contents`**  
-**`1. [Authentication](#authentication)`**  
-**`2. [Classes](#classes)`**  
-**`3. [Sections](#sections)`**  
-**`4. [Enrollments](#enrollments)`**  
-**`5. [Assignments](#assignments)`**  
-**`6. [Quests](#quests)`**  
-**`7. [Help Requests (Bulletin Board)](#help-requests-bulletin-board)`**  
-**`8. [Study Rooms](#study-rooms)`**  
-**`9. [Users](#users)`**
-
-**`---`**
-
-**`## Global Conventions`**
-
-**`` - All endpoints are prefixed with `/api` ``**  
-**``- All requests and responses use `application/json` unless otherwise noted``**  
-**`- All timestamps are returned in ISO 8601 format`**  
-**`- Authentication is required on all endpoints unless marked **[Public]**`**  
-**`- Role-based access is enforced server-side on every protected endpoint`**  
-**``- Soft deletes are used across academic records (`is_archived` + `deleted_at`) — no hard deletes, except the `refresh_tokens` table (see note below)``**  
-**`` - JWT access tokens must be included in the `Authorization` header as `Bearer <token>` ``**
-
-**`` **Roles:** `student` | `teacher` | `admin` ``**
-
-**`**Error Response Structure (all endpoints):**`**  
-**```` ```json ````**  
-**`{ "message": "string" }`**  
-**```` ``` ````**
-
-**`---`**
-
-**`## Authentication`**
-
-**``### `POST /api/auth/register` [Public]``**  
-**`Creates a new user account scoped to a school.`**
-
-**`- **Request Body:**`**  
-**```` ```json ````**  
-**`{`**  
-  **`"username": "string (required)",`**  
-  **`"password": "string (required)",`**  
-  **`"school_code": "string (required)",`**  
-  **`"role": "student | teacher | admin (required)",`**  
-  **`"email": "string (optional)"`**  
-**`}`**  
-**```` ``` ````**  
-**`- **Response:**`**  
-  **``- `201` — Returns the created user``**  
-**```` ```json ````**  
-**`{`**  
-  **`"user_id": "integer",`**  
-  **`"username": "string",`**  
-  **`"role": "string",`**  
-  **`"school_id": "integer",`**  
-  **`"total_points": "integer",`**  
-  **`"created_at": "timestamp"`**  
-**`}`**  
-**```` ``` ````**  
-  **`` - `404` — School code doesn't match any school `{ "message": "School not found." }` ``**  
-  **`` - `409` — Username already taken at that school `{ "message": "Username already taken." }` ``**
-
-**``> **Note:** Students are created with `is_verified = true` automatically. Teacher and Admin accounts are created with `is_verified = false` and must be verified by an existing Admin (`PATCH /api/users/:id/verify`) before they can log in. The response does not currently surface `is_verified`, so the client can't tell from this call alone which state the account is in.``**
-
-**`---`**
-
-**``### `POST /api/auth/login` [Public]``**  
-**`Authenticates a user and returns JWT tokens.`**
-
-**`- **Request Body:**`**  
-**```` ```json ````**  
-**`{`**  
-  **`"username": "string (required)",`**  
-  **`"password": "string (required)"`**  
-**`}`**  
-**```` ``` ````**  
-**`- **Response:**`**  
-  **`` - `200` ``**  
-**```` ```json ````**  
-**`{`**  
-  **`"access_token": "string",`**  
-  **`"refresh_token": "string",`**  
-  **`"token_type": "bearer",`**  
-  **`"role": "student | teacher | admin",`**  
-  **`"user_id": "integer"`**  
-**`}`**  
-**```` ``` ````**  
-  **`` - `401` — Invalid credentials `{ "message": "Invalid credentials." }` ``**  
-  **`` - `403` — Account not yet verified `{ "message": "Account pending admin verification." }` ``**
-
-**``> **Note:** Login does not currently require `school_code` — usernames are looked up across all schools (excluding archived users).``**
-
-**`---`**
-
-**``### `POST /api/auth/refresh` [Public]``**  
-**`Issues a new access token using a valid refresh token.`**
-
-**`- **Request Body:**`**  
-**```` ```json ````**  
-**`{ "refresh_token": "string (required)" }`**  
-**```` ``` ````**  
-**`- **Response:**`**  
-  **`` - `200` ``**  
-**```` ```json ````**  
-**`{ "access_token": "string", "token_type": "bearer" }`**  
-**```` ``` ````**  
-  **`` - `401` — Missing `jti`/`user_id` in token `{ "message": "Invalid refresh token." }` ``**  
-  **`` - `401` — No matching record (already used/rotated) `{ "message": "Refresh token not found or already used." }` ``**  
-  **`` - `401` — User no longer exists or is archived `{ "message": "User not found." }` ``**
-
-**`---`**
-
-**`` ### `POST /api/auth/logout` ``**  
-**`Invalidates the current refresh token. Requires a valid access token.`**
-
-**`- **Request Body:**`**  
-**```` ```json ````**  
-**`{ "refresh_token": "string (required)" }`**  
-**```` ``` ````**  
-**`- **Response:**`**  
-  **`` - `200` `{ "message": "Logged out successfully." }` ``**
-
-**`---`**
-
-**``> **Implementation Note — `refresh_tokens` table:** Implemented via `RefreshToken` model. Fields: `id` (PK), `user_id` (FK → users), `jti` (unique), `token_hash` (unique, SHA-256 of the token), `expires_at`, `created_at`. This table has no dedicated API endpoint and does not support soft deletes — records are hard deleted on logout.``**
-
-**`---`**
-
-**`` ### `POST /api/auth/reset-password` ``**  
-**`Allows an Admin or Teacher to reset a student's password.`**
-
-**`` - **Roles:** `admin`, `teacher` ``**  
-**`- **Request Body:**`**  
-**```` ```json ````**  
-**`{`**  
-  **`"user_id": "integer (required)",`**  
-  **`"new_password": "string (required)"`**  
-**`}`**  
-**```` ``` ````**  
-**`- **Response:**`**  
-  **`` - `200` `{ "message": "Password reset successfully." }` ``**  
-  **`` - `403` — Target is not a student `{ "message": "Can only reset passwords for students." }` ``**  
-  **`` - `403` — Target belongs to a different school `{ "message": "Cannot reset passwords for users outside your school." }` ``**  
-  **`` - `404` — User not found `{ "message": "User not found." }` ``**
-
-**`---`**
-
-**`## Classes`**
-
-**`` ### `GET /api/classes` ``**  
-**`Returns all available global classes, alphabetized by name.`**
-
-**`` - **Roles:** `teacher`, `admin` ``**  
-**`- **Response:**`**  
-  **`` - `200` ``**  
-**```` ```json ````**  
-**`[`**  
-  **`{ "class_id": "integer", "name": "string" }`**  
-**`]`**  
-**```` ``` ````**
-
-**``> **Note:** Classes are currently only created two ways — the startup seed job (a fixed list of default class names) or automatically on class-request approval. There is no direct `POST /api/classes` endpoint.``**
-
-**`---`**
-
-**`## Sections`**
-
-**`` ### `GET /api/sections` ``**  
-**`Returns all active sections for the authenticated user's school.`**
-
-**`` - **Roles:** `student`, `teacher`, `admin` ``**  
-**``- **Query Params:** `?class_id=integer` (optional)``**  
-**`- **Response:**`**  
-  **`` - `200` ``**  
-**```` ```json ````**  
-**`[`**  
-  **`{`**  
-    **`"section_id": "integer",`**  
-    **`"class_name": "string",`**  
-    **`"teacher_name": "string | null",`**  
-    **`"period": "string",`**  
-    **`"enrolled_count": "integer",`**  
-    **`"capacity": "integer",`**  
-    **`"status": "active | archived | pending_reassignment"`**  
-  **`}`**  
-**`]`**  
-**```` ``` ````**
-
-**`---`**
-
-**`` ### `POST /api/sections` ``**  
-**`Creates a new section, owned by the creating teacher.`**
-
-**`` - **Roles:** `teacher` ``**  
-**`- **Request Body:**`**  
-**```` ```json ````**  
-**`{`**  
-  **`"class_id": "integer (required)",`**  
-  **`"period": "string (required)",`**  
-  **`"capacity": "integer (required)"`**  
-**`}`**  
-**```` ``` ````**  
-**`- **Response:**`**  
-  **`` - `201` ``**  
-**```` ```json ````**  
-**`{`**  
-  **`"section_id": "integer",`**  
-  **`"class_name": "string",`**  
-  **`"period": "string",`**  
-  **`"capacity": "integer",`**  
-  **`"status": "active",`**  
-  **`"created_at": "timestamp"`**  
-**`}`**  
-**```` ``` ````**
-
-**`---`**
-
-**`` ### `GET /api/sections/:id` ``**  
-**`Returns full details for a single section, including its roster, assignments, and quests.`**
-
-**`` - **Roles:** `student` (enrolled only), `teacher` (owner only), `admin` ``**  
-**`- **Response:**`**  
-  **`` - `200` ``**  
-**```` ```json ````**  
-**`{`**  
-  **`"section_id": "integer",`**  
-  **`"class_name": "string",`**  
-  **`"teacher_name": "string | null",`**  
-  **`"period": "string",`**  
-  **`"capacity": "integer",`**  
-  **`"enrolled_count": "integer",`**  
-  **`"status": "active | archived | pending_reassignment",`**  
-  **`"students": [ { "user_id": "integer", "username": "string" } ],`**  
-  **`"assignments": [ { "assignment_id": "integer", "title": "string", "due_date": "timestamp" } ],`**  
-  **`"quests": [ { "quest_id": "integer", "title": "string", "category": "academic | social" } ]`**  
-**`}`**  
-**```` ``` ````**  
-  **`` - `403` — Not enrolled / not owner / different school `{ "message": "Not enrolled in this section." }` or `{ "message": "Not your section." }` or `{ "message": "Access denied." }` ``**  
-  **`` - `404` — Section not found `{ "message": "Section not found." }` ``**
-
-**`---`**
-
-**`` ### `PATCH /api/sections/:id` ``**  
-**`Updates section details or status.`**
-
-**``- **Roles:** `teacher` (period, capacity only), `admin` (period, capacity, status, teacher reassignment)``**  
-**`- **Request Body:**`**  
-**```` ```json ````**  
-**`{`**  
-  **`"period": "string (optional)",`**  
-  **`"capacity": "integer (optional)",`**  
-  **`"status": "active | archived | pending_reassignment (admin only, optional)",`**  
-  **`"teacher_id": "integer (admin only, optional)"`**  
-**`}`**  
-**```` ``` ````**  
-**`- **Response:**`**  
-  **`` - `200` `{ "section_id": "integer", "status": "string", "updated_at": "timestamp" }` ``**  
-  **``- `403` — Unauthorized role, or teacher doesn't own the section``**  
-  **``- `404` — Section not found``**
-
-**``> **Note:** If a teacher submits `status` or `teacher_id`, those fields are silently ignored rather than erroring.``**
-
-**`---`**
-
-**`` ### `DELETE /api/sections/:id` ``**  
-**`Soft deletes (archives) a section.`**
-
-**`` - **Roles:** `admin` ``**  
-**`- **Response:**`**  
-  **`` - `200` `{ "message": "Section deleted successfully." }` ``**  
-  **``- `404` — Section not found``**
-
-**`---`**
-
-**`## Enrollments`**
-
-**``> **Not yet implemented.** `enrollment_requests_controller.py` currently only defines an empty router with no endpoints. There is no way yet for a student to request to join a section, for a teacher to approve/reject that request, or for an admin to remove a student from a section — even though the `Enrollment` model, `EnrollmentStatusEnum`, and downstream logic that depends on approved enrollments (sections, quests, help requests, submissions) are already built and expect this data to exist.``**  
-**`>`**  
-**`> Endpoints still to be built:`**  
-**``> - `POST /api/sections/:id/enrollment-requests` — student requests to join a section``**  
-**``> - `GET /api/sections/:id/enrollment-requests` — teacher/admin views pending requests``**  
-**``> - `PATCH /api/enrollment-requests/:id` — teacher approves/rejects a request``**  
-**``> - `DELETE /api/sections/:id/students/:student_id` — admin removes a student from a section``**
-
-**`---`**
-
-**`## Assignments`**
-
-**``> **Not yet implemented.** `assignments_controller.py` currently only defines an empty router with no endpoints. There is no way yet to create, list, view, update, or delete an assignment — even though the `Assignment` model file exists as a placeholder (`from db.pool import Base`, no columns defined yet) and the submissions logic already assumes assignments exist (referencing `assignment.section_id`, `assignment.point_value`, etc.).``**  
-**`>`**  
-**`> Endpoints still to be built:`**  
-**``> - `GET /api/sections/:id/assignments` — list assignments for a section``**  
-**``> - `POST /api/sections/:id/assignments` — teacher creates an assignment``**  
-**``> - `GET /api/assignments/:id` — view a single assignment``**  
-**``> - `PATCH /api/assignments/:id` — teacher updates an assignment``**  
-**``> - `DELETE /api/assignments/:id` — teacher soft-deletes an assignment``**
-
-**`---`**
-
-**`## Quests`**
-
-**`` ### `GET /api/sections/:id/quests` ``**  
-**`Returns all quests for a section, newest first.`**
-
-**`` - **Roles:** `student` (enrolled only), `teacher` (owner only), `admin` ``**  
-**``- **Query Params:** `?category=academic|social` (optional; `400` on invalid value)``**  
-**`- **Response:**`**  
-  **`` - `200` ``**  
-**```` ```json ````**  
-**`[`**  
-  **`{`**  
-    **`"quest_id": "integer",`**  
-    **`"title": "string",`**  
-    **`"description": "string",`**  
-    **`"category": "academic | social",`**  
-    **`"point_value": "integer",`**  
-    **`"quest_type": "daily | weekly | monthly",`**  
-    **`"source": "teacher | system",`**  
-    **`"assigned_to": "all | integer (student_id)",`**  
-    **`"created_at": "timestamp"`**  
-  **`}`**  
-**`]`**  
-**```` ``` ````**
-
-**`---`**
-
-**`` ### `POST /api/sections/:id/quests` ``**  
-**`Teacher creates a custom quest for a section or a specific student.`**
-
-**``- **Roles:** `teacher` (section owner)``**  
-**`- **Request Body:**`**  
-**```` ```json ````**  
-**`{`**  
-  **`"title": "string (required)",`**  
-  **`"description": "string (required)",`**  
-  **`"category": "academic | social (required)",`**  
-  **`"point_value": "integer (required)",`**  
-  **`"quest_type": "daily | weekly | monthly (required)",`**  
-  **`"assigned_to": "all | integer (student_id) (required)"`**  
-**`}`**  
-**```` ``` ````**  
-**`- **Response:**`**  
-  **`` - `201` ``**  
-**```` ```json ````**  
-**`{`**  
-  **`"quest_id": "integer",`**  
-  **`"title": "string",`**  
-  **`"category": "string",`**  
-  **`"point_value": "integer",`**  
-  **`"assigned_to": "all | integer",`**  
-  **`"created_at": "timestamp"`**  
-**`}`**  
-**```` ``` ````**  
-  **``- `404` — Section or target student not found``**
-
-**``> **Note:** `social` category quests automatically get their `point_value` multiplied by 1.5 (rounded down) on creation. Creating a quest notifies the assigned student, or all approved-and-enrolled students if `assigned_to` is `"all"`.``**
-
-**`---`**
-
-**`` ### `DELETE /api/quests/:id` ``**  
-**`Soft deletes a teacher-created quest.`**
-
-**``- **Roles:** `teacher` (section owner)``**  
-**`- **Response:**`**  
-  **`` - `200` `{ "message": "Quest deleted successfully." }` ``**  
-  **``- `403` — Cannot delete system-generated quests, or not your quest``**  
-  **``- `404` — Quest not found``**
-
-**`---`**
-
-**`` ### `POST /api/quests/:id/complete` ``**  
-**`Marks a quest as completed and awards points.`**
-
-**`` - **Roles:** `student` ``**  
-**`- **Request Body:** None`**  
-**`- **Response:**`**  
-  **`` - `201` ``**  
-**```` ```json ````**  
-**`{`**  
-  **`"quest_completion_id": "integer",`**  
-  **`"quest_id": "integer",`**  
-  **`"student_id": "integer",`**  
-  **`"points_awarded": "integer",`**  
-  **`"completed_at": "timestamp"`**  
-**`}`**  
-**```` ``` ````**  
-  **``- `403` — Not enrolled, or quest is assigned to a different student``**  
-  **``- `404` — Quest not found``**  
-  **``- `409` — Already completed``**
-
-**`---`**
-
-**`## Help Requests (Bulletin Board)`**
-
-**`` ### `GET /api/sections/:id/help-requests` ``**  
-**`Returns all active help requests for a section.`**
-
-**`` - **Roles:** `student` (enrolled only), `teacher` (owner only), `admin` ``**  
-**`- **Response:**`**  
-  **``- `200` — Student-facing (requester identity hidden):``**  
-**```` ```json ````**  
-**`[`**  
-  **`{`**  
-    **`"help_request_id": "integer",`**  
-    **`"topic": "string",`**  
-    **`"description": "string | null",`**  
-    **`"group_size": "integer",`**  
-    **`"current_size": "integer",`**  
-    **`"duration_minutes": "integer",`**  
-    **`"status": "open | active | closed | expired",`**  
-    **`"created_at": "timestamp"`**  
-  **`}`**  
-**`]`**  
-**```` ``` ````**  
-  **``- `200` — Teacher/Admin-facing (includes requester identity):``**  
-**```` ```json ````**  
-**`[`**  
-  **`{`**  
-    **`"help_request_id": "integer",`**  
-    **`"requester_id": "integer",`**  
-    **`"requester_username": "string",`**  
-    **`"topic": "string",`**  
-    **`"description": "string | null",`**  
-    **`"group_size": "integer",`**  
-    **`"current_size": "integer",`**  
-    **`"duration_minutes": "integer",`**  
-    **`"status": "open | active | closed | expired",`**  
-    **`"accepted_by": [ { "user_id": "integer", "username": "string", "accepted_at": "timestamp" } ],`**  
-    **`"created_at": "timestamp"`**  
-  **`}`**  
-**`]`**  
-**```` ``` ````**
-
-**`---`**
-
-**`` ### `POST /api/sections/:id/help-requests` ``**  
-**`Student posts a help request to the bulletin board.`**
-
-**``- **Roles:** `student` (enrolled only)``**  
-**`- **Request Body:**`**  
-**```` ```json ````**  
-**`{`**  
-  **`"topic": "string (required)",`**  
-  **`"description": "string (optional)",`**  
-  **`"group_size": "integer (required)",`**  
-  **`"duration_minutes": "integer (required)"`**  
-**`}`**  
-**```` ``` ````**  
-**`- **Response:**`**  
-  **`` - `201` ``**  
-**```` ```json ````**  
-**`{`**  
-  **`"help_request_id": "integer",`**  
-  **`"topic": "string",`**  
-  **`"description": "string | null",`**  
-  **`"group_size": "integer",`**  
-  **`"current_size": "integer",`**  
-  **`"duration_minutes": "integer",`**  
-  **`"status": "open",`**  
-  **`"created_at": "timestamp"`**  
-**`}`**  
-**```` ``` ````**
-
-**`---`**
-
-**`` ### `POST /api/help-requests/:id/accept` ``**  
-**`Student accepts an open help request.`**
-
-**``- **Roles:** `student` (enrolled in the section, not the requester)``**  
-**`- **Request Body:** None`**  
-**`- **Response:**`**  
-  **`` - `200` `{ "help_request_id": "integer", "status": "active", "room_id": "integer" }` ``**  
-  **``- `400` — Accepting your own request``**  
-  **``- `403` — Not enrolled``**  
-  **``- `404` — Help request not found``**  
-  **``- `409` — Already full, no longer open, or already accepted by this user``**
-
-**``> **Note:** The first acceptance creates a `StudyRoom` (with the requester and acceptor as members); subsequent acceptances add members to the existing room. Once `current_size` reaches `group_size`, status flips to `active`. The requester gets a `help_request_accepted` notification on every acceptance.``**
-
-**``> **Implementation Note — `help_request_acceptances` table:** Implemented via `HelpRequestAcceptance` model. Composite PK on (`help_request_id`, `user_id`), plus `accepted_at`. No dedicated endpoint; does not support soft deletes.``**
-
-**`---`**
-
-**`` ### `POST /api/help-requests/:id/drop` ``**  
-**`Requester closes their own help request.`**
-
-**``- **Roles:** `student` (requester only)``**  
-**`- **Request Body:** None`**  
-**`- **Response:**`**  
-  **`` - `200` `{ "message": "Help request closed." }` ``**  
-  **``- `403` — Not the requester``**  
-  **``- `404` — Help request not found``**
-
-**`---`**
-
-**`` ### `POST /api/help-requests/:id/confirm` ``**  
-**`Requester confirms or denies that a help session took place. Triggers point distribution.`**
-
-**``- **Roles:** `student` (requester only)``**  
-**`- **Request Body:**`**  
-**```` ```json ````**  
-**`{ "session_occurred": "boolean (required)" }`**  
-**```` ``` ````**  
-**`- **Response:**`**  
-  **`` - `200` ``**  
-**```` ```json ````**  
-**`{`**  
-  **`"help_request_id": "integer",`**  
-  **`"session_occurred": "boolean",`**  
-  **`"points_awarded": "integer (25 per participant if true, 0 if false)"`**  
-**`}`**  
-**```` ``` ````**  
-  **``- `403` — Not the requester``**  
-  **``- `404` — Help request not found``**  
-  **``- `409` — Session already confirmed for this request``**
-
-**``> **Note:** On confirmation with `session_occurred: true`, the requester and every accepted participant each receive 25 points.``**
-
-**`---`**
-
-**`## Study Rooms`**
-
-**``> **Implementation Note — `room_members` table:** Implemented via `RoomMember` model. Composite PK on (`room_id`, `user_id`), plus `joined_at`. No dedicated endpoint; does not support soft deletes.``**
-
-**`` ### `GET /api/rooms/:id` ``**  
-**`Returns the current state of a study room.`**
-
-**``- **Roles:** `student` (room members only), `teacher`, `admin` (same school as the room)``**  
-**`- **Response:**`**  
-  **`` - `200` ``**  
-**```` ```json ````**  
-**`{`**  
-  **`"room_id": "integer",`**  
-  **`"help_request_id": "integer",`**  
-  **`"members": [ { "user_id": "integer", "username": "string" } ],`**  
-  **`"timer_ends_at": "timestamp",`**  
-  **`"status": "active | closed"`**  
-**`}`**  
-**```` ``` ````**  
-  **``- `403` — Not a room member / different school``**  
-  **``- `404` — Room not found``**
-
-**`---`**
-
-**`` ### `POST /api/rooms/:id/kick` ``**  
-**`Requester removes a participant from the study room.`**
-
-**``- **Roles:** Requester only (not restricted to `student` in code — enforced purely by requester check)``**  
-**`- **Request Body:**`**  
-**```` ```json ````**  
-**`{ "user_id": "integer (required)" }`**  
-**```` ``` ````**  
-**`- **Response:**`**  
-  **`` - `200` `{ "message": "Member removed from room." }` ``**  
-  **``- `400` — Trying to kick yourself``**  
-  **``- `403` — Not the requester``**  
-  **``- `404` — User not in this room``**
-
-**`> **Note:** If DB membership drops to 1 or fewer remaining after the kick, the room auto-closes and all live WebSocket connections are disconnected.`**
-
-**`---`**
-
-**`` ### `POST /api/rooms/:id/extend` ``**  
-**`Requester extends the session timer by 10 minutes.`**
-
-**`- **Roles:** Requester only`**  
-**`- **Request Body:** None`**  
-**`- **Response:**`**  
-  **`` - `200` `{ "room_id": "integer", "timer_ends_at": "timestamp" }` ``**  
-  **``- `403` — Not the requester``**  
-  **``- `404` — Room not found``**  
-  **``- `409` — Room is not active``**
-
-**`---`**
-
-**`` ### `POST /api/rooms/:id/close` ``**  
-**`Requester manually closes the study room.`**
-
-**`- **Roles:** Requester only`**  
-**`- **Request Body:** None`**  
-**`- **Response:**`**  
-  **`` - `200` `{ "message": "Room closed." }` ``**  
-  **``- `403` — Not the requester``**  
-  **``- `404` — Room not found``**  
-  **``- `409` — Room already closed``**
-
-**``> **Note:** Closing sends a `session_confirmation_required` message over the requester's active WebSocket connection (if any), then disconnects everyone.``**
-
-**`---`**
-
-**`` ### WebSocket `WS /api/rooms/:id/chat` ``**  
-**`Real-time text chat within a study room.`**
-
-**`- **Roles:** Room members only`**  
-**`` - **Connection:** JWT passed as query param `?token=<access_token>` ``**  
-**`` - **Incoming Message:** `{ "content": "string" }` ``**  
-**`- **Outgoing (broadcast) Message:**`**  
-**```` ```json ````**  
-**`{`**  
-  **`"user_id": "integer",`**  
-  **`"username": "string",`**  
-  **`"content": "string",`**  
-  **`"sent_at": "timestamp"`**  
-**`}`**  
-**```` ``` ````**  
-**`- **Disconnect Codes:**`**  
-  **``- `1000` — Normal closure``**  
-  **``- `4001` — Invalid/expired token, or user not a room member``**  
-  **``- `4003` — Room doesn't exist or isn't active``**
-
-**``> **Note:** Chat is in-memory only (`room_registry` dict) and is never persisted to the database. If the requester ends up as the only connected member, the room auto-closes.``**
-
-**`---`**
-
-**`## Users`**
-
-**`` ### `GET /api/users` ``**  
-**`Returns all active users in the authenticated admin's school.`**
-
-**`` - **Roles:** `admin` ``**  
-**``- **Query Params:** `?role=student|teacher|admin` (optional; `400` on invalid value)``**  
-**`- **Response:**`**  
-  **`` - `200` ``**  
-**```` ```json ````**  
-**`[`**  
-  **`{`**  
-    **`"user_id": "integer",`**  
-    **`"username": "string",`**  
-    **`"role": "string",`**  
-    **`"is_verified": "boolean",`**  
-    **`"created_at": "timestamp"`**  
-  **`}`**  
-**`]`**  
-**```` ``` ````**
-
-**`---`**
-
-**`` ### `GET /api/users/:id` ``**  
-**`Returns profile information for a user.`**
-
-**`` - **Roles:** `student` (own only), `teacher`, `admin` ``**  
-**`- **Response:**`**  
-  **`` - `200` ``**  
-**```` ```json ````**  
-**`{`**  
-  **`"user_id": "integer",`**  
-  **`"username": "string",`**  
-  **`"role": "student | teacher | admin",`**  
-  **`"school_id": "integer",`**  
-  **`"total_points": "integer",`**  
-  **`"created_at": "timestamp"`**  
-**`}`**  
-**```` ``` ````**  
-  **``- `403` — Student requesting someone else's profile, or cross-school access``**  
-  **``- `404` — User not found``**
-
-**`---`**
-
-**`` ### `PATCH /api/users/:id/verify` ``**  
-**`Admin verifies a pending Teacher or Admin account.`**
-
-**`` - **Roles:** `admin` ``**  
-**`- **Request Body:** None`**  
-**`- **Response:**`**  
-  **`` - `200` `{ "message": "User verified successfully." }` ``**  
-  **``- `404` — User not found``**
-
-**``> **Note:** No error is currently raised if the user is already verified — it's simply set to `true` again.``**
-
-**`---`**
-
-**`` ### `DELETE /api/users/:id` ``**  
-**`Soft deletes a user from the school.`**
-
-**`` - **Roles:** `admin` ``**  
-**`- **Response:**`**  
-  **`` - `200` `{ "message": "User deleted successfully." }` ``**  
-  **``- `400` — Trying to delete your own account``**  
-  **``- `404` — User not found``**
+All endpoints are prefixed with `/api` (except the unauthenticated `GET /` health check used by Render). All requests/responses use `application/json` unless noted otherwise (multipart form uploads are called out explicitly). Timestamps are ISO 8601. JWT access tokens go in the `Authorization: Bearer <token>` header; WebSocket connections instead pass the token via the `Sec-WebSocket-Protocol` handshake header, since query-string tokens end up in proxy/CDN access logs and browser history. Soft deletes (`is_archived` + `deleted_at`) are used across academic records — the only hard-deleted table is `refresh_tokens`, cleared on logout/rotation. Roles: `student` | `teacher` | `admin`.
+
+This section is intentionally condensed to method/path/role/description rather than full request-and-response JSON for every one of the ~90 endpoints below — see the model tables above for the exact fields each resource returns, and the controller source under `backend/controllers/` for exact validation rules.
+
+### Authentication (`/api/auth`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| POST | `/auth/register` | Public | Creates a user under a school by `school_code`. Students auto-verify; teacher/admin signups stay pending until an admin approves them via `PATCH /users/{id}/verify`. |
+| POST | `/auth/login` | Public | Returns an access + refresh token pair. Usernames are looked up across all schools, not scoped by `school_code`. |
+| POST | `/auth/refresh` | Public (token in body) | Rotates a refresh token (old one is deleted, a new pair issued). Reuse of an already-rotated token revokes every refresh token for that user. |
+| POST | `/auth/logout` | any authenticated user | Deletes the presented refresh token. |
+| POST | `/auth/reset-password` | admin, teacher | Resets a student's password (target must be a student in the caller's school). |
+| POST | `/auth/change-password` | teacher, admin | Changes the caller's own password; requires the old password. |
+
+### Schools (`/api/schools`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| POST | `/schools` | Public | Creates a new school plus its first admin account; returns tokens for that admin. |
+| GET | `/schools/code` | admin | Returns the caller's school join code. |
+| GET | `/schools/me` | student, teacher, admin | Returns the caller's school. |
+| PATCH | `/schools/me` | admin | Updates the school's name/district/grades. |
+| GET | `/schools/points` | admin | Sums `total_points` across every non-archived user in the school. |
+
+### Classes (`/api/classes`) & Class Requests (`/api/class-requests`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| GET | `/classes` | teacher, admin | Lists the global class catalog, alphabetized. There is no direct `POST /classes` — new classes are created via the seed job or class-request approval below. |
+| POST | `/class-requests` | teacher | Requests a new class be added to the catalog; notifies school admins. |
+| GET | `/class-requests` | admin | Lists class requests for the school, annotated with fuzzy-matched existing class names. |
+| PATCH | `/class-requests/{class_request_id}` | admin | Approves (creates the `Class_` row if needed) or rejects a pending request; notifies the requester. |
+
+### Sections (`/api/sections`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| GET | `/sections` | student, teacher, admin | Lists sections in the caller's school. `?scope=mine` (default) filters to the student's enrolled sections; `?scope=all` returns every section, optionally filtered by `?class_id=`. |
+| POST | `/sections` | teacher | Creates a section owned by the calling teacher. |
+| GET | `/sections/{id}` | any (enrolled student / owning teacher / admin) | Full section detail: roster, assignments, quests. |
+| GET | `/sections/{id}/analytics` | teacher, admin | Paginated grade/points/attention analytics for the section. |
+| GET | `/sections/{id}/grades/me` | student | The calling student's own computed grade for the section. |
+| GET | `/sections/{id}/grades/{student_id}` | teacher, admin | A specific enrolled student's computed grade. |
+| PATCH | `/sections/{id}` | teacher (own section, period/capacity only), admin (+status, +teacher reassignment) | Updates section fields; a teacher's `status`/`teacher_id` fields, if sent, are silently ignored. |
+| DELETE | `/sections/{id}` | admin | Soft-deletes (archives) the section. |
+
+### Enrollments (`/api/sections/{id}/enrollment-requests`, `/api/enrollment-requests`, `/api/unenroll-requests`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| POST | `/sections/{id}/enrollment-requests` | student | Requests to join a section (blocked if already enrolled or already pending). |
+| GET | `/sections/{id}/enrollment-requests` | teacher (owner), admin | Lists a section's pending requests. |
+| PATCH | `/enrollment-requests/{id}` | teacher | Accepts (creates the `Enrollment`, capacity-checked) or rejects a request; notifies the student. |
+| DELETE | `/sections/{id}/students/{student_id}` | admin | Directly drops (archives) a student's enrollment. |
+| POST | `/sections/{id}/unenroll-requests` | teacher | Requests removal of one of their own students; notifies admins. |
+| GET | `/sections/{id}/unenroll-requests` | teacher, admin | Lists a section's pending unenroll requests. |
+| GET | `/unenroll-requests` | admin | Lists every pending/processed unenroll request in the school. |
+| PATCH | `/unenroll-requests/{id}` | admin | Approves (archives the enrollment) or rejects a pending request. |
+| POST | `/unenroll-requests/{id}/cancel` | teacher | The original requesting teacher cancels their own pending request. |
+
+### Assignments (`/api/assignments`, `/api/sections/{id}/assignments`) & Submissions
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| GET | `/assignments` | student | Assignments across every section the student is enrolled in. |
+| GET | `/sections/{id}/assignments` | enrolled student, owning teacher, admin | Assignments for one section. |
+| POST | `/sections/{id}/assignments` | teacher | Creates an assignment for the teacher's own section; notifies enrolled students. |
+| GET | `/assignments/{id}` | same access as list | Fetches one assignment. |
+| PATCH | `/assignments/{id}` | teacher (owner) | Updates an assignment's fields. |
+| DELETE | `/assignments/{id}` | teacher (owner), admin | Soft-deletes an assignment. |
+| POST | `/assignments/{id}/submissions` | student | Creates a submission (awards an initial 25% of `point_value` immediately). |
+| GET | `/assignments/{id}/submissions` | teacher (owner), admin | Lists all submissions for an assignment. |
+| GET | `/assignments/{id}/my-submission` | student | The caller's own submission for an assignment. |
+| PATCH | `/submissions/{id}/grade` | teacher | Sets a numeric grade (not yet finalized); status → `pending`. |
+| POST | `/submissions/{id}/finalize` | teacher | Finalizes a graded submission: bonus points by grade threshold (≥85 → 75% of `point_value`, ≥70 → 50%, else 0%), replaces the point transaction, status → `graded`, evaluates badges. |
+
+### Quests (`/api/quests`, `/api/sections/{id}/quests`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| GET | `/quests` | any | Lists quests across one or more `?section_ids=` the caller can access; students get a `completed` flag. |
+| GET | `/sections/{id}/quests` | enrolled student, owning teacher, admin | Lists quests for one section, optional `?category=academic\|social`. |
+| POST | `/sections/{id}/quests` | teacher | Creates a quest for the teacher's own section, optionally targeted at one enrolled student; `social`-category quests get `point_value` × 1.5 (rounded down); notifies the target(s). |
+| DELETE | `/quests/{id}` | teacher (owner) | Soft-deletes a teacher-created quest (system-generated quests can't be deleted this way). |
+| POST | `/quests/{id}/complete` | student | Marks the quest complete — multipart form, optional description + file upload (JPEG/PDF); awards points; evaluates badges; one completion per student per quest. |
+| GET | `/quests/{id}/completions` | teacher (owner), admin | Lists all completions for a quest. |
+
+### Help Requests / Bulletin Board (`/api/help-requests`, `/api/sections/{id}/help-requests`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| GET | `/help-requests` | student | Help requests across every section the student is enrolled in. |
+| GET | `/sections/{id}/help-requests` | enrolled student, owning teacher, admin | Lists a section's help requests. Response shape differs by role: students never receive `requester_id`/`requester_username`; teachers/admins do, plus the list of who's accepted. |
+| POST | `/sections/{id}/help-requests` | student | Creates a help request in an enrolled section; notifies classmates. |
+| PATCH | `/help-requests/{id}` | student (requester) | Edits topic/description/group_size/duration — only while still `open` and nobody else has joined. |
+| POST | `/help-requests/{id}/accept` | student (not the requester) | Joins the request. First acceptance creates the `StudyRoom` (+ a Daily.co room, best-effort) and adds both students as `room_members` — this is the moment the requester's identity becomes visible to the joiner. Status flips to `active` once `current_size` reaches `group_size`. |
+| POST | `/help-requests/{id}/drop` | student (requester) | Closes/archives the requester's own help request. |
+| POST | `/help-requests/{id}/confirm` | student (requester) | Confirms whether the session actually happened; if so, awards 25 points to the requester and every accepted participant (idempotent — enforced by a unique constraint on `point_transactions`). |
+
+### Study Rooms (`/api/rooms/{id}`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| GET | `/rooms/{id}` | room member (student), same-school staff | Room state: members, timer, status, video URL. |
+| POST | `/rooms/{id}/video-token` | room member | Issues a Daily.co meeting token for an active room. |
+| POST | `/rooms/{id}/kick` | requester | Removes a member; room auto-closes if ≤1 member remains. |
+| POST | `/rooms/{id}/leave` | any member | Caller leaves; room closes if empty, and the underlying help request re-opens or closes as appropriate. |
+| POST | `/rooms/{id}/extend` | requester | Extends the countdown timer by 10 minutes. |
+| POST | `/rooms/{id}/close` | requester | Closes the room and the underlying help request; sends a `session_confirmation_required` message over the requester's socket first. |
+| DELETE | `/rooms/{id}` | requester | Deletes the room outright: members removed, Daily room torn down, help request archived. |
+| WS | `/rooms/{id}/chat` | room member (JWT via `Sec-WebSocket-Protocol`) | Real-time text chat. In-memory only (`room_registry`), never persisted. Disconnect codes: `1000` normal, `4001` bad/expired token or not a member, `4003` room missing/inactive. |
+
+### Notifications (`/api/notifications`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| GET | `/notifications` | any | Lists the caller's notifications, optional `?is_read=`. |
+| PATCH | `/notifications/read-all` | any | Marks all of the caller's unread notifications read. |
+| PATCH | `/notifications/{id}/read` | any | Marks one notification read. |
+| POST | `/sections/{id}/notify` | admin | Broadcasts a custom message to every student enrolled in a section. |
+| WS | `/notifications/stream` | JWT via `Sec-WebSocket-Protocol` | Push channel for new notifications and generic "data events" (used by the frontend's `RealtimeProvider` to invalidate cached queries). |
+
+### Resources (`/api/sections/{id}/resources`, `/api/resources`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| GET | `/sections/{id}/resources` | enrolled student, owning teacher | Lists a section's resource links. |
+| POST | `/sections/{id}/resources` | teacher | Creates a resource link for the teacher's own section. |
+| PATCH | `/resources/{id}` | teacher (owner) | Updates a resource's title/url/description. |
+| DELETE | `/resources/{id}` | teacher (owner) | Soft-deletes a resource. |
+
+### Assignment Fit / AI Advisor (`/api/sections/{id}/assignment-fit`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| POST | `/sections/{id}/assignment-fit` | teacher (owner); rate-limited to 10 calls/60s | Sends a draft assignment plus the section's grading snapshot to Gemini and returns a readiness verdict (`ready` / `review_first` / `mixed`). Returns "unavailable" if there isn't enough grading data yet, or if `GEMINI_API_KEY` isn't configured, or on any Gemini failure — this endpoint is designed to degrade rather than error. |
+
+### Shop & Inventory (`/api/shop`, `/api/inventory`, `/api/users/{id}/inventory`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| GET | `/shop/items` | any | Lists shop items, optional `?item_type=`; annotates `owned`/`equipped` for the caller and badge `progress` for students. |
+| POST | `/shop/items` | admin | Creates a shop item; auto-grants it to every existing staff account. |
+| PATCH | `/shop/items/{id}` | admin | Updates a shop item's fields. |
+| DELETE | `/shop/items/{id}` | admin | Archives a shop item. |
+| POST | `/shop/items/{id}/purchase` | student | Buys a non-badge item with points; records an `InventoryItem` and a negative `PointTransaction`. |
+| GET | `/users/{id}/inventory` | self, or teacher/admin same school | Lists a user's owned inventory items. |
+| PATCH | `/inventory/{id}/equip` | student, teacher, admin | Equips/unequips an owned item; single-equip categories (avatar_base, avatar_accessory, theme) un-equip any sibling item of the same type first. |
+
+### Users (`/api/users`, `/api/users/{id}/points`)
+
+| Method | Path | Roles | Description |
+| :---- | :---- | :---- | :---- |
+| GET | `/users` | admin | Lists users in the admin's school, optional `?role=`. |
+| GET | `/users/{id}` | self (student), teacher, admin | Fetches one user's profile (same-school only). |
+| GET | `/users/{id}/points` | self (student), teacher, admin | Paginated point-transaction history plus running `total_points`. |
+| GET | `/users/{id}/grades` | admin | A student's computed grade per enrolled section. |
+| GET | `/users/{id}/report_card` | admin | Full report card (grades + assignment/quest items) across all of a student's sections. |
+| PATCH | `/users/me` | any | Updates the caller's own username (unique within school). |
+| POST | `/users/me/profile-picture` | any | Uploads (multipart) and sets the caller's avatar, re-encoding server-side and deleting the old image. |
+| DELETE | `/users/me/profile-picture` | any | Removes the caller's avatar. |
+| PATCH | `/users/me/featured-badge` | student | Sets/clears the student's featured badge (must own it). |
+| POST | `/users/me/request-password-reset` | student | Notifies all school admins that the student needs a reset. |
+| DELETE | `/users/me` | any | Self-service soft delete; blocked if the caller is a school's last remaining admin. |
+| PATCH | `/users/{id}/verify` | admin | Approves a pending signup (approving a self-registered admin requires an extra `confirm_role="admin"` echo). No error if already verified. |
+| PATCH | `/users/{id}/reject` | admin | Rejects a pending signup, with an optional reason. |
+| PATCH | `/users/{id}/deactivate` | admin | Deactivates a user (not self). |
+| PATCH | `/users/{id}/reactivate` | admin | Reactivates a previously deactivated user. |
+| DELETE | `/users/{id}` | admin | Soft-deletes another user (not self); cascades teacher-section fallout. |
+
+> **Route-ordering note:** in `users_controller.py` and `notifications_controller.py`, literal sub-paths (`/me`, `/me/...`, `/read-all`) are registered *before* the corresponding `/{id}` route, so FastAPI doesn't try to parse `"me"` or `"read-all"` as an integer path parameter.
 
 ## Wireframe 
-
-## Core Technologies, 3rd-Party APIs and New Libraries
-
-This project will make use of the following technologies, 3rd-Party APIs, and new libraries
-
-* React 
-* Python  
-* FastAPI
-* Postgres
-* Pydantic
-* SQLAlchemy
-* Pytest
 
 ## Future Ideas
 
