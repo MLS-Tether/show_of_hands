@@ -39,6 +39,33 @@
   cursor: default;
 }
 
+.badges-card-info {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: italic;
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.badges-card-info:hover,
+.badges-card-info:focus-visible {
+  background: var(--surface-3, var(--surface-2));
+  color: var(--text-h);
+}
+
 .badges-card-tooltip {
   position: absolute;
   bottom: 100%;
@@ -59,7 +86,8 @@
   z-index: 5;
 }
 
-.badges-card-tooltip-wrapper:hover .badges-card-tooltip {
+.badges-card-tooltip-wrapper:hover .badges-card-tooltip,
+.badges-card-tooltip-wrapper.badges-card-tooltip-open .badges-card-tooltip {
   opacity: 1;
   visibility: visible;
 }
