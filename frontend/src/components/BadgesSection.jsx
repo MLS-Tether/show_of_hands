@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import './BadgesSection.css'
 
 function formatProgress(progress) {
@@ -8,6 +9,19 @@ function formatProgress(progress) {
 }
 
 function BadgesSection({ badges, featuredItemId, pendingId, onSetFeatured, onClearFeatured }) {
+  // Hover alone never fires on touch devices, so tapping the info dot toggles
+  // the same tooltip open/closed -- desktop still gets it for free on hover.
+  const [openTooltipId, setOpenTooltipId] = useState(null)
+
+  useEffect(() => {
+    if (openTooltipId === null) return
+    const closeOnOutsideClick = (event) => {
+      if (!event.target.closest('.badges-card-tooltip-wrapper')) setOpenTooltipId(null)
+    }
+    document.addEventListener('click', closeOnOutsideClick)
+    return () => document.removeEventListener('click', closeOnOutsideClick)
+  }, [openTooltipId])
+
   if (badges.length === 0) {
     return <p className="admin-empty-card">No badges yet.</p>
   }
@@ -17,14 +31,31 @@ function BadgesSection({ badges, featuredItemId, pendingId, onSetFeatured, onCle
       {badges.map((badge) => {
         const isFeatured = badge.item_id === featuredItemId
         const pending = pendingId === badge.item_id
+        const tooltipOpen = openTooltipId === badge.item_id
         return (
           <div className={`badges-card${badge.owned ? '' : ' badges-card-locked'}`} key={badge.item_id}>
-            <div className="badges-card-image badges-card-tooltip-wrapper">
+            <div
+              className={`badges-card-image badges-card-tooltip-wrapper${tooltipOpen ? ' badges-card-tooltip-open' : ''}`}
+            >
               <img src={badge.image_url} alt="" />
               {badge.progress && (
-                <div className="badges-card-tooltip" role="tooltip">
-                  {formatProgress(badge.progress)}
-                </div>
+                <>
+                  <button
+                    type="button"
+                    className="badges-card-info"
+                    aria-label={`Unlock requirement for ${badge.name}`}
+                    aria-expanded={tooltipOpen}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setOpenTooltipId(tooltipOpen ? null : badge.item_id)
+                    }}
+                  >
+                    i
+                  </button>
+                  <div className="badges-card-tooltip" role="tooltip">
+                    {formatProgress(badge.progress)}
+                  </div>
+                </>
               )}
             </div>
             <span className="badges-card-title">{badge.name}</span>
