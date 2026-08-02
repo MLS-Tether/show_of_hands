@@ -1,11 +1,37 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { useAssignments, useNotificationCountsByEntity } from '../queries'
+import { useAssignments, useNotificationCountsByEntity, useSections } from '../queries'
 import { formatDueDate } from '../utils/formatDueDate'
 import { isTeacher } from '../utils/auth'
 import NotificationCountBadge from '../components/NotificationCountBadge'
 import '../styles/shared-ui.css'
 import './Assignments.css'
+
+// Group a tab's rows by section, in the student's section order, dropping
+// sections with nothing to show in this tab. Rows whose section_id doesn't
+// match any enrolled section (e.g. a section left after the data loaded)
+// still show up, under a trailing "Other" group, instead of disappearing.
+function buildSectionGroups(sections, rows) {
+  const bySection = new Map()
+  rows.forEach((a) => {
+    if (!bySection.has(a.section_id)) bySection.set(a.section_id, [])
+    bySection.get(a.section_id).push(a)
+  })
+
+  const groups = sections
+    .map((s) => ({
+      key: s.section_id,
+      label: `${s.class_name} — ${s.period}`,
+      rows: bySection.get(s.section_id) ?? [],
+    }))
+    .filter((g) => g.rows.length > 0)
+
+  const knownIds = new Set(sections.map((s) => s.section_id))
+  const otherRows = rows.filter((a) => !knownIds.has(a.section_id))
+  if (otherRows.length > 0) groups.push({ key: 'other', label: 'Other', rows: otherRows })
+
+  return groups
+}
 
 function Assignments() {
   const navigate = useNavigate()
@@ -18,6 +44,7 @@ function Assignments() {
   // the tab pick without re-running it on every unrelated render.
   const [lastAppliedHighlightId, setLastAppliedHighlightId] = useState(null)
   const { data: rawAssignments = null } = useAssignments()
+  const { data: sections = null } = useSections('mine')
   // Lazy-initialized once at mount rather than recomputed on every render,
   // which would call the impure Date.now() during render.
   const [now] = useState(() => Date.now())
@@ -41,7 +68,7 @@ function Assignments() {
 
   const sectionFilter = searchParams.get('section')
 
-  const loading = rawAssignments === null
+  const loading = rawAssignments === null || sections === null
   const scoped = loading
     ? []
     : sectionFilter
@@ -74,6 +101,7 @@ function Assignments() {
   }
 
   const rows = loading ? [] : assignments[tab]
+  const groups = loading ? [] : buildSectionGroups(sections, rows)
   const emptyMessage = tab === 'upcoming' ? 'No upcoming assignments' : 'No past assignments'
 
   return (
@@ -102,28 +130,32 @@ function Assignments() {
 
       {loading && <p className="admin-empty-card">Loading assignments…</p>}
       {!loading && rows.length === 0 && <p className="admin-empty-card">{emptyMessage}</p>}
-      {!loading && rows.length > 0 && (
-        <div className="assignments-list">
-          {rows.map((a) => (
-            <button
-              type="button"
-              key={a.assignment_id}
-              id={`assignment-${a.assignment_id}`}
-              className={`assignments-row${
-                String(a.assignment_id) === highlightId ? ' assignments-row-highlight' : ''
-              }`}
-              onClick={() => navigate(`/assignments/${a.assignment_id}`)}
-            >
-              <NotificationCountBadge count={notifCounts[`assignment:${a.assignment_id}`]} />
-              <span className="assignments-row-title">{a.title}</span>
-              <span className="assignments-row-meta">
-                <span>{formatDueDate(a.due_date)}</span>
-                <span className="assignments-row-points">{a.point_value} pts</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
+      {!loading &&
+        groups.map((group) => (
+          <div className="assignments-group" key={group.key}>
+            <div className="widget-label">{group.label}</div>
+            <div className="assignments-list">
+              {group.rows.map((a) => (
+                <button
+                  type="button"
+                  key={a.assignment_id}
+                  id={`assignment-${a.assignment_id}`}
+                  className={`assignments-row${
+                    String(a.assignment_id) === highlightId ? ' assignments-row-highlight' : ''
+                  }`}
+                  onClick={() => navigate(`/assignments/${a.assignment_id}`)}
+                >
+                  <NotificationCountBadge count={notifCounts[`assignment:${a.assignment_id}`]} />
+                  <span className="assignments-row-title">{a.title}</span>
+                  <span className="assignments-row-meta">
+                    <span>{formatDueDate(a.due_date)}</span>
+                    <span className="assignments-row-points">{a.point_value} pts</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
     </section>
   )
 }
