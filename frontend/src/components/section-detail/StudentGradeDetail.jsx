@@ -2,6 +2,14 @@ import { useSectionGradeDetail } from '../../queries'
 import { formatPercent } from '../../utils/format'
 import GradeSummary from './GradeSummary'
 
+function dueDateClass(assignment) {
+  const due = new Date(assignment.due_date)
+  if (assignment.submitted_at) {
+    return new Date(assignment.submitted_at) <= due ? 'grade-detail-date-on-time' : 'grade-detail-date-late'
+  }
+  return due < new Date() ? 'grade-detail-date-late' : ''
+}
+
 function StudentGradeDetail({ sectionId, student, onBack }) {
   const { data, isError: failed } = useSectionGradeDetail(sectionId, student.user_id)
 
@@ -25,7 +33,8 @@ function StudentGradeDetail({ sectionId, student, onBack }) {
               <div className="teacher-panel-row" key={a.assignment_id}>
                 <span>{a.title}</span>
                 <span className="teacher-panel-row-sub">
-                  {a.category} · due {new Date(a.due_date).toLocaleDateString()} ·{' '}
+                  {a.category} · due{' '}
+                  <span className={dueDateClass(a)}>{new Date(a.due_date).toLocaleDateString()}</span> ·{' '}
                   {a.status === 'graded' ? formatPercent(a.grade) : a.status.replace('_', ' ')}
                 </span>
               </div>

@@ -112,9 +112,26 @@ def test_detail_matches_grades_endpoint_and_lists_assignments(client, world, cle
     items_by_id = {a["assignment_id"]: a for a in detail["assignments"]}
     assert items_by_id[graded_id]["status"] == "graded"
     assert items_by_id[graded_id]["grade"] == 85
+    assert items_by_id[graded_id]["submitted_at"] is not None
     assert items_by_id[ungraded_id]["status"] == "not_submitted"
     assert items_by_id[ungraded_id]["grade"] is None
+    assert items_by_id[ungraded_id]["submitted_at"] is None
     assert detail["study_rooms"] == []
+
+
+def test_detail_marks_submission_as_late_when_submitted_after_due_date(client, world, cleanup):
+    # Due date in the past -- any submission created now is necessarily late.
+    assignment_id = _new_assignment(client, world, cleanup, due_date="2020-01-01T00:00:00Z")
+    submission_id = _submit(client, world, cleanup, assignment_id)
+
+    resp = client.get(
+        f"/api/sections/{world.section_id}/grades/{world.student_id}/detail",
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 200, resp.text
+    item = next(a for a in resp.json()["assignments"] if a["assignment_id"] == assignment_id)
+    assert item["submitted_at"] is not None
+    assert item["submitted_at"] > item["due_date"]
 
 
 def test_detail_only_lists_rooms_requested_by_this_student(client, world, cleanup):
