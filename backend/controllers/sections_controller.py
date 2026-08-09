@@ -26,6 +26,7 @@ from schemas.section import (
     SectionUpdateResponse,
     SectionAnalyticsResponse,
     StudentGradeResponse,
+    StudentGradeDetailResponse,
 )
 
 LOW_GRADE_THRESHOLD = 70
@@ -410,6 +411,94 @@ def get_student_section_grade(
         raise HTTPException(status_code=404, detail="Student is not enrolled in this section.")
 
     return compute_section_grade_for_student(db, section_id, student_id)
+
+
+@router.get("/{section_id}/grades/{student_id}/detail", response_model=StudentGradeDetailResponse)
+def get_student_section_grade_detail(
+    section_id: int,
+    student_id: int,
+    current_user: User = Depends(require_role(["teacher", "admin"])),
+    db: Session = Depends(get_db),
+):
+    section = _get_section_for_grade_check(section_id, db)
+    if section.school_id != current_user.school_id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+    if current_user.role == RoleEnum.teacher and section.teacher_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not your section.")
+
+    enrolled = db.query(Enrollment).filter(
+        Enrollment.section_id == section_id,
+        Enrollment.student_id == student_id,
+        Enrollment.is_archived == False,
+    ).first()
+    if not enrolled:
+        raise HTTPException(status_code=404, detail="Student is not enrolled in this section.")
+
+    grade = compute_section_grade_for_student(db, section_id, student_id)
+
+    assignments = db.query(Assignment).filter(
+        Assignment.section_id == section_id,
+        Assignment.is_archived == False,
+    ).order_by(Assignment.due_date).all()
+    submissions_by_assignment = {
+        s.assignment_id: s
+        for s in db.query(Submission).filter(
+            Submission.student_id == student_id,
+            Submission.assignment_id.in_([a.assignment_id for a in assignments]),
+            Submission.is_archived == False,
+        ).all()
+    } if assignments else {}
+
+    assignment_items = []
+    for a in assignments:
+        submission = submissions_by_assignment.get(a.assignment_id)
+        if submission is None:
+            status, item_grade = "not_submitted", None
+        else:
+            status = submission.status.value
+            item_grade = submission.grade if submission.status == SubmissionStatusEnum.graded else None
+        assignment_items.append({
+            "assignment_id": a.assignment_id,
+            "title": a.title,
+            "category": a.category.value,
+            "due_date": a.due_date,
+            "point_value": a.point_value,
+            "status": status,
+            "grade": item_grade,
+        })
+
+    rooms = (
+        db.query(StudyRoom)
+        .join(HelpRequest, StudyRoom.help_request_id == HelpRequest.help_request_id)
+        .filter(HelpRequest.section_id == section_id, HelpRequest.requester_id == student_id)
+        .options(
+            joinedload(StudyRoom.help_request),
+            selectinload(StudyRoom.members).joinedload(RoomMember.user),
+        )
+        .order_by(StudyRoom.created_at.desc())
+        .all()
+    )
+    study_rooms = [
+        {
+            "room_id": room.room_id,
+            "help_request_id": room.help_request_id,
+            "topic": room.help_request.topic,
+            "status": room.status,
+            "created_at": room.created_at,
+            "members": [
+                {"user_id": m.user_id, "username": m.user.username, "joined_at": m.joined_at}
+                for m in sorted(room.members, key=lambda m: m.joined_at)
+            ],
+        }
+        for room in rooms
+    ]
+
+    return {
+        "percentage": grade["percentage"],
+        "letter_grade": grade["letter_grade"],
+        "assignments": assignment_items,
+        "study_rooms": study_rooms,
+    }
 
 
 @router.patch("/{section_id}", response_model=SectionUpdateResponse)

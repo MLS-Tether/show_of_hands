@@ -163,3 +163,29 @@ class SectionAnalyticsResponse(BaseModel):
 class StudentGradeResponse(BaseModel):
     percentage: Optional[float]
     letter_grade: Optional[str]
+
+
+class StudentGradeAssignmentItem(BaseModel):
+    assignment_id: int
+    title: str
+    category: str
+    due_date: datetime
+    point_value: int
+    status: str
+    grade: Optional[float]
+
+
+class StudentStudyRoomItem(BaseModel):
+    room_id: int
+    help_request_id: int
+    topic: str
+    status: str
+    created_at: datetime
+    members: List[RoomMemberActivity]
+
+
+class StudentGradeDetailResponse(BaseModel):
+    percentage: Optional[float]
+    letter_grade: Optional[str]
+    assignments: List[StudentGradeAssignmentItem]
+    study_rooms: List[StudentStudyRoomItem]
