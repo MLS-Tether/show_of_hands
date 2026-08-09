@@ -20,6 +20,7 @@ export const keys = {
   sectionEnrollmentRequests: (sectionId) => ['section', sectionId, 'enrollment-requests'],
   sectionUnenrollRequests: (sectionId) => ['section', sectionId, 'unenroll-requests'],
   sectionGrades: (sectionId, who = 'me') => ['section', sectionId, 'grades', who],
+  sectionGradeDetail: (sectionId, studentId) => ['section', sectionId, 'grades', studentId, 'detail'],
   assignments: () => ['assignments'],
   assignment: (assignmentId) => ['assignment', assignmentId],
   assignmentSubmissions: (assignmentId) => ['assignment', assignmentId, 'submissions'],
@@ -152,6 +153,15 @@ export function useSectionGrades(sectionId, who = 'me', options = {}) {
           : api.get(`/sections/${sectionId}/grades/${who}`)
       ),
     enabled: !!sectionId,
+    ...options,
+  })
+}
+
+export function useSectionGradeDetail(sectionId, studentId, options = {}) {
+  return useQuery({
+    queryKey: keys.sectionGradeDetail(sectionId, studentId),
+    queryFn: () => unwrap(api.get(`/sections/${sectionId}/grades/${studentId}/detail`)),
+    enabled: !!sectionId && !!studentId,
     ...options,
   })
 }
