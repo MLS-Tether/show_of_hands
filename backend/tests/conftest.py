@@ -21,6 +21,7 @@ from models.help_request_model import HelpRequestAcceptance
 from models.study_room_model import RoomMember
 from models.class_request_model import ClassRequest
 from models.inventory_model import InventoryItem
+from models.shop_item_model import ShopItem
 
 
 def unique(prefix: str) -> str:
@@ -96,6 +97,14 @@ def _delete_row(session, model, pk_value=None, filters=None):
     if model is User:
         for dep_model, fk_col in _USER_DEPENDENT_LEAF_TABLES:
             session.query(dep_model).filter(getattr(dep_model, fk_col) == pk_value).delete(synchronize_session=False)
+        session.commit()
+    if model is ShopItem:
+        # grant_item_to_all_staff (services/staff_inventory.py) backfills a new
+        # auto-unlock-eligible item into every teacher/admin's inventory
+        # globally (ShopItem has no school scoping), not just the ones this
+        # test knows about -- deleting the item directly hits its FK from
+        # those untracked InventoryItem rows.
+        session.query(InventoryItem).filter(InventoryItem.item_id == pk_value).delete(synchronize_session=False)
         session.commit()
     if filters:
         session.query(model).filter_by(**filters).delete(synchronize_session=False)
