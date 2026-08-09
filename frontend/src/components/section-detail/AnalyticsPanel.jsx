@@ -4,7 +4,8 @@ import { formatPercent } from '../../utils/format'
 
 function AnalyticsPanel({ sectionId }) {
   const [attentionPage, setAttentionPage] = useState(1)
-  const { data: analytics = null, isError: failed } = useSectionAnalytics(sectionId, attentionPage)
+  const [roomsPage, setRoomsPage] = useState(1)
+  const { data: analytics = null, isError: failed } = useSectionAnalytics(sectionId, attentionPage, roomsPage)
 
   if (failed) {
     return <p className="teacher-panel-placeholder">Could not load analytics.</p>
@@ -20,6 +21,8 @@ function AnalyticsPanel({ sectionId }) {
     points_distribution,
     students_needing_attention,
     attention_total_pages,
+    study_rooms,
+    study_rooms_total_pages,
   } = analytics
 
   return (
@@ -96,6 +99,57 @@ function AnalyticsPanel({ sectionId }) {
             className="admin-btn-text"
             disabled={attentionPage >= attention_total_pages}
             onClick={() => setAttentionPage((p) => p + 1)}
+          >
+            Next
+          </button>
+        </div>
+      )}
+
+      <div className="widget-label widget-label-spaced">
+        study rooms
+      </div>
+      {study_rooms.length === 0 ? (
+        <p className="teacher-panel-placeholder">No study rooms created yet.</p>
+      ) : (
+        <div className="teacher-panel-list">
+          {study_rooms.map((room) => (
+            <div className="teacher-panel-row teacher-panel-row-stacked" key={room.room_id}>
+              <div className="teacher-panel-row-header">
+                <span>{room.topic}</span>
+                <span className="teacher-panel-row-sub">{room.status}</span>
+              </div>
+              <span className="teacher-panel-row-sub">
+                Created by {room.requester_username} on {new Date(room.created_at).toLocaleString()}
+              </span>
+              <span className="teacher-panel-row-sub">
+                Joined by:{' '}
+                {room.members
+                  .map((m) => `${m.username} (${new Date(m.joined_at).toLocaleString()})`)
+                  .join(', ')}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {study_rooms_total_pages > 1 && (
+        <div className="teacher-panel-pagination">
+          <button
+            type="button"
+            className="admin-btn-text"
+            disabled={roomsPage <= 1}
+            onClick={() => setRoomsPage((p) => p - 1)}
+          >
+            Previous
+          </button>
+          <span className="teacher-panel-pagination-label">
+            Page {roomsPage} of {study_rooms_total_pages}
+          </span>
+          <button
+            type="button"
+            className="admin-btn-text"
+            disabled={roomsPage >= study_rooms_total_pages}
+            onClick={() => setRoomsPage((p) => p + 1)}
           >
             Next
           </button>

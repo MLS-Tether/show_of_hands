@@ -1,8 +1,53 @@
 # tests/test_analytics.py
+from db.pool import SessionLocal
 from models.assignment_model import Assignment
+from models.enrollment_model import Enrollment, EnrollmentRequest
+from models.help_request_model import HelpRequest, HelpRequestAcceptance
+from models.study_room_model import StudyRoom, RoomMember
 from models.submission_model import Submission
 from models.user_model import User
 from tests.conftest import unique, auth_header
+
+
+def _enroll_new_student(client, world, cleanup):
+    username = unique("classmate")
+    resp = client.post("/api/auth/register", json={
+        "username": username,
+        "full_name": "Class Mate",
+        "password": "password123",
+        "school_code": world.school_code,
+        "role": "student",
+    })
+    assert resp.status_code == 201, resp.text
+    user_id = resp.json()["user_id"]
+    cleanup(User, user_id)
+
+    resp = client.post("/api/auth/login", json={"username": username, "password": "password123"})
+    assert resp.status_code == 200, resp.text
+    token = resp.json()["access_token"]
+
+    resp = client.post(f"/api/sections/{world.section_id}/enrollment-requests", headers=auth_header(token))
+    assert resp.status_code == 201, resp.text
+    request_id = resp.json()["enrollment_request_id"]
+    cleanup(EnrollmentRequest, request_id)
+
+    resp = client.patch(
+        f"/api/enrollment-requests/{request_id}",
+        json={"status": "accepted"},
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 200, resp.text
+
+    db = SessionLocal()
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.section_id == world.section_id,
+        Enrollment.student_id == user_id,
+    ).first()
+    enrollment_id = enrollment.enrollment_id
+    db.close()
+    cleanup(Enrollment, enrollment_id)
+
+    return user_id, username, token
 
 
 def _new_assignment(client, world, cleanup, point_value=100, due_date="2027-01-01T00:00:00Z"):
@@ -17,11 +62,11 @@ def _new_assignment(client, world, cleanup, point_value=100, due_date="2027-01-0
     return assignment_id
 
 
-def _submit(client, world, cleanup, assignment_id):
+def _submit(client, world, cleanup, assignment_id, student_token=None):
     resp = client.post(
         f"/api/assignments/{assignment_id}/submissions",
         json={},
-        headers=auth_header(world.student_token),
+        headers=auth_header(student_token or world.student_token),
     )
     assert resp.status_code == 201, resp.text
     submission_id = resp.json()["submission_id"]
@@ -150,3 +195,103 @@ def test_analytics_forbidden_for_non_owning_teacher(client, world, cleanup):
 def test_analytics_not_found(client, world):
     resp = client.get("/api/sections/999999999/analytics", headers=auth_header(world.teacher_token))
     assert resp.status_code == 404
+
+
+def test_analytics_ignores_dropped_student(client, world, cleanup):
+    classmate_id, _classmate_username, classmate_token = _enroll_new_student(client, world, cleanup)
+
+    # An assignment created *after* the drop below still needs to reflect
+    # only currently-enrolled students -- due in the future so it doesn't
+    # also trigger a no_submission flag for world.student, keeping this
+    # test focused on the completion_rate/attention-scoping bug alone.
+    a1 = _new_assignment(client, world, cleanup, point_value=100)
+    sub1 = _submit(client, world, cleanup, a1, classmate_token)
+    _grade_and_finalize(client, world, sub1, 50)  # below LOW_GRADE_THRESHOLD
+
+    resp = client.delete(
+        f"/api/sections/{world.section_id}/students/{classmate_id}",
+        headers=auth_header(world.admin_token),
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = client.get(f"/api/sections/{world.section_id}/analytics", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+
+    by_id = {a["assignment_id"]: a for a in body["assignments"]}
+    # Before the fix this was 1 (the dropped student's submission still
+    # counted) against an enrolled_count that had already dropped to 1
+    # (world.student only) -- completion_rate came out to 100% even though
+    # no *currently enrolled* student had submitted anything.
+    assert by_id[a1]["submitted_count"] == 0
+    assert by_id[a1]["completion_rate"] == 0.0
+
+    attention_user_ids = {s["user_id"] for s in body["students_needing_attention"]}
+    assert classmate_id not in attention_user_ids
+
+
+def test_analytics_average_grade_matches_weighted_formula(client, world, cleanup):
+    # One graded assignment (100) and one overdue assignment never submitted
+    # -- grading.py counts a true non-submission as a 0 in its category, so
+    # the correct section average (both assignments default to the
+    # "homework" category, weight renormalized to 1.0 since it's the only
+    # category present) is mean([100, 0]) = 50, not a flat mean of only the
+    # graded grade (which would incorrectly read 100).
+    a1 = _new_assignment(client, world, cleanup, point_value=100)
+    sub1 = _submit(client, world, cleanup, a1, world.student_token)
+    _grade_and_finalize(client, world, sub1, 100)
+
+    _new_assignment(client, world, cleanup, point_value=50, due_date="2020-01-01T00:00:00Z")
+
+    resp = client.get(f"/api/sections/{world.section_id}/analytics", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["average_grade"] == 50
+
+
+def test_analytics_shows_study_room_activity(client, world, cleanup):
+    classmate_id, classmate_username, classmate_token = _enroll_new_student(client, world, cleanup)
+
+    resp = client.post(
+        f"/api/sections/{world.section_id}/help-requests",
+        json={"topic": "Analytics room test", "group_size": 2, "duration_minutes": 30},
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 201, resp.text
+    hr_id = resp.json()["help_request_id"]
+    cleanup(HelpRequest, hr_id)
+
+    resp = client.post(f"/api/help-requests/{hr_id}/accept", headers=auth_header(classmate_token))
+    assert resp.status_code == 200, resp.text
+    room_id = resp.json()["room_id"]
+    cleanup(StudyRoom, room_id)
+    cleanup(RoomMember, room_id=room_id, user_id=world.student_id)
+    cleanup(RoomMember, room_id=room_id, user_id=classmate_id)
+    cleanup(HelpRequestAcceptance, help_request_id=hr_id, user_id=classmate_id)
+
+    resp = client.get(f"/api/sections/{world.section_id}/analytics", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+
+    rooms_by_id = {r["room_id"]: r for r in body["study_rooms"]}
+    room = rooms_by_id[room_id]
+    assert room["topic"] == "Analytics room test"
+    assert room["requester_id"] == world.student_id
+    assert room["requester_username"] == world.student_username
+    assert room["status"] == "active"
+    member_usernames = {m["username"] for m in room["members"]}
+    assert member_usernames == {world.student_username, classmate_username}
+    assert body["study_rooms_page"] == 1
+    assert body["study_rooms_total_rooms"] >= 1
+
+
+def test_analytics_study_rooms_paginated(client, world, cleanup):
+    resp = client.get(
+        f"/api/sections/{world.section_id}/analytics",
+        params={"rooms_page": 1, "rooms_page_size": 1},
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["study_rooms_page"] == 1
+    assert body["study_rooms_page_size"] == 1
+    assert len(body["study_rooms"]) <= 1

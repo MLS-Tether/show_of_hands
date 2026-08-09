@@ -10,9 +10,12 @@ from db.data_events import emit_data_event, resolve_admin_audience, resolve_sect
 from db.pool import get_db
 from dependencies import get_current_user, require_role
 from grading import compute_section_grade_for_student
+from models.assignment_model import Assignment
 from models.enrollment_model import Enrollment
+from models.help_request_model import HelpRequest
 from models.section_model import Section, SectionStatusEnum
-from models.submission_model import SubmissionStatusEnum
+from models.study_room_model import StudyRoom, RoomMember
+from models.submission_model import Submission, SubmissionStatusEnum
 from models.user_model import User, RoleEnum
 from schemas.section import (
     SectionCreate,
@@ -194,6 +197,8 @@ def get_section_analytics(
     section_id: int,
     attention_page: int = 1,
     attention_page_size: int = 50,
+    rooms_page: int = 1,
+    rooms_page_size: int = 20,
     current_user: User = Depends(require_role(["teacher", "admin"])),
     db: Session = Depends(get_db),
 ):
@@ -201,9 +206,13 @@ def get_section_analytics(
         raise HTTPException(status_code=400, detail="attention_page must be 1 or greater.")
     if attention_page_size < 1:
         raise HTTPException(status_code=400, detail="attention_page_size must be 1 or greater.")
+    if rooms_page < 1:
+        raise HTTPException(status_code=400, detail="rooms_page must be 1 or greater.")
+    if rooms_page_size < 1:
+        raise HTTPException(status_code=400, detail="rooms_page_size must be 1 or greater.")
     section = db.query(Section).options(
         selectinload(Section.enrollments),
-        selectinload(Section.assignments),
+        selectinload(Section.assignments).selectinload(Assignment.submissions).joinedload(Submission.student),
     ).filter(
         Section.section_id == section_id,
         Section.is_archived == False,
@@ -216,11 +225,11 @@ def get_section_analytics(
         raise HTTPException(status_code=403, detail="Not your section.")
 
     approved_enrollments = [e for e in section.enrollments if not e.is_archived and not e.student.is_archived]
+    approved_student_ids = {e.student_id for e in approved_enrollments}
     enrolled_count = len(approved_enrollments)
     assignments = [a for a in section.assignments if not a.is_archived]
 
     now = datetime.now(timezone.utc)
-    all_graded_grades = []
     per_student_points = {}
     assignment_analytics = []
     attention_by_student = {}
@@ -230,10 +239,15 @@ def get_section_analytics(
         entry["issues"].append(issue)
 
     for assignment in assignments:
-        submissions = [s for s in assignment.submissions if not s.is_archived]
+        # Scoped to currently-approved enrollments -- a student removed from
+        # the section afterward shouldn't keep inflating completion_rate
+        # past 100%, or keep showing up flagged for a low grade below.
+        submissions = [
+            s for s in assignment.submissions
+            if not s.is_archived and s.student_id in approved_student_ids
+        ]
         graded = [s for s in submissions if s.status == SubmissionStatusEnum.graded]
         graded_grades = [s.grade for s in graded if s.grade is not None]
-        all_graded_grades.extend(graded_grades)
 
         for s in submissions:
             per_student_points[s.student_id] = per_student_points.get(s.student_id, 0) + s.points_awarded
@@ -280,11 +294,54 @@ def get_section_analytics(
         "median": statistics.median(points_totals) if points_totals else None,
     }
 
+    # The section-wide average is the mean of each student's own official
+    # grade (grading.py's category-weighted formula, same one shown on their
+    # individual grade page) rather than a flat mean of every raw submission
+    # grade -- a flat mean ignores category weighting and missing overdue
+    # work entirely, so it doesn't agree with the grades shown anywhere else.
+    student_percentages = [
+        compute_section_grade_for_student(db, section_id, student_id)["percentage"]
+        for student_id in approved_student_ids
+    ]
+    student_percentages = [p for p in student_percentages if p is not None]
+
+    all_rooms = (
+        db.query(StudyRoom)
+        .join(HelpRequest, StudyRoom.help_request_id == HelpRequest.help_request_id)
+        .filter(HelpRequest.section_id == section_id)
+        .options(
+            joinedload(StudyRoom.help_request).joinedload(HelpRequest.requester),
+            selectinload(StudyRoom.members).joinedload(RoomMember.user),
+        )
+        .order_by(StudyRoom.created_at.desc())
+        .all()
+    )
+    study_rooms_total_rooms = len(all_rooms)
+    study_rooms_total_pages = max(1, (study_rooms_total_rooms + rooms_page_size - 1) // rooms_page_size)
+    rooms_start = (rooms_page - 1) * rooms_page_size
+    page_rooms = all_rooms[rooms_start:rooms_start + rooms_page_size]
+    study_rooms = [
+        {
+            "room_id": room.room_id,
+            "help_request_id": room.help_request_id,
+            "topic": room.help_request.topic,
+            "requester_id": room.help_request.requester_id,
+            "requester_username": room.help_request.requester.username,
+            "status": room.status,
+            "created_at": room.created_at,
+            "members": [
+                {"user_id": m.user_id, "username": m.user.username, "joined_at": m.joined_at}
+                for m in sorted(room.members, key=lambda m: m.joined_at)
+            ],
+        }
+        for room in page_rooms
+    ]
+
     return {
         "section_id": section.section_id,
         "enrolled_count": enrolled_count,
         "assignment_count": len(assignments),
-        "average_grade": statistics.mean(all_graded_grades) if all_graded_grades else None,
+        "average_grade": statistics.mean(student_percentages) if student_percentages else None,
         "assignments": assignment_analytics,
         "points_distribution": points_distribution,
         "students_needing_attention": students_needing_attention,
@@ -292,6 +349,11 @@ def get_section_analytics(
         "attention_page_size": attention_page_size,
         "attention_total_students": attention_total_students,
         "attention_total_pages": attention_total_pages,
+        "study_rooms": study_rooms,
+        "study_rooms_page": rooms_page,
+        "study_rooms_page_size": rooms_page_size,
+        "study_rooms_total_rooms": study_rooms_total_rooms,
+        "study_rooms_total_pages": study_rooms_total_pages,
     }
 
 

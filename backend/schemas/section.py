@@ -124,6 +124,23 @@ class StudentNeedingAttention(BaseModel):
     issues: List[StudentAttentionIssue]
 
 
+class RoomMemberActivity(BaseModel):
+    user_id: int
+    username: str
+    joined_at: datetime
+
+
+class StudyRoomActivity(BaseModel):
+    room_id: int
+    help_request_id: int
+    topic: str
+    requester_id: int
+    requester_username: str
+    status: str
+    created_at: datetime
+    members: List[RoomMemberActivity]
+
+
 class SectionAnalyticsResponse(BaseModel):
     section_id: int
     enrolled_count: int
@@ -136,6 +153,11 @@ class SectionAnalyticsResponse(BaseModel):
     attention_page_size: int
     attention_total_students: int
     attention_total_pages: int
+    study_rooms: List[StudyRoomActivity]
+    study_rooms_page: int
+    study_rooms_page_size: int
+    study_rooms_total_rooms: int
+    study_rooms_total_pages: int
 
 
 class StudentGradeResponse(BaseModel):
