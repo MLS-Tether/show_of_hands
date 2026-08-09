@@ -465,6 +465,7 @@ def get_student_section_grade_detail(
             "point_value": a.point_value,
             "status": status,
             "grade": item_grade,
+            "submitted_at": submission.created_at if submission else None,
         })
 
     rooms = (

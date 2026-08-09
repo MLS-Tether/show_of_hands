@@ -173,6 +173,7 @@ class StudentGradeAssignmentItem(BaseModel):
     point_value: int
     status: str
     grade: Optional[float]
+    submitted_at: Optional[datetime]
 
 
 class StudentStudyRoomItem(BaseModel):
