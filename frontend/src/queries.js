@@ -15,7 +15,8 @@ export const keys = {
   questCompletions: (questId) => ['quest', questId, 'completions'],
   sectionResources: (sectionId) => ['section', sectionId, 'resources'],
   sectionHelpRequests: (sectionId) => ['section', sectionId, 'help-requests'],
-  sectionAnalytics: (sectionId, attentionPage = 1) => ['section', sectionId, 'analytics', attentionPage],
+  sectionAnalytics: (sectionId, attentionPage = 1, roomsPage = 1) =>
+    ['section', sectionId, 'analytics', attentionPage, roomsPage],
   sectionEnrollmentRequests: (sectionId) => ['section', sectionId, 'enrollment-requests'],
   sectionUnenrollRequests: (sectionId) => ['section', sectionId, 'unenroll-requests'],
   sectionGrades: (sectionId, who = 'me') => ['section', sectionId, 'grades', who],
@@ -109,11 +110,15 @@ export function useSectionHelpRequests(sectionId, options = {}) {
   })
 }
 
-export function useSectionAnalytics(sectionId, attentionPage = 1, options = {}) {
+export function useSectionAnalytics(sectionId, attentionPage = 1, roomsPage = 1, options = {}) {
   return useQuery({
-    queryKey: keys.sectionAnalytics(sectionId, attentionPage),
+    queryKey: keys.sectionAnalytics(sectionId, attentionPage, roomsPage),
     queryFn: () =>
-      unwrap(api.get(`/sections/${sectionId}/analytics`, { params: { attention_page: attentionPage } })),
+      unwrap(
+        api.get(`/sections/${sectionId}/analytics`, {
+          params: { attention_page: attentionPage, rooms_page: roomsPage },
+        })
+      ),
     enabled: !!sectionId,
     ...options,
   })
