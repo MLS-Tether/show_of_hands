@@ -196,8 +196,19 @@ class StudentStudyRoomItem(BaseModel):
     members: List[RoomMemberActivity]
 
 
+class StudentQuestCompletionItem(BaseModel):
+    quest_id: int
+    quest_completion_id: int
+    title: str
+    category: str
+    points_awarded: int
+    completed_at: datetime
+
+
 class StudentGradeDetailResponse(BaseModel):
     percentage: Optional[float]
     letter_grade: Optional[str]
     assignments: List[StudentGradeAssignmentItem]
+    quest_completions: List[StudentQuestCompletionItem]
+    total_quest_points: int
     study_rooms: List[StudentStudyRoomItem]

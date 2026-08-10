@@ -3,10 +3,31 @@ from db.pool import SessionLocal
 from models.assignment_model import Assignment
 from models.enrollment_model import Enrollment, EnrollmentRequest
 from models.help_request_model import HelpRequest, HelpRequestAcceptance
+from models.quest_model import Quest
+from models.quest_completion_model import QuestCompletion
 from models.study_room_model import StudyRoom, RoomMember
 from models.submission_model import Submission
 from models.user_model import User
 from tests.conftest import unique, auth_header
+
+
+def _new_quest(client, world, cleanup, point_value=10, category="academic"):
+    resp = client.post(
+        f"/api/sections/{world.section_id}/quests",
+        json={
+            "title": unique("Quest"),
+            "description": "d",
+            "category": category,
+            "point_value": point_value,
+            "quest_type": "daily",
+            "assigned_to": "all",
+        },
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    cleanup(Quest, body["quest_id"])
+    return body["quest_id"], body["point_value"]
 
 
 def _enroll_new_student(client, world, cleanup):
@@ -117,6 +138,29 @@ def test_detail_matches_grades_endpoint_and_lists_assignments(client, world, cle
     assert items_by_id[ungraded_id]["grade"] is None
     assert items_by_id[ungraded_id]["submitted_at"] is None
     assert detail["study_rooms"] == []
+
+
+def test_detail_includes_quest_completions_and_total_points(client, world, cleanup):
+    quest_id, quest_points = _new_quest(client, world, cleanup, point_value=10)
+
+    resp = client.post(f"/api/quests/{quest_id}/complete", headers=auth_header(world.student_token))
+    assert resp.status_code == 201, resp.text
+    completion_id = resp.json()["quest_completion_id"]
+    cleanup(QuestCompletion, completion_id)
+
+    resp = client.get(
+        f"/api/sections/{world.section_id}/grades/{world.student_id}/detail",
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 200, resp.text
+    detail = resp.json()
+
+    completions_by_id = {c["quest_completion_id"]: c for c in detail["quest_completions"]}
+    assert completion_id in completions_by_id
+    item = completions_by_id[completion_id]
+    assert item["quest_id"] == quest_id
+    assert item["points_awarded"] == quest_points
+    assert detail["total_quest_points"] == quest_points
 
 
 def test_detail_marks_submission_as_late_when_submitted_after_due_date(client, world, cleanup):

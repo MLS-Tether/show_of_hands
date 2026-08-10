@@ -497,6 +497,27 @@ def get_student_section_grade_detail(
             "submitted_at": submission.created_at if submission else None,
         })
 
+    quest_completions = (
+        db.query(QuestCompletion)
+        .join(Quest, QuestCompletion.quest_id == Quest.quest_id)
+        .filter(Quest.section_id == section_id, QuestCompletion.student_id == student_id)
+        .options(joinedload(QuestCompletion.quest))
+        .order_by(QuestCompletion.completed_at.desc())
+        .all()
+    )
+    quest_completion_items = [
+        {
+            "quest_id": c.quest_id,
+            "quest_completion_id": c.quest_completion_id,
+            "title": c.quest.title,
+            "category": c.quest.category.value,
+            "points_awarded": c.points_awarded,
+            "completed_at": c.completed_at,
+        }
+        for c in quest_completions
+    ]
+    total_quest_points = sum(c.points_awarded for c in quest_completions)
+
     rooms = (
         db.query(StudyRoom)
         .join(HelpRequest, StudyRoom.help_request_id == HelpRequest.help_request_id)
@@ -527,6 +548,8 @@ def get_student_section_grade_detail(
         "percentage": grade["percentage"],
         "letter_grade": grade["letter_grade"],
         "assignments": assignment_items,
+        "quest_completions": quest_completion_items,
+        "total_quest_points": total_quest_points,
         "study_rooms": study_rooms,
     }
 

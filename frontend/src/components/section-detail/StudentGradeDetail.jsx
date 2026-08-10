@@ -1,6 +1,9 @@
 import { useSectionGradeDetail } from '../../queries'
 import { formatPercent } from '../../utils/format'
 import GradeSummary from './GradeSummary'
+import '../../pages/Quests.css'
+
+const QUEST_CATEGORY_LABELS = { academic: 'Academic', social: 'Non-academic' }
 
 function dueDateClass(assignment) {
   const due = new Date(assignment.due_date)
@@ -20,6 +23,36 @@ function StudentGradeDetail({ sectionId, student, onBack }) {
       </button>
       <div className="widget-label">{student.username}'s grade</div>
       <GradeSummary sectionId={sectionId} studentId={student.user_id} />
+
+      <div className="widget-label widget-label-spaced">quests completed</div>
+      {failed && <p className="teacher-panel-placeholder">Could not load quests.</p>}
+      {!failed && !data && <p className="teacher-panel-placeholder">Loading…</p>}
+      {data && (
+        <>
+          <div className="section-detail-grade-summary">
+            <span className="section-detail-grade-percentage">{data.quest_completions.length}</span>
+            <span className="section-detail-grade-letter">{data.total_quest_points} pts from quests</span>
+          </div>
+          {data.quest_completions.length === 0 ? (
+            <p className="teacher-panel-placeholder">No quests completed yet.</p>
+          ) : (
+            <div className="teacher-panel-list">
+              {data.quest_completions.map((q) => (
+                <div className="teacher-panel-row" key={q.quest_completion_id}>
+                  <span>{q.title}</span>
+                  <span className="teacher-panel-row-sub">
+                    <span className={`quest-card-category quest-card-category-${q.category}`}>
+                      {QUEST_CATEGORY_LABELS[q.category] || q.category}
+                    </span>
+                    {' · '}
+                    {q.points_awarded} pts · {new Date(q.completed_at).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       <div className="widget-label widget-label-spaced">assignments</div>
       {failed && <p className="teacher-panel-placeholder">Could not load assignments.</p>}
