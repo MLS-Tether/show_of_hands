@@ -24,14 +24,16 @@ function StudentGradeDetail({ sectionId, student, onBack }) {
       <div className="widget-label">{student.username}'s grade</div>
       <GradeSummary sectionId={sectionId} studentId={student.user_id} />
 
-      <div className="widget-label widget-label-spaced">quests completed</div>
+      <div className="widget-label widget-label-spaced">
+        quests completed{data ? ` (${data.quest_completions.length})` : ''}
+      </div>
       {failed && <p className="teacher-panel-placeholder">Could not load quests.</p>}
       {!failed && !data && <p className="teacher-panel-placeholder">Loading…</p>}
       {data && (
         <>
           <div className="section-detail-grade-summary">
-            <span className="section-detail-grade-percentage">{data.quest_completions.length}</span>
-            <span className="section-detail-grade-letter">{data.total_quest_points} pts from quests</span>
+            <span className="section-detail-grade-percentage">{data.total_quest_points}</span>
+            <span className="section-detail-grade-letter">pts from quests</span>
           </div>
           {data.quest_completions.length === 0 ? (
             <p className="teacher-panel-placeholder">No quests completed yet.</p>
