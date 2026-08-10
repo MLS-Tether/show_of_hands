@@ -105,6 +105,15 @@ class AssignmentAnalytics(BaseModel):
     completion_rate: float
 
 
+class QuestAnalytics(BaseModel):
+    quest_id: int
+    title: str
+    category: str
+    point_value: int
+    completed_count: int
+    completion_rate: float
+
+
 class PointsDistribution(BaseModel):
     min: Optional[int]
     max: Optional[int]
@@ -147,6 +156,8 @@ class SectionAnalyticsResponse(BaseModel):
     assignment_count: int
     average_grade: Optional[float]
     assignments: List[AssignmentAnalytics]
+    quest_count: int
+    quests: List[QuestAnalytics]
     points_distribution: PointsDistribution
     students_needing_attention: List[StudentNeedingAttention]
     attention_page: int

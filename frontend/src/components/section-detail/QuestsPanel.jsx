@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
 import { keys, useQuestCompletions, useSectionQuests } from '../../queries'
 import { useDialog } from '../DialogContext'
+import Modal from '../Modal'
 import '../../styles/shared-ui.css'
 import '../../pages/Quests.css'
 
@@ -10,8 +11,68 @@ const CATEGORY_LABELS = { academic: 'Academic', social: 'Non-academic' }
 const QUEST_TYPE_LABELS = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' }
 const SOCIAL_MULTIPLIER = 1.5
 
-function QuestCompletionsList({ questId }) {
+function SubmissionDetailModal({ completion, questId, sectionId, onClose }) {
+  const { confirm } = useDialog()
+  const queryClient = useQueryClient()
+  const [reversing, setReversing] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleReverse() {
+    const ok = await confirm(
+      `Reverse ${completion.points_awarded} pts awarded to ${completion.username} for this quest? They'll be able to complete it again.`
+    )
+    if (!ok) return
+    setError('')
+    setReversing(true)
+    try {
+      await api.post(`/quests/completions/${completion.quest_completion_id}/reverse`)
+      queryClient.invalidateQueries({ queryKey: keys.questCompletions(questId) })
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[0] === 'section' && query.queryKey[1] === sectionId && query.queryKey[2] === 'analytics',
+      })
+      onClose()
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Could not reverse this completion.')
+      setReversing(false)
+    }
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <h2 className="submission-detail-username">{completion.username}</h2>
+      <div className="admin-detail-row">
+        <span className="admin-detail-label">Completed</span>
+        <span>{new Date(completion.completed_at).toLocaleString()}</span>
+      </div>
+      <div className="admin-detail-row">
+        <span className="admin-detail-label">Points awarded</span>
+        <span>{completion.points_awarded} pts</span>
+      </div>
+      {completion.description && (
+        <div className="admin-detail-row">
+          <span className="admin-detail-label">Description</span>
+          <span>{completion.description}</span>
+        </div>
+      )}
+      {completion.file_url && (
+        <a href={completion.file_url} target="_blank" rel="noreferrer" className="quest-completions-list-file">
+          View attachment
+        </a>
+      )}
+      {error && <p className="teacher-panel-error">{error}</p>}
+      <div className="teacher-panel-form-actions">
+        <button type="button" className="admin-btn-danger" disabled={reversing} onClick={handleReverse}>
+          {reversing ? 'Reversing…' : 'Reverse points'}
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+function QuestCompletionsList({ questId, sectionId }) {
   const { data: completions = null } = useQuestCompletions(questId)
+  const [selected, setSelected] = useState(null)
 
   if (completions === null) {
     return <p className="admin-empty-card">Loading completions…</p>
@@ -20,19 +81,35 @@ function QuestCompletionsList({ questId }) {
     return <p className="admin-empty-card">No students have completed this quest yet.</p>
   }
   return (
-    <ul className="quest-completions-list">
-      {completions.map((c) => (
-        <li key={c.quest_completion_id} className="quest-completions-list-item">
-          <span className="quest-completions-list-username">{c.username}</span>
-          {c.description && <p className="quest-completions-list-description">{c.description}</p>}
-          {c.file_url && (
-            <a href={c.file_url} target="_blank" rel="noreferrer" className="quest-completions-list-file">
-              View attachment
-            </a>
-          )}
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="quest-completions-list">
+        {completions.map((c) => (
+          <li key={c.quest_completion_id} className="quest-completions-list-item">
+            <button
+              type="button"
+              className="admin-btn-text quest-completions-list-username"
+              onClick={() => setSelected(c)}
+            >
+              {c.username}
+            </button>
+            {c.description && <p className="quest-completions-list-description">{c.description}</p>}
+            {c.file_url && (
+              <a href={c.file_url} target="_blank" rel="noreferrer" className="quest-completions-list-file">
+                View attachment
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+      {selected && (
+        <SubmissionDetailModal
+          completion={selected}
+          questId={questId}
+          sectionId={sectionId}
+          onClose={() => setSelected(null)}
+        />
+      )}
+    </>
   )
 }
 
@@ -220,7 +297,9 @@ function QuestsPanel({ sectionId }) {
                   {deletingId === q.quest_id ? 'Deleting…' : 'Delete'}
                 </button>
               </div>
-              {expandedId === q.quest_id && <QuestCompletionsList questId={q.quest_id} />}
+              {expandedId === q.quest_id && (
+                <QuestCompletionsList questId={q.quest_id} sectionId={sectionId} />
+              )}
             </div>
           ))}
         </div>

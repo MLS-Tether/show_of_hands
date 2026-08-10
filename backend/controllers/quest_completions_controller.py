@@ -138,6 +138,54 @@ async def complete_quest(
     return completion
 
 
+@router.post("/completions/{quest_completion_id}/reverse", status_code=204)
+def reverse_quest_completion(
+    quest_completion_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role not in (RoleEnum.teacher, RoleEnum.admin):
+        raise HTTPException(status_code=403, detail="Unauthorized.")
+
+    completion = db.query(QuestCompletion).filter(
+        QuestCompletion.quest_completion_id == quest_completion_id,
+    ).first()
+    if not completion:
+        raise HTTPException(status_code=404, detail="Completion not found.")
+
+    quest = db.query(Quest).filter(Quest.quest_id == completion.quest_id).first()
+    if not quest:
+        raise HTTPException(status_code=404, detail="Quest not found.")
+
+    section = _check_teacher_owns_quest_section(quest, current_user, db)
+
+    student = db.query(User).filter(User.user_id == completion.student_id).first()
+
+    original_txn = db.query(PointTransaction).filter(
+        PointTransaction.user_id == completion.student_id,
+        PointTransaction.source == TransactionSourceEnum.quest,
+        PointTransaction.source_id == completion.quest_id,
+    ).first()
+    if original_txn:
+        student.total_points -= original_txn.amount
+        db.delete(original_txn)
+        db.flush()
+
+    db.delete(completion)
+
+    emit_data_event(
+        db, "quests", "updated", section.school_id,
+        resolve_section_audience(db, section),
+        section_id=section.section_id, ids={"quest_id": quest.quest_id},
+    )
+    emit_data_event(
+        db, "points", "updated", section.school_id,
+        resolve_admin_audience(db, section.school_id, [completion.student_id]),
+        ids={"user_id": completion.student_id},
+    )
+    db.commit()
+
+
 @router.get("/{quest_id}/completions", response_model=List[QuestCompletionListResponse])
 def list_quest_completions(
     quest_id: int,

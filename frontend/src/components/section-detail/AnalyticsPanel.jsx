@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useSectionAnalytics } from '../../queries'
 import { formatPercent } from '../../utils/format'
 
+const QUEST_CATEGORY_LABELS = { academic: 'Academic', social: 'Non-academic' }
+
 function AnalyticsPanel({ sectionId }) {
   const [attentionPage, setAttentionPage] = useState(1)
   const [roomsPage, setRoomsPage] = useState(1)
@@ -16,8 +18,10 @@ function AnalyticsPanel({ sectionId }) {
   }
 
   const {
+    enrolled_count,
     average_grade,
     assignments,
+    quests,
     points_distribution,
     students_needing_attention,
     attention_total_pages,
@@ -51,6 +55,26 @@ function AnalyticsPanel({ sectionId }) {
               <span className="teacher-panel-row-sub">
                 {a.graded_count}/{a.submitted_count} graded · {formatPercent(a.completion_rate * 100, 0)} submitted
                 {a.average_grade != null ? ` · avg ${formatPercent(a.average_grade)}` : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="widget-label widget-label-spaced">
+        per-quest completion
+      </div>
+      {quests.length === 0 ? (
+        <p className="teacher-panel-placeholder">No quests yet.</p>
+      ) : (
+        <div className="teacher-panel-list">
+          {quests.map((q) => (
+            <div className="teacher-panel-row" key={q.quest_id}>
+              <span>
+                {q.title} <span className="teacher-panel-row-sub">({QUEST_CATEGORY_LABELS[q.category] || q.category})</span>
+              </span>
+              <span className="teacher-panel-row-sub">
+                {q.completed_count}/{enrolled_count} completed · {formatPercent(q.completion_rate * 100, 0)}
               </span>
             </div>
           ))}

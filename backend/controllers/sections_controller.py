@@ -13,6 +13,8 @@ from grading import compute_section_grade_for_student
 from models.assignment_model import Assignment
 from models.enrollment_model import Enrollment
 from models.help_request_model import HelpRequest
+from models.quest_completion_model import QuestCompletion
+from models.quest_model import Quest
 from models.section_model import Section, SectionStatusEnum
 from models.study_room_model import StudyRoom, RoomMember
 from models.submission_model import Submission, SubmissionStatusEnum
@@ -282,6 +284,31 @@ def get_section_analytics(
                         "assignment_title": assignment.title,
                     })
 
+    quests = db.query(Quest).filter(
+        Quest.section_id == section_id,
+        Quest.is_archived == False,
+    ).all()
+    quest_completion_counts = dict(
+        db.query(QuestCompletion.quest_id, func.count(QuestCompletion.quest_completion_id))
+        .filter(
+            QuestCompletion.quest_id.in_([q.quest_id for q in quests]),
+            QuestCompletion.student_id.in_(approved_student_ids),
+        )
+        .group_by(QuestCompletion.quest_id)
+        .all()
+    ) if quests else {}
+    quest_analytics = [
+        {
+            "quest_id": q.quest_id,
+            "title": q.title,
+            "category": q.category.value,
+            "point_value": q.point_value,
+            "completed_count": quest_completion_counts.get(q.quest_id, 0),
+            "completion_rate": (quest_completion_counts.get(q.quest_id, 0) / enrolled_count) if enrolled_count else 0.0,
+        }
+        for q in quests
+    ]
+
     all_flagged_students = sorted(attention_by_student.values(), key=lambda s: s["username"])
     attention_total_students = len(all_flagged_students)
     attention_total_pages = max(1, (attention_total_students + attention_page_size - 1) // attention_page_size)
@@ -344,6 +371,8 @@ def get_section_analytics(
         "assignment_count": len(assignments),
         "average_grade": statistics.mean(student_percentages) if student_percentages else None,
         "assignments": assignment_analytics,
+        "quest_count": len(quests),
+        "quests": quest_analytics,
         "points_distribution": points_distribution,
         "students_needing_attention": students_needing_attention,
         "attention_page": attention_page,

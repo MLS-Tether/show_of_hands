@@ -19,7 +19,7 @@ export function getTutorialSteps(role) {
         target: 'nav-quests',
         place: 'right',
         title: 'Assign quests',
-        body: 'Build academic or social quests, set point values, and target the whole class or a single student who needs a nudge.',
+        body: "Build academic or social quests, set point values, and target the whole class or a single student who needs a nudge. Quests are self-reported by students — there's no grading step. You can optionally check what a student submitted and reverse a completion's points if it doesn't hold up.",
       },
       {
         badge: 'Step 3',

@@ -3,10 +3,31 @@ from db.pool import SessionLocal
 from models.assignment_model import Assignment
 from models.enrollment_model import Enrollment, EnrollmentRequest
 from models.help_request_model import HelpRequest, HelpRequestAcceptance
+from models.quest_model import Quest
+from models.quest_completion_model import QuestCompletion
 from models.study_room_model import StudyRoom, RoomMember
 from models.submission_model import Submission
 from models.user_model import User
 from tests.conftest import unique, auth_header
+
+
+def _new_quest(client, world, cleanup, point_value=15, category="academic"):
+    resp = client.post(
+        f"/api/sections/{world.section_id}/quests",
+        json={
+            "title": unique("Quest"),
+            "description": "d",
+            "category": category,
+            "point_value": point_value,
+            "quest_type": "daily",
+            "assigned_to": "all",
+        },
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    cleanup(Quest, body["quest_id"])
+    return body["quest_id"], body["point_value"]
 
 
 def _enroll_new_student(client, world, cleanup):
@@ -282,6 +303,53 @@ def test_analytics_shows_study_room_activity(client, world, cleanup):
     assert member_usernames == {world.student_username, classmate_username}
     assert body["study_rooms_page"] == 1
     assert body["study_rooms_total_rooms"] >= 1
+
+
+def test_analytics_includes_quest_completion_stats(client, world, cleanup):
+    completed_quest, completed_quest_points = _new_quest(client, world, cleanup, point_value=15, category="social")
+    uncompleted_quest, _uncompleted_quest_points = _new_quest(client, world, cleanup, point_value=20, category="academic")
+
+    resp = client.post(
+        f"/api/quests/{completed_quest}/complete",
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 201, resp.text
+    cleanup(QuestCompletion, resp.json()["quest_completion_id"])
+
+    resp = client.get(f"/api/sections/{world.section_id}/analytics", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+
+    assert body["quest_count"] >= 2
+    by_id = {q["quest_id"]: q for q in body["quests"]}
+    assert by_id[completed_quest]["category"] == "social"
+    assert by_id[completed_quest]["point_value"] == completed_quest_points
+    assert by_id[completed_quest]["completed_count"] == 1
+    assert by_id[completed_quest]["completion_rate"] == 1.0 / body["enrolled_count"]
+    assert by_id[uncompleted_quest]["completed_count"] == 0
+    assert by_id[uncompleted_quest]["completion_rate"] == 0.0
+
+
+def test_analytics_quest_stats_ignore_dropped_student(client, world, cleanup):
+    classmate_id, _classmate_username, classmate_token = _enroll_new_student(client, world, cleanup)
+
+    quest_id, _quest_points = _new_quest(client, world, cleanup, point_value=10)
+    resp = client.post(f"/api/quests/{quest_id}/complete", headers=auth_header(classmate_token))
+    assert resp.status_code == 201, resp.text
+    cleanup(QuestCompletion, resp.json()["quest_completion_id"])
+
+    resp = client.delete(
+        f"/api/sections/{world.section_id}/students/{classmate_id}",
+        headers=auth_header(world.admin_token),
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = client.get(f"/api/sections/{world.section_id}/analytics", headers=auth_header(world.teacher_token))
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+
+    by_id = {q["quest_id"]: q for q in body["quests"]}
+    assert by_id[quest_id]["completed_count"] == 0
 
 
 def test_analytics_study_rooms_paginated(client, world, cleanup):

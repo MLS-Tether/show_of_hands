@@ -8,6 +8,7 @@ import quest_submission_utils as qsu
 from models.enrollment_model import Enrollment, EnrollmentRequest
 from models.quest_model import Quest
 from models.quest_completion_model import QuestCompletion
+from models.point_transaction_model import PointTransaction, TransactionSourceEnum
 from models.user_model import User
 from tests.conftest import unique, auth_header
 
@@ -246,3 +247,107 @@ def test_list_quest_completions_requires_teacher_role(client, world, cleanup):
 
     resp = client.get(f"/api/quests/{quest_id}/completions", headers=auth_header(world.student_token))
     assert resp.status_code == 403
+
+
+def test_reverse_quest_completion_deletes_and_refunds_points(client, world, db, cleanup):
+    quest_id = _new_quest(client, world, cleanup, point_value=20)
+
+    student = db.query(User).filter(User.user_id == world.student_id).first()
+    baseline_points = student.total_points
+
+    resp = client.post(f"/api/quests/{quest_id}/complete", headers=auth_header(world.student_token))
+    assert resp.status_code == 201, resp.text
+    completion_id = resp.json()["quest_completion_id"]
+
+    resp = client.post(
+        f"/api/quests/completions/{completion_id}/reverse",
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 204, resp.text
+
+    db.expire_all()
+    student = db.query(User).filter(User.user_id == world.student_id).first()
+    assert student.total_points == baseline_points
+
+    assert db.query(QuestCompletion).filter(QuestCompletion.quest_completion_id == completion_id).first() is None
+    assert db.query(PointTransaction).filter(
+        PointTransaction.source == TransactionSourceEnum.quest,
+        PointTransaction.source_id == quest_id,
+    ).first() is None
+
+
+def test_reverse_quest_completion_allows_recompletion(client, world, cleanup):
+    quest_id = _new_quest(client, world, cleanup, point_value=10)
+
+    resp = client.post(f"/api/quests/{quest_id}/complete", headers=auth_header(world.student_token))
+    assert resp.status_code == 201, resp.text
+    completion_id = resp.json()["quest_completion_id"]
+
+    resp = client.post(
+        f"/api/quests/completions/{completion_id}/reverse",
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 204, resp.text
+
+    resp = client.post(f"/api/quests/{quest_id}/complete", headers=auth_header(world.student_token))
+    assert resp.status_code == 201, resp.text
+    cleanup(QuestCompletion, resp.json()["quest_completion_id"])
+
+
+def test_reverse_quest_completion_forbidden_for_student(client, world, cleanup):
+    quest_id = _new_quest(client, world, cleanup)
+
+    resp = client.post(f"/api/quests/{quest_id}/complete", headers=auth_header(world.student_token))
+    assert resp.status_code == 201, resp.text
+    completion_id = resp.json()["quest_completion_id"]
+    cleanup(QuestCompletion, completion_id)
+
+    resp = client.post(
+        f"/api/quests/completions/{completion_id}/reverse",
+        headers=auth_header(world.student_token),
+    )
+    assert resp.status_code == 403
+
+
+def test_reverse_quest_completion_forbidden_for_non_owning_teacher(client, world, cleanup):
+    other_teacher_username = unique("teacher2")
+    resp = client.post("/api/auth/register", json={
+        "username": other_teacher_username,
+        "password": "password123",
+        "full_name": "Other Teacher",
+        "school_code": world.school_code,
+        "role": "teacher",
+    })
+    assert resp.status_code == 201, resp.text
+    other_teacher_id = resp.json()["user_id"]
+    cleanup(User, other_teacher_id)
+
+    resp = client.patch(f"/api/users/{other_teacher_id}/verify", headers=auth_header(world.admin_token))
+    assert resp.status_code == 200, resp.text
+
+    resp = client.post("/api/auth/login", json={
+        "username": other_teacher_username,
+        "password": "password123",
+    })
+    assert resp.status_code == 200, resp.text
+    other_teacher_token = resp.json()["access_token"]
+
+    quest_id = _new_quest(client, world, cleanup)
+    resp = client.post(f"/api/quests/{quest_id}/complete", headers=auth_header(world.student_token))
+    assert resp.status_code == 201, resp.text
+    completion_id = resp.json()["quest_completion_id"]
+    cleanup(QuestCompletion, completion_id)
+
+    resp = client.post(
+        f"/api/quests/completions/{completion_id}/reverse",
+        headers=auth_header(other_teacher_token),
+    )
+    assert resp.status_code == 403
+
+
+def test_reverse_quest_completion_not_found(client, world):
+    resp = client.post(
+        "/api/quests/completions/999999999/reverse",
+        headers=auth_header(world.teacher_token),
+    )
+    assert resp.status_code == 404
