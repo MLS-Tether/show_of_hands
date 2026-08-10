@@ -112,9 +112,10 @@ function TeacherSectionDetail() {
   const notifCounts = useNotificationCountsByEntity()
 
   const pendingRequests = enrollmentRequests?.length ?? 0
-  const ungraded = analytics
-    ? analytics.assignments.reduce((sum, a) => sum + (a.submitted_count - a.graded_count), 0)
-    : 0
+  const ungradedByAssignment = analytics
+    ? Object.fromEntries(analytics.assignments.map((a) => [a.assignment_id, a.submitted_count - a.graded_count]))
+    : {}
+  const ungraded = Object.values(ungradedByAssignment).reduce((sum, n) => sum + n, 0)
   // grade_finalization_reminder is the only notification type scoped to a
   // section that targets the section's own teacher — surface it on the
   // "Assignments" tile, since that's what the reminder is actually about.
@@ -215,7 +216,11 @@ function TeacherSectionDetail() {
             ))}
           {activeCard === 'enrollment-requests' && <EnrollmentRequestsPanel sectionId={sectionId} />}
           {activeCard === 'assignments' && (
-            <AssignmentsPanel sectionId={sectionId} assignments={section.assignments} />
+            <AssignmentsPanel
+              sectionId={sectionId}
+              assignments={section.assignments}
+              ungradedByAssignment={ungradedByAssignment}
+            />
           )}
           {activeCard === 'quests' && <QuestsPanel sectionId={sectionId} />}
           {activeCard === 'help-requests' && <HelpRequestsPanel sectionId={sectionId} />}

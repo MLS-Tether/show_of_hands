@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../../api'
 import { keys } from '../../queries'
+import NotificationCountBadge from '../NotificationCountBadge'
 import AssignmentFitResult from './AssignmentFitResult'
 
-function AssignmentsPanel({ sectionId, assignments }) {
+function AssignmentsPanel({ sectionId, assignments, ungradedByAssignment = {} }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
@@ -175,7 +176,13 @@ function AssignmentsPanel({ sectionId, assignments }) {
               key={a.assignment_id}
               onClick={() => navigate(`/assignments/${a.assignment_id}`)}
             >
-              <span>{a.title}</span>
+              <span>
+                {a.title}
+                <NotificationCountBadge
+                  count={ungradedByAssignment[a.assignment_id]}
+                  className="notification-count-badge-inline"
+                />
+              </span>
               <span className="teacher-panel-row-sub">
                 Due {new Date(a.due_date).toLocaleDateString()}
               </span>
