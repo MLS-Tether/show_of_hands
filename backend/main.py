@@ -16,6 +16,7 @@ from db.seed import (
     seed_dev_data,
     seed_second_teacher_data,
     seed_more_cs_students,
+    seed_teamwork_data,
     seed_shop_items,
     seed_badge_rules,
 )
@@ -199,6 +200,7 @@ async def lifespan(app: FastAPI):
     seed_dev_data()
     seed_second_teacher_data()
     seed_more_cs_students()
+    seed_teamwork_data()
     scheduler.add_job(check_pending_grades, "interval", days=1)
     scheduler.add_job(check_overdue_assignments, "interval", days=1)
     scheduler.add_job(check_expired_rooms, "interval", minutes=5)

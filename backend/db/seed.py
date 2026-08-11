@@ -614,6 +614,180 @@ def seed_more_cs_students(count: int = 15):
         db.close()
 
 
+TEAMWORK_QUEST_SPECS = [
+    (
+        "Library Study Squad",
+        "Meet up with a group of classmates at the library this week to review notes together.",
+        QuestTypeEnum.weekly,
+        15,
+    ),
+    (
+        "Study Room Session",
+        "Book a study room and work through practice problems with a partner.",
+        QuestTypeEnum.daily,
+        10,
+    ),
+    (
+        "Group Project Kickoff",
+        "Meet with your project group to divide up this week's tasks.",
+        QuestTypeEnum.weekly,
+        15,
+    ),
+    (
+        "Peer Tutoring Circle",
+        "Join a peer tutoring session and both give and receive help on a topic.",
+        QuestTypeEnum.weekly,
+        20,
+    ),
+    (
+        "Whiteboard Workshop",
+        "Gather a group and solve a problem together on a whiteboard.",
+        QuestTypeEnum.daily,
+        10,
+    ),
+    (
+        "Lunch & Learn",
+        "Organize a lunchtime study group to go over upcoming test material.",
+        QuestTypeEnum.weekly,
+        15,
+    ),
+    (
+        "Code Review Buddies",
+        "Pair up with a classmate to review each other's code before submitting.",
+        QuestTypeEnum.weekly,
+        15,
+    ),
+    (
+        "Flashcard Exchange",
+        "Trade self-made flashcards with a group and quiz each other.",
+        QuestTypeEnum.daily,
+        10,
+    ),
+    (
+        "Study Room Marathon",
+        "Reserve a study room for an extended group session before a big test.",
+        QuestTypeEnum.monthly,
+        20,
+    ),
+    (
+        "Team Debrief",
+        "Meet with your group after a quest or assignment to discuss what you learned.",
+        QuestTypeEnum.weekly,
+        15,
+    ),
+]
+
+
+def seed_teamwork_data():
+    """Adds Maya Chen -- a Computer Science student with a perfect submission
+    record across section_a's existing assignments -- plus 10 social-category
+    quests themed around students working together (library groups, study
+    rooms, group projects, etc.) on that same section.
+
+    Guarded on Maya's username already existing, so reruns (e.g. app
+    restarts) don't duplicate her or the quest set.
+    """
+    if os.getenv("ENV") != "development":
+        return
+
+    db = SessionLocal()
+    try:
+        school = db.query(School).filter(School.school_code == DEV_SCHOOL_CODE).first()
+        if not school:
+            return  # seed_dev_data() hasn't run yet -- nothing to attach to
+
+        if db.query(User).filter(
+            User.school_id == school.school_id,
+            User.username == "maya_chen",
+        ).first():
+            return
+
+        cs_class = db.query(Class_).filter(Class_.name == "Computer Science").first()
+        section = db.query(Section).filter(
+            Section.school_id == school.school_id,
+            Section.class_id == cs_class.class_id,
+        ).first()
+        if not cs_class or not section:
+            raise RuntimeError("seed_teamwork_data requires seed_dev_data() to have run first")
+
+        assignments = {
+            a.title: a
+            for a in db.query(Assignment).filter(Assignment.section_id == section.section_id).all()
+        }
+        loops_quiz = assignments["Intro to Loops Quiz"]
+        binary_search_lab = assignments["Binary Search Lab"]
+        recursion_set = assignments["Recursion Practice Set"]
+
+        now = datetime.now(timezone.utc)
+        password_hash = hash_password(DEV_PASSWORD)
+
+        maya = User(
+            school_id=school.school_id,
+            username="maya_chen",
+            full_name="Maya Chen",
+            password_hash=password_hash,
+            role=RoleEnum.student,
+            is_verified=True,
+        )
+        db.add(maya)
+        db.flush()
+
+        db.add(Enrollment(section_id=section.section_id, student_id=maya.user_id))
+
+        def seed_graded_submission(assignment, student, grade, submitted_days_ago, finalized_days_ago):
+            """Matches the real finalize flow (submissions_controller.py):
+            a single PointTransaction per (student, assignment) holding the
+            final grade-tier-bonus total -- uq_point_transaction_user_source
+            allows only one row per (user_id, source, source_id)."""
+            submitted_at = now - timedelta(days=submitted_days_ago)
+            finalized_at = now - timedelta(days=finalized_days_ago)
+            initial_points = int(assignment.point_value * 0.25)
+            bonus_points = (
+                int(assignment.point_value * 0.75) if grade >= 85
+                else int(assignment.point_value * 0.50) if grade >= 70
+                else 0
+            )
+            total_points = initial_points + bonus_points
+            db.add(Submission(
+                assignment_id=assignment.assignment_id,
+                student_id=student.user_id,
+                content="Submitted via demo seed data.",
+                status=SubmissionStatusEnum.graded,
+                grade=grade,
+                points_awarded=total_points,
+                finalized_at=finalized_at,
+                created_at=submitted_at,
+                updated_at=finalized_at,
+            ))
+            db.add(PointTransaction(
+                user_id=student.user_id,
+                amount=total_points,
+                source=TransactionSourceEnum.assignment,
+                source_id=assignment.assignment_id,
+                awarded_at=finalized_at,
+            ))
+            student.total_points += total_points
+
+        seed_graded_submission(loops_quiz, maya, 98, 6, 4)
+        seed_graded_submission(binary_search_lab, maya, 96, 5, 3)
+        seed_graded_submission(recursion_set, maya, 94, 2, 1)
+
+        for title, description, quest_type, point_value in TEAMWORK_QUEST_SPECS:
+            db.add(Quest(
+                section_id=section.section_id,
+                title=title,
+                description=description,
+                category=QuestCategoryEnum.social,
+                point_value=point_value,
+                quest_type=quest_type,
+                source=QuestSourceEnum.teacher,
+            ))
+
+        db.commit()
+    finally:
+        db.close()
+
+
 def seed_second_teacher_data():
     """Adds a second teacher (teacher_demo2) with 3 sections of her own, each
     with 3 assignments, 3 quests, and a random subset of the existing seeded
