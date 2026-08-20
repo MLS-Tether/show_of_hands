@@ -59,6 +59,43 @@ Examples:
 
 * **pytest + pytest-asyncio** — backend test suite (30+ files covering nearly every controller). The frontend has no test framework configured yet (no Jest/Vitest/Playwright/Testing Library).
 
+## Getting Started
+
+**Prerequisites:** Python 3.9+, Node 18+, and a Supabase Postgres project (or any Postgres instance).
+
+### Backend
+
+```bash
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # fill in DATABASE_URL, JWT_SECRET, SUPABASE_URL/KEY;
+                        # GEMINI_API_KEY and DAILY_API_KEY are optional —
+                        # those features degrade gracefully without them
+alembic upgrade head    # run DB migrations
+uvicorn main:app --reload
+```
+
+Setting `ENV=development` in `.env` also auto-seeds a demo school, roster, and quest set on startup (`db/seed.py`) — handy for local frontend development without creating data by hand.
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+cp .env.example .env   # VITE_API_BASE_URL, defaults to http://127.0.0.1:8000/api
+npm run dev
+```
+
+### Running Tests
+
+```bash
+cd backend
+pytest
+```
+
+See [Hosting & Deployment](#hosting--deployment) above for how the backend/frontend are actually deployed (Render/Vercel).
+
 ## User Personas/Audience
 
 **The Problem**  
@@ -513,9 +550,10 @@ This section is intentionally condensed to method/path/role/description rather t
 | GET | `/sections` | student, teacher, admin | Lists sections in the caller's school. `?scope=mine` (default) filters to the student's enrolled sections; `?scope=all` returns every section, optionally filtered by `?class_id=`. |
 | POST | `/sections` | teacher | Creates a section owned by the calling teacher. |
 | GET | `/sections/{id}` | any (enrolled student / owning teacher / admin) | Full section detail: roster, assignments, quests. |
-| GET | `/sections/{id}/analytics` | teacher, admin | Paginated grade/points/attention analytics for the section. |
+| GET | `/sections/{id}/analytics` | teacher, admin | Paginated grade/points/attention analytics for the section, plus per-quest completion analytics (`quest_count`, `quests[]` with `completed_count`/`completion_rate`) and paginated study-room activity (`study_rooms[]`, via `?rooms_page=`/`?rooms_page_size=`). `average_grade` is the mean of each enrolled student's official weighted grade, not a flat mean of raw submission grades. |
 | GET | `/sections/{id}/grades/me` | student | The calling student's own computed grade for the section. |
 | GET | `/sections/{id}/grades/{student_id}` | teacher, admin | A specific enrolled student's computed grade. |
+| GET | `/sections/{id}/grades/{student_id}/detail` | teacher, admin | Full student detail for the section: computed grade, every assignment's status/grade, quest completions (with total quest points), and the student's study room history. |
 | PATCH | `/sections/{id}` | teacher (own section, period/capacity only), admin (+status, +teacher reassignment) | Updates section fields; a teacher's `status`/`teacher_id` fields, if sent, are silently ignored. |
 | DELETE | `/sections/{id}` | admin | Soft-deletes (archives) the section. |
 
@@ -559,6 +597,7 @@ This section is intentionally condensed to method/path/role/description rather t
 | DELETE | `/quests/{id}` | teacher (owner) | Soft-deletes a teacher-created quest (system-generated quests can't be deleted this way). |
 | POST | `/quests/{id}/complete` | student | Marks the quest complete — multipart form, optional description + file upload (JPEG/PDF); awards points; evaluates badges; one completion per student per quest. |
 | GET | `/quests/{id}/completions` | teacher (owner), admin | Lists all completions for a quest. |
+| POST | `/quests/completions/{quest_completion_id}/reverse` | teacher (owner), admin | Reverses a quest completion: deletes it and its point transaction, decrementing the student's `total_points`. |
 
 ### Help Requests / Bulletin Board (`/api/help-requests`, `/api/sections/{id}/help-requests`)
 
