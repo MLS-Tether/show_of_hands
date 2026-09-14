@@ -2,7 +2,9 @@
 
 ## Project Description: Show of Hands ✋
 
-Show of Hands aims to bridge the gap between learning and school communities. Its primary goal is to make learning fun while also rewarding students for engaging with others and building lasting relationships with each other. With the social aspects, students will get rewarded for not only helping other students that might be falling behind, but even students who need help will get rewarded for going to their fellow classmates for help instead of the internet or AI. With the learning aspects, teachers will be able to see exactly where most students are experiencing difficulties, and can update the curriculum or add **personalized quests** for students to practice more on topics that might be difficult to grasp.
+During the COVID-19 pandemic, being stuck inside unable to interact with others and struggling to be engaged with the material you were essentially being bombarded with, were common experiences of students. Teachers were overworked, unable to rely on visual cues to tell if students were struggling, and couldn't provide individualized assistance to students. We built Show of Hands to address these issues.
+
+Show of Hands is a collaborative learning platform built for New York City schools that turns peer help into a core, rewarded part of learning. Students post help requests to a bulletin board instead of turning to the internet or AI, work through problems together in live study rooms, and earn points for it. Points are also earned through teacher-assigned or system-generated quests, giving teachers a way to target extra practice without overworking them or singling students out. As submissions and quest data roll in, teachers get visibility into where comprehension is lacking through an AI analysis of the class data. They can send students recommended resources or launch a targeted quest in response.
 
 ## What is a Quest?
 
